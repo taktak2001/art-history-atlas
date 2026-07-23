@@ -46,10 +46,10 @@ jobs:
       - name: 静的エクスポートのビルド
         run: npm run build
 
-      - name: Pages の設定（未設定なら自動で有効化）
+      # 事前に Settings → Pages → Source を「GitHub Actions」に設定しておくこと
+      # （Pages サイトの作成は GITHUB_TOKEN の権限では行えないため、初回のみ手動）。
+      - name: Pages の設定
         uses: actions/configure-pages@v5
-        with:
-          enablement: true
 
       - name: 成果物（out/）のアップロード
         uses: actions/upload-pages-artifact@v3
