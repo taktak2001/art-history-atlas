@@ -12,10 +12,14 @@ export function ServiceWorkerRegister() {
     if (process.env.NODE_ENV !== 'production') return;
     if (typeof navigator === 'undefined' || !('serviceWorker' in navigator)) return;
 
+    // GitHub Pages のサブパス配下では basePath を付けて登録・スコープ設定する
+    const base = process.env.NEXT_PUBLIC_BASE_PATH ?? '';
     const onLoad = () => {
-      navigator.serviceWorker.register('/sw.js').catch(() => {
-        /* 登録失敗は致命的ではない（オフライン機能が無効になるのみ） */
-      });
+      navigator.serviceWorker
+        .register(`${base}/sw.js`, { scope: `${base}/` })
+        .catch(() => {
+          /* 登録失敗は致命的ではない（オフライン機能が無効になるのみ） */
+        });
     };
     window.addEventListener('load', onLoad);
     return () => window.removeEventListener('load', onLoad);

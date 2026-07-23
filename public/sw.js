@@ -7,6 +7,9 @@
  *  - ナビゲーション: network-first → キャッシュ → offline.html。
  *  - 静的アセット(_next/static, icons, fonts): stale-while-revalidate。
  *  - 閲覧したページはランタイムキャッシュに保存するが、上限件数で古いものを削除し端末容量を圧迫しない。
+ *
+ * GitHub Pages のサブパス配下（/art-history-atlas）でも動くよう、
+ * 自身の登録スコープから BASE を導出する（ルート配信・サブパス配信の双方に対応）。
  */
 const VERSION = 'v1';
 const SHELL_CACHE = `aha-shell-${VERSION}`;
@@ -14,11 +17,21 @@ const PAGES_CACHE = `aha-pages-${VERSION}`;
 const ASSETS_CACHE = `aha-assets-${VERSION}`;
 const PAGES_LIMIT = 40; // 閲覧ページのキャッシュ上限
 
-const SHELL_ASSETS = ['/offline.html', '/manifest.webmanifest', '/icons/icon-192.png'];
+// 登録スコープから配信ベースパスを求める（例: "/art-history-atlas" または ""）。
+const BASE = new URL(self.registration.scope).pathname.replace(/\/$/, '');
+
+const SHELL_ASSETS = [
+  `${BASE}/offline.html`,
+  `${BASE}/manifest.webmanifest`,
+  `${BASE}/icons/icon-192.png`,
+];
 
 self.addEventListener('install', (event) => {
   event.waitUntil(
-    caches.open(SHELL_CACHE).then((cache) => cache.addAll(SHELL_ASSETS)).then(() => self.skipWaiting()),
+    caches
+      .open(SHELL_CACHE)
+      .then((cache) => cache.addAll(SHELL_ASSETS))
+      .then(() => self.skipWaiting()),
   );
 });
 
@@ -67,7 +80,7 @@ self.addEventListener('fetch', (event) => {
         })
         .catch(async () => {
           const cached = await caches.match(request);
-          return cached || caches.match('/offline.html');
+          return cached || caches.match(`${BASE}/offline.html`);
         }),
     );
     return;
@@ -75,8 +88,8 @@ self.addEventListener('fetch', (event) => {
 
   // 静的アセット: stale-while-revalidate
   if (
-    url.pathname.startsWith('/_next/static/') ||
-    url.pathname.startsWith('/icons/') ||
+    url.pathname.startsWith(`${BASE}/_next/static/`) ||
+    url.pathname.startsWith(`${BASE}/icons/`) ||
     /\.(?:css|js|woff2?|png|svg|webmanifest)$/.test(url.pathname)
   ) {
     event.respondWith(

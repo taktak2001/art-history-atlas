@@ -4,17 +4,17 @@
   "description": "先史から現代までの美術の思想・様式・運動・流派を、時系列・地域・相互影響から学ぶ学習ツール。",
   "lang": "ja",
   "dir": "ltr",
-  "start_url": "/",
-  "scope": "/",
+  "start_url": "/art-history-atlas/",
+  "scope": "/art-history-atlas/",
   "display": "standalone",
   "orientation": "any",
   "background_color": "#f6f4ef",
   "theme_color": "#161618",
   "categories": ["education", "reference", "art"],
   "icons": [
-    { "src": "/icons/icon-192.png", "sizes": "192x192", "type": "image/png", "purpose": "any" },
-    { "src": "/icons/icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any" },
-    { "src": "/icons/maskable-192.png", "sizes": "192x192", "type": "image/png", "purpose": "maskable" },
-    { "src": "/icons/maskable-512.png", "sizes": "512x512", "type": "image/png", "purpose": "maskable" }
+    { "src": "/art-history-atlas/icons/icon-192.png", "sizes": "192x192", "type": "image/png", "purpose": "any" },
+    { "src": "/art-history-atlas/icons/icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any" },
+    { "src": "/art-history-atlas/icons/maskable-192.png", "sizes": "192x192", "type": "image/png", "purpose": "maskable" },
+    { "src": "/art-history-atlas/icons/maskable-512.png", "sizes": "512x512", "type": "image/png", "purpose": "maskable" }
   ]
 }

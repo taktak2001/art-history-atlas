@@ -6,7 +6,9 @@
 
 > 美術史とは様式名を暗記するものではなく、社会・思想・技術・制度と視覚表現の相互作用を理解するもの。
 
-このアプリは、リポジトリ `taktak2001/taktak` の **`art-history-atlas/` サブディレクトリ**に独立した Next.js プロジェクトとして構築されています（同リポジトリの既存アプリ「Art Exhibition Watcher」とは別物です）。
+**公開URL（GitHub Pages）**： https://taktak2001.github.io/art-history-atlas/
+
+GitHub Actions（`.github/workflows/deploy-pages.yml`）が `main` への push で検証・ビルドし、`out/` を GitHub Pages へデプロイします。プロジェクトサイトのサブパス配信（`/art-history-atlas/`）に合わせ、production ビルドで `basePath` / `assetPrefix` を付与しています。
 
 ---
 
@@ -40,6 +42,7 @@
 ## ローカル起動
 
 ```bash
+git clone https://github.com/taktak2001/art-history-atlas.git
 cd art-history-atlas
 npm install
 npm run dev            # http://localhost:3000
@@ -92,12 +95,17 @@ npm run build     # 静的サイトを out/ に出力（output: 'export'）
 npx serve out     # ビルド結果をローカル配信
 ```
 
-## デプロイ（Vercel）
+## デプロイ（GitHub Pages）
 
-- Vercel プロジェクトの **Root Directory を `art-history-atlas`** に設定します。
-- Framework Preset は Next.js（自動検出）。Build Command `npm run build`、Output は静的エクスポート（`out`）。
-- `vercel.json` にトレイリングスラッシュ等の設定を同梱しています。
-- 詳細な接続手順はリポジトリ直下のコミットメッセージおよび本 README「既知の制約」を参照。
+本リポジトリ（`taktak2001/art-history-atlas`、デフォルトブランチ `main`）は GitHub Actions で GitHub Pages へ自動デプロイされます。
+
+1. リポジトリの **Settings → Pages → Build and deployment → Source を「GitHub Actions」** に設定する（初回のみ）。
+2. `main` に push すると `.github/workflows/deploy-pages.yml` が実行され、`npm ci → validate:data → typecheck → lint → test → build` の順に検証してから、`out/` を `actions/upload-pages-artifact` → `actions/deploy-pages` で公開する。
+3. 公開URL： https://taktak2001.github.io/art-history-atlas/
+
+**サブパス対応**：GitHub Pages のプロジェクトサイトは `/art-history-atlas/` 配下で配信されるため、production ビルドで `basePath` / `assetPrefix` を `/art-history-atlas` に設定している（`next.config.mjs`）。内部リンク・静的アセット・manifest・アイコン・Service Worker はいずれもこのサブパス配下で動作する。`public/.nojekyll` により `_next/` ディレクトリが Jekyll に無視されないようにしている。ローカル開発（`npm run dev`）ではルート配信のため basePath は付かない。
+
+> Vercel など他のホスティングを使う場合は、`basePath` を外して（`next.config.mjs` の `isProd` 分岐を無効化して）ルート配信すればよい。
 
 ## 既知の制約
 
