@@ -1,0 +1,138 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/*
+ * 美術史アトラス デザインシステム
+ * オフホワイト（紙）／チャコール（墨）／グレー（石）を基調。
+ * 彩色は時代・関係タイプの識別に限定して用いる。
+ * システムフォントを用いて日本語可読性と軽量性を両立（ビルド時ネットワーク不要）。
+ */
+:root {
+  /* 無彩色ベース（ライト） */
+  --c-paper: 246 244 239; /* オフホワイト（紙） */
+  --c-surface: 240 238 232;
+  --c-raised: 255 255 255;
+  --c-ink: 28 28 30; /* 墨 */
+  --c-muted: 92 92 96;
+  --c-faint: 107 106 104; /* WCAG AA: 白/紙背景で4.5:1以上を確保 */
+  --c-line: 214 210 200;
+  --c-accent: 122 60 42; /* 弁柄（アクセント：わずかに用いる） */
+
+  --font-serif: 'Hiragino Mincho ProN', 'YuMincho', 'Yu Mincho', 'Noto Serif JP',
+    'Georgia', serif;
+  --font-sans: 'Hiragino Kaku Gothic ProN', 'Hiragino Sans', 'Yu Gothic',
+    'Meiryo', 'Noto Sans JP', system-ui, -apple-system, 'Segoe UI', sans-serif;
+}
+
+:root[data-theme='dark'],
+html.dark {
+  --c-paper: 22 22 24; /* 墨に近い地 */
+  --c-surface: 30 30 33;
+  --c-raised: 38 38 42;
+  --c-ink: 234 231 224; /* 生成りの文字 */
+  --c-muted: 168 166 160;
+  --c-faint: 150 148 143; /* 暗背景で4.5:1以上 */
+  --c-line: 58 58 62;
+  --c-accent: 210 146 112; /* 暗背景で沈まないアクセント */
+}
+
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme='light']) {
+    --c-paper: 22 22 24;
+    --c-surface: 30 30 33;
+    --c-raised: 38 38 42;
+    --c-ink: 234 231 224;
+    --c-muted: 168 166 160;
+    --c-faint: 150 148 143;
+    --c-line: 58 58 62;
+    --c-accent: 210 146 112;
+  }
+}
+
+html {
+  background-color: rgb(var(--c-paper));
+  color: rgb(var(--c-ink));
+  -webkit-text-size-adjust: 100%;
+}
+
+body {
+  font-family: var(--font-sans);
+  line-height: 1.75;
+  font-feature-settings: 'palt';
+  /* モバイルの安全領域 */
+  padding-bottom: env(safe-area-inset-bottom);
+}
+
+h1, h2, h3, h4 {
+  font-family: var(--font-serif);
+  line-height: 1.4;
+  letter-spacing: 0.01em;
+}
+
+/* フォーカスの可視化（アクセシビリティ） */
+:focus-visible {
+  outline: 2px solid rgb(var(--c-accent));
+  outline-offset: 2px;
+  border-radius: 2px;
+}
+
+/* prefers-reduced-motion 対応 */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.001ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.001ms !important;
+    scroll-behavior: auto !important;
+  }
+}
+
+/* スクリーンリーダー専用テキスト */
+.sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
+}
+
+/* スキップリンク */
+.skip-link {
+  position: absolute;
+  left: -999px;
+  top: 0;
+  z-index: 100;
+  background: rgb(var(--c-ink));
+  color: rgb(var(--c-paper));
+  padding: 0.5rem 1rem;
+}
+.skip-link:focus {
+  left: 0.5rem;
+  top: 0.5rem;
+}
+
+/* 罫線・地色ユーティリティ（縦罫の展覧会図録的グリッド） */
+.hairline {
+  border-color: rgb(var(--c-line));
+}
+
+/* 横スクロール可能領域（タイムライン・マトリクス） */
+.scroll-x {
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+  scrollbar-width: thin;
+}
+
+/* 本文リンク */
+.prose-link {
+  color: rgb(var(--c-accent));
+  text-underline-offset: 0.2em;
+  text-decoration: underline;
+  text-decoration-thickness: 1px;
+}
