@@ -1,0 +1,16 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="512" height="512" viewBox="0 0 512 512">
+  <!-- 美術史アトラス アイコン：墨地に紙色の列柱／年表を想起させる縦罫 -->
+  <rect width="512" height="512" fill="#1c1c1e"/>
+  <rect x="40" y="40" width="432" height="432" fill="none" stroke="#4a463f" stroke-width="4"/>
+  <!-- 時代を示す高さの異なる縦バー（列柱＝建築的モチーフ） -->
+  <g fill="#f2efe8">
+    <rect x="120" y="150" width="26" height="240"/>
+    <rect x="170" y="110" width="26" height="280"/>
+    <rect x="220" y="200" width="26" height="190"/>
+    <rect x="270" y="130" width="26" height="260"/>
+    <rect x="320" y="230" width="26" height="160"/>
+    <rect x="370" y="170" width="26" height="220"/>
+  </g>
+  <!-- 基線（時間軸） -->
+  <rect x="96" y="398" width="320" height="6" fill="#c6825f"/>
+</svg>
