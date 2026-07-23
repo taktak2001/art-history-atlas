@@ -1,0 +1,7 @@
+{
+  "extends": ["next/core-web-vitals", "next/typescript"],
+  "rules": {
+    "@typescript-eslint/no-explicit-any": "warn"
+  },
+  "ignorePatterns": ["out/", ".next/", "tests/e2e/", "scripts/"]
+}

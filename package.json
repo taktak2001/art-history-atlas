@@ -1,0 +1,46 @@
+{
+  "name": "art-history-atlas",
+  "version": "0.1.0",
+  "private": true,
+  "description": "美術史アトラス — 先史から現代までの美術運動を時系列・地域・相互影響から学ぶPWA",
+  "scripts": {
+    "dev": "next dev",
+    "build": "next build",
+    "start": "next start",
+    "lint": "next lint",
+    "typecheck": "tsc --noEmit",
+    "validate:data": "tsx scripts/validate-data.ts",
+    "gen:icons": "node scripts/generate-icons.mjs",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "test:e2e": "playwright test",
+    "check": "npm run typecheck && npm run lint && npm run validate:data && npm run test"
+  },
+  "dependencies": {
+    "next": "15.1.6",
+    "react": "19.0.0",
+    "react-dom": "19.0.0",
+    "zod": "3.24.1"
+  },
+  "devDependencies": {
+    "@axe-core/playwright": "^4.12.1",
+    "@playwright/test": "1.49.1",
+    "@testing-library/jest-dom": "6.6.3",
+    "@testing-library/react": "16.1.0",
+    "@types/node": "22.10.5",
+    "@types/react": "19.0.7",
+    "@types/react-dom": "19.0.3",
+    "@vitejs/plugin-react": "4.3.4",
+    "autoprefixer": "10.4.20",
+    "axe-core": "^4.12.1",
+    "eslint": "9.18.0",
+    "eslint-config-next": "15.1.6",
+    "jsdom": "25.0.1",
+    "postcss": "8.5.1",
+    "sharp": "^0.35.3",
+    "tailwindcss": "3.4.17",
+    "tsx": "4.19.2",
+    "typescript": "5.7.3",
+    "vitest": "2.1.8"
+  }
+}
