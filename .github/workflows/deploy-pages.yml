@@ -46,8 +46,10 @@ jobs:
       - name: 静的エクスポートのビルド
         run: npm run build
 
-      - name: Pages の設定
+      - name: Pages の設定（未設定なら自動で有効化）
         uses: actions/configure-pages@v5
+        with:
+          enablement: true
 
       - name: 成果物（out/）のアップロード
         uses: actions/upload-pages-artifact@v3
