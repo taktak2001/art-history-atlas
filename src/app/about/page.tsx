@@ -1,6 +1,6 @@
 import type { Metadata } from 'next';
 import Link from 'next/link';
-import { CLASSIFICATION_LABELS } from '@/lib/dataset';
+import { ClassificationAccordion } from '@/components/ClassificationAccordion';
 import { VERIFICATION_LABELS } from '@/lib/schema';
 
 export const metadata: Metadata = {
@@ -71,16 +71,13 @@ export default function AboutPage() {
       <section className="mt-10">
         <h2 className="font-serif text-2xl">分類の基準</h2>
         <p className="mt-3 text-sm leading-relaxed text-muted">
-          「時代区分」「様式」「芸術運動」「流派」「芸術家集団」「制作傾向」「方法論・理論」という異なる概念を区別し、同じ階層に混在させません。
-          たとえば「バロック」は様式、「印象派」は芸術運動、「具体美術協会」は芸術家集団、「コンセプチュアル・アート」は方法論・理論として扱います。
+          このアプリでは、美術史上の名称をすべて同じ種類として扱いません。
+          「時代区分」は年代上の枠組み、「様式」は視覚的特徴、
+          「芸術運動」は共通理念を持つ動き、「流派」は地域や師弟関係による系譜、
+          「芸術家集団」は実在する組織、「制作傾向」は共通する表現上の方向性、
+          「方法論・理論」は美術を解釈する枠組みを指します。
         </p>
-        <ul className="mt-4 grid gap-2 sm:grid-cols-2">
-          {(Object.keys(CLASSIFICATION_LABELS) as Array<keyof typeof CLASSIFICATION_LABELS>).map((k) => (
-            <li key={k} className="rounded-sm border hairline bg-surface px-3 py-2 text-sm text-muted">
-              {CLASSIFICATION_LABELS[k]}
-            </li>
-          ))}
-        </ul>
+        <ClassificationAccordion />
       </section>
 
       <section className="mt-10">
