@@ -16,10 +16,27 @@ type Props = {
 
 export function LodControl({ value, onChange, counts, compact = false }: Props) {
   return (
-    <div className={compact ? '' : 'border-y hairline py-4'} data-lod-control>
-      <p className="mb-2 text-xs font-bold text-ink">表示する範囲</p>
+    <div
+      className={
+        compact
+          ? 'lod-control lod-control--compact'
+          : 'border-y hairline py-4'
+      }
+      data-lod-control
+    >
+      <p
+        className={
+          compact
+            ? 'lod-control__label'
+            : 'mb-2 text-xs font-bold text-ink'
+        }
+      >
+        表示する範囲
+      </p>
       <div
-        className="inline-grid min-w-[264px] grid-cols-3 overflow-hidden rounded-sm border hairline bg-raised"
+        className={`inline-grid grid-cols-3 overflow-hidden rounded-sm border hairline bg-raised ${
+          compact ? 'lod-control__options' : 'min-w-[264px]'
+        }`}
         role="group"
         aria-label="表示する範囲"
       >
@@ -29,7 +46,9 @@ export function LodControl({ value, onChange, counts, compact = false }: Props) 
             type="button"
             onClick={() => onChange(level)}
             aria-pressed={value === level}
-            className={`min-h-11 px-3 py-2 text-sm font-medium transition-colors active:translate-y-px ${
+            className={`min-h-11 text-sm font-medium transition-colors active:translate-y-px ${
+              compact ? 'px-2 py-1.5' : 'px-3 py-2'
+            } ${
               index > 0 ? 'border-l hairline' : ''
             } ${
               value === level
@@ -46,7 +65,14 @@ export function LodControl({ value, onChange, counts, compact = false }: Props) 
           </button>
         ))}
       </div>
-      <p className="mt-2 text-xs leading-relaxed text-muted" aria-live="polite">
+      <p
+        className={
+          compact
+            ? 'lod-control__description'
+            : 'mt-2 text-xs leading-relaxed text-muted'
+        }
+        aria-live="polite"
+      >
         {VISIBILITY_LEVEL_DESCRIPTIONS[value]}
       </p>
     </div>
