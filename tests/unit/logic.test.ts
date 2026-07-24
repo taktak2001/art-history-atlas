@@ -33,6 +33,7 @@ import {
   calculateFollowLabelX,
   chooseTimelineLabel,
   clipMovementToMode,
+  fitTimelineModeToMovements,
   movementOverlapsMode,
   timelineBarVisualWidth,
   timelineModeById,
@@ -295,6 +296,39 @@ describe('横型タイムラインの表示設定', () => {
     expect(yearToTimelineX(-3000, ancient, 700)).toBe(0);
     expect(yearToTimelineX(-480, ancient, 700)).toBeCloseTo(504);
     expect(yearToTimelineX(500, ancient, 700)).toBe(700);
+  });
+
+  it('古代の描画範囲を表示データへ合わせ、前後余白を250年単位で丸める', () => {
+    const ancient = timelineModeById('ancient');
+    const fitted = fitTimelineModeToMovements(ancient, [
+      getMovement('ancient-greek-classical')!,
+      getMovement('early-christian-byzantine')!,
+    ]);
+
+    expect(fitted).toMatchObject({
+      start: -750,
+      end: 750,
+      tickStep: 250,
+    });
+  });
+
+  it('時代別の描画範囲には最低200年と10%以上の余白を確保する', () => {
+    const modern = timelineModeById('modern');
+    const fitted = fitTimelineModeToMovements(modern, [
+      getMovement('impressionism')!,
+    ]);
+
+    expect(fitted.end - fitted.start).toBeGreaterThanOrEqual(200);
+    expect(fitted.start).toBeLessThan(1860);
+    expect(fitted.end).toBeGreaterThan(1890);
+    expect([100, 250, 500]).toContain(fitted.tickStep);
+  });
+
+  it('通史の非線形スケール設定は自動フィットで変更しない', () => {
+    const survey = timelineModeById('survey');
+    expect(
+      fitTimelineModeToMovements(survey, [getMovement('impressionism')!]),
+    ).toBe(survey);
   });
 
   it('目盛りとバー開始年は同じ座標になる', () => {

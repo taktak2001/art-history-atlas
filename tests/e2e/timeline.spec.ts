@@ -26,7 +26,7 @@ test('通史はコンパクトな俯瞰表示と1行ラベルを使う', async (
   expect(await surveyLabel.evaluate((element) => getComputedStyle(element).whiteSpace)).toBe('nowrap');
 });
 
-test('時代別モードは端末と密度に応じた幅と詳細目盛りを使う', async ({ page }, testInfo) => {
+test('時代別モードは端末と密度に応じた幅と自動フィット目盛りを使う', async ({ page }, testInfo) => {
   await page.goto('/timeline/');
 
   const mobile = testInfo.project.name === 'mobile';
@@ -85,7 +85,7 @@ test('近代では対象範囲、使用レーン、クリップ表示だけを�
   expect(emptyLanes).toBe(0);
 });
 
-test('詳細ラベルは2行まで表示し、PCのフォーカスで正式情報を示す', async ({ page }, testInfo) => {
+test('詳細ラベルは600ウェイトの1行表示で、PCのフォーカスに正式情報を示す', async ({ page }, testInfo) => {
   test.skip(testInfo.project.name !== 'desktop', 'desktop project only');
   await page.goto('/timeline/');
   await modeButton(page, '現代').click();
@@ -101,11 +101,17 @@ test('詳細ラベルは2行まで表示し、PCのフォーカスで正式情�
     const style = getComputedStyle(element);
     return {
       whiteSpace: style.whiteSpace,
-      lineClamp: style.getPropertyValue('-webkit-line-clamp'),
+      fontWeight: style.fontWeight,
+      color: style.color,
+      opacity: style.opacity,
+      wordBreak: style.wordBreak,
     };
   });
-  expect(labelStyle.whiteSpace).toBe('normal');
-  expect(labelStyle.lineClamp).toBe('2');
+  expect(labelStyle.whiteSpace).toBe('nowrap');
+  expect(labelStyle.fontWeight).toBe('600');
+  expect(labelStyle.opacity).toBe('1');
+  expect(labelStyle.wordBreak).toBe('keep-all');
+  expect(labelStyle.color).not.toBe('rgb(92, 92, 96)');
   expect(
     await conceptual
       .locator('[data-timeline-hit-area]')
@@ -156,13 +162,23 @@ test('先史と古代の主要ムーブメントを正しいモードへ表示�
   const trackWidth = await page
     .locator('[data-timeline-track]')
     .evaluate((element) => element.getBoundingClientRect().width);
+  const domain = await page.locator('[data-timeline-track]').evaluate((element) => ({
+    start: Number((element as HTMLElement).dataset.scaleStart),
+    end: Number((element as HTMLElement).dataset.scaleEnd),
+    rounding: Number((element as HTMLElement).dataset.scaleRounding),
+  }));
+  expect(domain).toEqual({ start: -750, end: 750, rounding: 250 });
+  await expect(greek.locator('[data-follow-label]')).toHaveAttribute(
+    'data-label-variant',
+    /full|short/,
+  );
   const coordinates = await greek.evaluate((element) => ({
     start: Number((element as HTMLElement).dataset.barStart),
     end: Number((element as HTMLElement).dataset.barEnd),
     width: element.getBoundingClientRect().width,
   }));
-  expect(coordinates.start).toBeCloseTo((2520 / 3500) * trackWidth, 1);
-  expect(coordinates.end).toBeCloseTo((2677 / 3500) * trackWidth, 1);
+  expect(coordinates.start).toBeCloseTo((270 / 1500) * trackWidth, 1);
+  expect(coordinates.end).toBeCloseTo((427 / 1500) * trackWidth, 1);
   expect(coordinates.width).toBeCloseTo(coordinates.end - coordinates.start, 1);
 });
 

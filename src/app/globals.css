@@ -787,11 +787,15 @@ html.dark .relation-badge {
 }
 
 .timeline-label-detail {
-  display: -webkit-box;
   overflow: hidden;
-  white-space: normal;
-  -webkit-box-orient: vertical;
-  -webkit-line-clamp: 2;
+  white-space: nowrap;
+  overflow-wrap: normal;
+  word-break: keep-all;
+  text-overflow: ellipsis;
+  color: rgb(var(--c-ink));
+  font-weight: 600;
+  font-synthesis: weight;
+  line-height: 1.25;
 }
 
 /* 本文リンク */
