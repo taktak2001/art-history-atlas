@@ -1,17 +1,17 @@
 # Project Status
 
-**最終更新: 2026-07-24**（Phase 2 作業中）
+**最終更新: 2026-07-24**（Phase 2 統合準備完了）
 
 ## サマリ（事実）
 
 | 項目 | 値 |
 | --- | --- |
-| バージョン | 0.1.0（package.json）。Phase 1 = 初回公開、Phase 2 = コンテンツ/画像充実（進行中） |
+| バージョン | 0.1.0（package.json）。Phase 1 = 初回公開、Phase 2 = コンテンツ/画像充実＋横型タイムライン再設計（実装・検証完了） |
 | 公開状況 | Phase 1 の内容が本番公開済み: https://taktak2001.github.io/art-history-atlas/ |
 | リポジトリ | github.com/taktak2001/art-history-atlas（Public） |
 | デフォルトブランチ | `main`（Phase 1 の成果。最新デプロイ済みtip 付近: commit `de2a443`） |
-| 作業ブランチ | `claude/phase2-content-images`（Phase 2、未マージ・未PR） |
-| デプロイ | main への push で GitHub Actions が自動デプロイ。Phase 2 は main 未マージのため未反映 |
+| 作業ブランチ | `claude/phase2-content-images`。統合PR: [#1](https://github.com/taktak2001/art-history-atlas/pull/1)（検証成功後の自動マージ対象。現在状態はGitHubを正本とする） |
+| デプロイ | `main` へのマージ後、GitHub Actions が自動デプロイ |
 
 ## データ件数（現時点、作業ブランチ）
 
@@ -44,12 +44,12 @@
 - 編集監査 + 第2出典
 - editorial-audit-phase2.md
 
-## 実装中 / 未完了（Phase 2、これから）
+## 最終検証（Phase 2）
 
-- **テストの追加と実行**: 新規 unit（画像ライセンス/PD整合/alt）、UI（WorkGrid/作品詳細/比較画像）、E2E（モバイル幅、画像404フォールバック、サブパス直接アクセス、オフライン）、a11y、Lighthouse。既存 43 unit + 26 E2E は Phase 1 で緑。**Phase 2 変更後の再実行が未実施**。
-- **本番相当ビルドの再確認**: `npm run build`（Phase 2 変更後に一度成功を確認済みだが、最終ゲートとして再実行推奨）。
-- **モバイル/PWA の実機同等確認**: iPhone幅の作品グリッド/タイムライン/ネットワーク図/比較表/ダークモード/長い日本語タイトル/画像クレジット/セーフエリア/PWA単独起動。
-- **PR 作成**: `claude/phase2-content-images` → `main` の PR（自動マージしない）。**未作成**。
+- `npm run check`: 成功（typecheck、lint 0件、データ検証、unit 53件）。
+- `npm run build`: 成功（本番 `basePath` 付き静的ビルド、181ページ）。
+- Playwright E2E + a11y: desktop/mobile 合計36件成功。
+- 統合PR [#1](https://github.com/taktak2001/art-history-atlas/pull/1) を作成。必要な検証成功後は自動マージしてよい。
 
 ## 未着手（Phase 2 の範囲だが今回見送り、TODO化）
 

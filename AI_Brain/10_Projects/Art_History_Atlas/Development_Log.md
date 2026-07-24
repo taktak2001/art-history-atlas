@@ -18,7 +18,7 @@
 - 本番デプロイ成功（Actions run、deploy-pages が live 確認後に成功）。公開: https://taktak2001.github.io/art-history-atlas/
 - **Phase 1 の既知の制約**: 実画像 0（全プレースホルダー）、一部データ `single-source`、egress 制約でライブ画面の自動確認不可。
 
-## Phase 2（進行中・作業ブランチ `claude/phase2-content-images`、未マージ・未PR）
+## Phase 2（実装・検証完了・統合PR [#1](https://github.com/taktak2001/art-history-atlas/pull/1)）
 
 目的: 新機能より「①作品画像の充実 ②記述の正確性 ③関係の精緻化 ④モバイル/PWA体験」。既存30件の完成度向上。
 
@@ -41,13 +41,13 @@ Phase 2 現在の件数: movements 30 / artists **64** / works **75**（画像41
 - モバイルは地域列を88pxに縮小し、時代ナビを4列、表示モードを3列で折り返す。横方向の移動量を旧比例軸から大幅に削減。
 - 検証: `npm run check` 成功（unit 53件）、静的ビルド成功、timelineを含む `tests/e2e/app.spec.ts` はdesktop/mobile計14件成功。通史幅1200px以下、近代幅960px以下をE2Eで固定。
 
-### まだ終わっていない Phase 2 作業（次にやること）
+### 最終検証・統合（2026-07-24）
 
-- テストの追加・実行（unit: 画像ライセンス/PD整合/alt、UI: WorkGrid/作品詳細/比較画像、E2E: モバイル幅/画像404/サブパス直接アクセス/オフライン、a11y、Lighthouse）。
-- `npm run check` + `npm run build` の最終グリーン確認（Phase 2 変更後）。
-- モバイル/PWA の実機同等確認。
-- **PR 作成**（`claude/phase2-content-images` → `main`、自動マージしない）。**未作成**。
-- （見送り→TODO）実画像 60点到達、単一機関12件の第2出典化。
+- `npm run check` 成功（typecheck、lint 0件、データ検証、unit 53件）。
+- `npm run build` 成功（本番 `basePath` 付き静的ビルド、181ページ）。
+- Playwright E2E + a11y は desktop/mobile 合計36件成功。
+- 統合PR [#1](https://github.com/taktak2001/art-history-atlas/pull/1) を作成。ユーザー常設指示により、必要な検証成功後は `main` へ自動マージする。
+- （Phase 3候補）実画像60点到達、単一機関12件の第2出典化。
 
 ## セッション切断イベントの記録（重要）
 
@@ -56,10 +56,10 @@ Phase 2 現在の件数: movements 30 / artists **64** / works **75**（画像41
 
 ## 現在の進捗率（推定・推論）
 
-- Phase 2 全体: **約75%**。
+- Phase 2 全体: **約95%**（実装・自動検証・PR作成まで完了。残りはマージ後デプロイ確認）。
   - データ（作品/画像/出典/記述）: ~90%（画像は41/60目標で未達、単一機関12件が残るが主要部は完了）。
   - UI（グリッド/比較画像/モバイル配慮）: ~90%（実機確認が残る）。
   - PWA/性能（画像キャッシュ上限/lazy/CLS）: ~95%。
-  - テスト/品質ゲート再実行: ~30%（未着手に近い。Phase 1 のテストは存在するが Phase 2 追加分と再実行が未）。
-  - PR/デプロイ: 0%（未作成。デプロイは main マージ後）。
+  - テスト/品質ゲート再実行: 100%（unit 53件、E2E+a11y 36件、本番ビルド成功）。
+  - PR/デプロイ: PR作成済み。`main` マージ後に自動デプロイ。
 - 数値は目安。正確な現況は `Project_Status.md` と `git log main..claude/phase2-content-images` を参照。

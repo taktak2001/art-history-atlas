@@ -4,14 +4,14 @@
 
 ## 短期（Phase 2 を完成させる）
 
-- [ ] **テスト追加・実行**（Phase 2 変更に対応）:
+- [x] **テスト追加・実行**（Phase 2 変更に対応）:
   - unit: 画像ライセンス必須 / PD判定とライセンスの整合 / alt 非空 / ≥2作品/ムーブメント / タイトル・画像URL重複なし。
   - UI: `WorkGrid` レンダリング、作品詳細（画像 or プレースホルダー + 出典）、比較ページの代表作画像。
   - E2E: iPhone幅の作品グリッド / 画像404時のプレースホルダー退避 / サブパス直接アクセス / オフラインフォールバック。
   - a11y（axe）: 主要画面で重大違反0を維持。Lighthouse 再取得。
-- [ ] `npm run check`（typecheck+lint+validate+test）と `npm run build` を最終グリーン確認。
+- [x] `npm run check`（typecheck+lint+validate+test）と `npm run build` を最終グリーン確認。
 - [ ] モバイル/PWA 実機同等確認（グリッド・タイムライン・ネットワーク図・比較表・ハンバーガー・ダーク・長い日本語タイトル・画像クレジット・セーフエリア・PWA単独起動）。ネットワーク図が小画面で読みにくい場合はテキストリスト切替を改善。
-- [ ] **PR 作成**（`claude/phase2-content-images` → `main`、自動マージしない）。本文に変更点・データ件数・画像権利方針・テスト結果。
+- [x] **PR 作成**（`claude/phase2-content-images` → `main`）: [#1](https://github.com/taktak2001/art-history-atlas/pull/1)。本文に変更点・データ件数・画像権利方針・テスト結果を記載。検証成功後は自動マージ対象。
 - [ ] （品質）実画像を 60点以上へ（現41）。古典系の PD 絵画を追加、または CC-BY（帰属付き）で3D/建築/日本現代を補う。
 - [ ] 単一機関の12ムーブメントに第2機関出典を追加（古代/ビザンティン/ゴシック/伊ルネ/北方/マニエリスム/バロック/オランダ/ロココ/新古典 + superflat + immersive-digital）。
 - [ ] `immersive-digital` に美術館/批評の二次出典を追加し `single-source` を解消。
@@ -39,5 +39,6 @@
 ## 恒久ルール（毎回守る）
 
 - `taktak2001/taktak` は触らない。作業は指定ブランチ。`main` へ force push しない。
+- 機能変更はその都度作業ブランチへ push し、必要な検証が成功したPRは `main` へ自動マージしてよい。競合・意図しない差分・検証失敗時はマージしない。
 - データ変更後は `npm run validate:data`。PR 前に `npm run check` + `npm run build`。
 - 画像・出典は推測URL禁止。ライセンス確認できないものは `image:null` / `single-source` / `needs-review` で明示。
