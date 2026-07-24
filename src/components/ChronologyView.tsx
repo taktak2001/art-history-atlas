@@ -295,45 +295,16 @@ export function ChronologyView({ movements }: { movements: Movement[] }) {
     }
   };
 
-  const navigateToEra = (era: EraId) => {
-    setExpandedEras(new Set([era]));
-    window.requestAnimationFrame(() => {
-      document.getElementById(`era-${era}`)?.scrollIntoView({
-        behavior: window.matchMedia('(prefers-reduced-motion: reduce)').matches
-          ? 'auto'
-          : 'smooth',
-        block: 'start',
-      });
-    });
-  };
-
   return (
     <>
       <div className="chronology-controls">
-        <LodControl value={lod} onChange={setLod} counts={counts} compact />
+        <LodControl
+          value={lod}
+          onChange={setLod}
+          counts={counts}
+          exhibition
+        />
       </div>
-
-      <nav
-        aria-label="時代ナビゲーション"
-        className="chronology-era-nav"
-      >
-        <ul className="scroll-x flex gap-2">
-          {CHRONOLOGY_ERAS.map((era) => (
-            <li key={era.id} className="shrink-0">
-              <a
-                href={`#era-${era.id}`}
-                onClick={(event) => {
-                  event.preventDefault();
-                  navigateToEra(era.id);
-                }}
-                className="chronology-era-nav__link"
-              >
-                {era.label}
-              </a>
-            </li>
-          ))}
-        </ul>
-      </nav>
 
       <div
         className="chronology-gallery"
@@ -366,21 +337,25 @@ export function ChronologyView({ movements }: { movements: Movement[] }) {
                   {String(eraIndex + 1).padStart(2, '0')}
                 </span>
                 <span className="chronology-era__identity">
-                  <span className="chronology-era__title">{era.label}</span>
-                  <span className="chronology-era__meta">
-                    <span className="chronology-era__range">{era.range}</span>
-                    <span aria-hidden="true">・</span>
-                    <span>{eraMovements.length}件</span>
-                  </span>
-                  {isExpanded && (
-                    <span className="chronology-era__catchphrase">
-                      「{era.catchphrase}」
+                  <span className="chronology-era__names">
+                    <span className="chronology-era__title-en">
+                      {era.labelEn}
                     </span>
-                  )}
-                </span>
-                <span className="chronology-era__action">
-                  <span className="chronology-era__toggle" aria-hidden="true">
-                    {isExpanded ? '−' : '＋'}
+                    <span className="chronology-era__title">{era.label}</span>
+                  </span>
+                  <span className="chronology-era__details">
+                    <span className="chronology-era__meta">
+                      <span className="chronology-era__range">{era.range}</span>
+                      <span>
+                        {eraMovements.length}{' '}
+                        {eraMovements.length === 1 ? 'movement' : 'movements'}
+                      </span>
+                    </span>
+                    {isExpanded && (
+                      <span className="chronology-era__catchphrase">
+                        「{era.catchphrase}」
+                      </span>
+                    )}
                   </span>
                 </span>
               </button>

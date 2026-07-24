@@ -218,6 +218,31 @@ describe('LOD UI', () => {
     expect(screen.getByText('重要な細分・派生ムーブメントも表示')).toBeVisible();
   });
 
+  it('縦型年表用LODを英語の索引表示へ圧縮する', () => {
+    const onChange = vi.fn();
+    render(
+      <LodControl
+        value="core"
+        onChange={onChange}
+        counts={{ core: 24, standard: 30, detailed: 30 }}
+        exhibition
+      />,
+    );
+
+    expect(
+      screen.getByRole('button', { name: /Basic（基本）\s*24件/ }),
+    ).toHaveAttribute('aria-pressed', 'true');
+    expect(
+      screen.getByRole('button', { name: /Standard（充実）\s*30件/ }),
+    ).toBeVisible();
+    expect(
+      screen.getByRole('button', { name: /Complete（すべて）\s*30件/ }),
+    ).toBeVisible();
+    expect(
+      screen.getByText('美術史の骨格となる主要項目を表示'),
+    ).toHaveClass('sr-only');
+  });
+
   it('マトリクスのセルを+Nで個別展開する', async () => {
     window.history.replaceState({}, '', '/matrix/?lod=core');
     render(<MatrixView movements={movements} regions={activeRegions()} />);
