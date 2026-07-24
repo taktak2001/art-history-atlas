@@ -14,6 +14,7 @@ import {
   compareRows,
   compareSections,
   COMPARE_ACCENTS,
+  assignCompareAccents,
   MAX_COMPARE,
 } from '@/lib/compare';
 import { buildHeroSummary } from '@/lib/movement-detail';
@@ -112,6 +113,24 @@ describe('比較ロジック', () => {
   it('最大4件へ重複しないアクセントカラーを割り当てる', () => {
     expect(COMPARE_ACCENTS).toHaveLength(MAX_COMPARE);
     expect(new Set(COMPARE_ACCENTS).size).toBe(MAX_COMPARE);
+  });
+
+  it('対象を削除しても残ったムーブメントのアクセントを維持する', () => {
+    const initial = assignCompareAccents([
+      'gothic',
+      'italian-renaissance',
+      'baroque',
+    ]);
+    const afterRemoval = assignCompareAccents(
+      ['italian-renaissance', 'baroque'],
+      initial,
+    );
+
+    expect(afterRemoval['italian-renaissance']).toBe(
+      initial['italian-renaissance'],
+    );
+    expect(afterRemoval.baroque).toBe(initial.baroque);
+    expect(new Set(Object.values(afterRemoval)).size).toBe(2);
   });
 });
 

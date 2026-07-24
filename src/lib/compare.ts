@@ -68,7 +68,7 @@ export const compareRows: CompareRow[] = compareSections.flatMap(
   (section) => section.rows,
 );
 
-/** 比較対象の順序に割り当てる、紙面になじむ識別色。RGB値はCSS変数で共用する。 */
+/** 比較対象へ割り当てる、紙面になじむ識別色。RGB値はCSS変数で共用する。 */
 export const COMPARE_ACCENTS = [
   '155 81 57',
   '62 112 108',
@@ -76,9 +76,42 @@ export const COMPARE_ACCENTS = [
   '151 112 52',
 ] as const;
 
+export type CompareAccent = (typeof COMPARE_ACCENTS)[number];
+export type CompareAccentMap = Record<string, CompareAccent>;
+
 /** 比較対象IDの検証（存在する2〜4件のみ許可） */
 export const MIN_COMPARE = 2;
 export const MAX_COMPARE = 4;
+
+/**
+ * 既存の割り当てを保ちながら、比較対象へ重複しない色を割り当てる。
+ * 対象を削除しても残った列の色が入れ替わらないため、チップと表を追いやすい。
+ */
+export const assignCompareAccents = (
+  ids: string[],
+  current: CompareAccentMap = {},
+): CompareAccentMap => {
+  const next: CompareAccentMap = {};
+  const used = new Set<CompareAccent>();
+
+  ids.forEach((id) => {
+    const accent = current[id];
+    if (accent && !used.has(accent)) {
+      next[id] = accent;
+      used.add(accent);
+    }
+  });
+
+  ids.forEach((id) => {
+    if (next[id]) return;
+    const accent = COMPARE_ACCENTS.find((candidate) => !used.has(candidate));
+    if (!accent) return;
+    next[id] = accent;
+    used.add(accent);
+  });
+
+  return next;
+};
 
 export const parseCompareIds = (raw: string | null | undefined): string[] => {
   if (!raw) return [];

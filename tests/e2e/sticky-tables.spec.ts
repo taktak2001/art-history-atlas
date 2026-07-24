@@ -108,6 +108,28 @@ test('比較対象が1件でもチップと不足件数を表示する', async (
   })).toHaveCount(0);
 });
 
+test('比較対象の削除を短くアニメーションし、残る対象の色を維持する', async ({ page }) => {
+  await page.goto('/compare/?ids=gothic,italian-renaissance,baroque');
+
+  const baroqueChip = page.locator('[data-compare-chip="baroque"]');
+  const accentBefore = await baroqueChip.evaluate((element) =>
+    getComputedStyle(element).getPropertyValue('--compare-accent').trim(),
+  );
+  const gothicChip = page.locator('[data-compare-chip="gothic"]');
+
+  await gothicChip
+    .getByRole('button', { name: 'ゴシック美術を比較から外す' })
+    .click();
+
+  await expect(gothicChip).toHaveAttribute('data-exiting', 'true');
+  await expect(gothicChip).toHaveCount(0);
+
+  const accentAfter = await baroqueChip.evaluate((element) =>
+    getComputedStyle(element).getPropertyValue('--compare-accent').trim(),
+  );
+  expect(accentAfter).toBe(accentBefore);
+});
+
 test('ダークモードでも固定セルに不透明な背景を持つ', async ({ page }) => {
   await page.emulateMedia({ colorScheme: 'dark' });
   await page.goto('/compare/?ids=gothic,baroque');

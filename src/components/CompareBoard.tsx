@@ -1,6 +1,13 @@
 'use client';
 
-import { useCallback, useMemo, useState, type CSSProperties } from 'react';
+import {
+  useCallback,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+  type CSSProperties,
+} from 'react';
 import Link from 'next/link';
 import { useSearchParams, useRouter } from 'next/navigation';
 import { movements, worksOf } from '@/lib/dataset';
@@ -11,7 +18,7 @@ import {
   MIN_COMPARE,
   MAX_COMPARE,
   compareMovements,
-  COMPARE_ACCENTS,
+  assignCompareAccents,
 } from '@/lib/compare';
 import { getMovementChildren } from '@/lib/movement-hierarchy';
 
@@ -20,7 +27,12 @@ export function CompareBoard() {
   const router = useRouter();
   const initial = parseCompareIds(searchParams.get('ids'));
   const [ids, setIds] = useState<string[]>(initial);
+  const [accentById, setAccentById] = useState(() =>
+    assignCompareAccents(initial),
+  );
+  const [exitingId, setExitingId] = useState<string | null>(null);
   const [copied, setCopied] = useState(false);
+  const removeTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const selected = useMemo(() => compareMovements(ids), [ids]);
 
@@ -36,13 +48,35 @@ export function CompareBoard() {
     if (!id || ids.includes(id) || ids.length >= MAX_COMPARE) return;
     const next = [...ids, id];
     setIds(next);
+    setAccentById((current) => assignCompareAccents(next, current));
     syncUrl(next);
   };
-  const remove = (id: string) => {
+
+  const commitRemove = (id: string) => {
     const next = ids.filter((x) => x !== id);
     setIds(next);
+    setAccentById((current) => assignCompareAccents(next, current));
+    setExitingId(null);
     syncUrl(next);
   };
+
+  const remove = (id: string) => {
+    if (exitingId) return;
+    if (window.matchMedia('(prefers-reduced-motion: reduce)').matches) {
+      commitRemove(id);
+      return;
+    }
+
+    setExitingId(id);
+    removeTimer.current = setTimeout(() => commitRemove(id), 160);
+  };
+
+  useEffect(
+    () => () => {
+      if (removeTimer.current) clearTimeout(removeTimer.current);
+    },
+    [],
+  );
 
   const share = async () => {
     const url = `${window.location.origin}/compare/?ids=${ids.join(',')}`;
@@ -57,9 +91,9 @@ export function CompareBoard() {
 
   const candidates = movements.filter((m) => !ids.includes(m.id));
   const missingCount = Math.max(0, MIN_COMPARE - ids.length);
-  const accentStyle = (index: number) =>
+  const accentStyle = (id: string) =>
     ({
-      '--compare-accent': COMPARE_ACCENTS[index % COMPARE_ACCENTS.length],
+      '--compare-accent': accentById[id],
     }) as CSSProperties;
 
   return (
@@ -74,7 +108,7 @@ export function CompareBoard() {
             id="add-movement"
             value=""
             onChange={(e) => add(e.target.value)}
-            disabled={ids.length >= MAX_COMPARE}
+            disabled={ids.length >= MAX_COMPARE || Boolean(exitingId)}
             className="min-h-11 rounded-sm border hairline bg-raised px-2 py-2 text-sm text-ink disabled:opacity-50"
           >
             <option value="">ムーブメントを選択…</option>
@@ -110,23 +144,26 @@ export function CompareBoard() {
             {selected.length === 0 ? (
               <li className="compare-chip-empty">まだ選択されていません</li>
             ) : (
-              selected.map((movement, index) => (
+              selected.map((movement) => (
                 <li
                   key={movement.id}
                   className="compare-chip"
-                  style={accentStyle(index)}
+                  style={accentStyle(movement.id)}
                   data-compare-chip={movement.id}
+                  data-exiting={exitingId === movement.id ? 'true' : undefined}
                 >
                   <span className="compare-chip__bar" aria-hidden="true" />
                   <Link
                     href={`/movements/${movement.id}/`}
                     className="compare-chip__link"
+                    title={movement.nameJa}
                   >
                     {movement.shortLabel ?? movement.nameJa}
                   </Link>
                   <button
                     type="button"
                     onClick={() => remove(movement.id)}
+                    disabled={Boolean(exitingId)}
                     aria-label={`${movement.nameJa}を比較から外す`}
                     className="compare-chip__remove"
                   >
@@ -179,12 +216,12 @@ export function CompareBoard() {
                 >
                   比較項目
                 </th>
-                {selected.map((m, index) => (
+                {selected.map((m) => (
                   <th
                     key={m.id}
                     scope="col"
                     className="data-table-column-header compare-column-header min-w-[220px] border-b border-l hairline p-3 text-left align-top"
-                    style={accentStyle(index)}
+                    style={accentStyle(m.id)}
                     data-sticky-cell="column"
                     data-compare-column={m.id}
                   >
@@ -196,6 +233,7 @@ export function CompareBoard() {
                       <button
                         type="button"
                         onClick={() => remove(m.id)}
+                        disabled={Boolean(exitingId)}
                         aria-label={`${m.nameJa}を比較から外す`}
                         className="min-h-11 min-w-11 shrink-0 rounded-sm text-faint hover:text-ink"
                       >
@@ -242,13 +280,13 @@ export function CompareBoard() {
                     >
                       代表作品
                     </th>
-                    {selected.map((m, index) => {
+                    {selected.map((m) => {
                       const reps = worksOf(m).slice(0, 2);
                       return (
                         <td
                           key={m.id}
                           className="compare-value-cell border-l border-t hairline p-3 align-top"
-                          style={accentStyle(index)}
+                          style={accentStyle(m.id)}
                         >
                           <div className="grid grid-cols-2 gap-2">
                             {reps.map((w) => (
@@ -275,11 +313,11 @@ export function CompareBoard() {
                     >
                       {row.label}
                     </th>
-                    {selected.map((m, index) => (
+                    {selected.map((m) => (
                       <td
                         key={m.id}
                         className="compare-value-cell border-l border-t hairline p-3 align-top leading-relaxed text-ink"
-                        style={accentStyle(index)}
+                        style={accentStyle(m.id)}
                       >
                         {row.get(m)}
                       </td>
