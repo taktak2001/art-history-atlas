@@ -702,7 +702,7 @@ html.dark .relation-badge {
   background: rgb(var(--c-paper) / 0.92);
   color: rgb(var(--c-faint));
   font-size: 0.625rem;
-  font-weight: 500;
+  font-weight: 400;
 }
 
 .timeline-origin-lane,
@@ -958,6 +958,7 @@ html.dark .relation-badge {
   color: rgb(var(--c-ink));
   font-family: var(--font-serif);
   font-size: 1.25rem;
+  font-weight: 600;
 }
 
 .timeline-status__range {
@@ -1003,7 +1004,7 @@ html.dark .relation-badge {
 }
 
 .timeline-bar-visual--priority {
-  border-color: rgb(var(--c-accent) / 0.46);
+  border-color: rgb(var(--c-accent) / 0.54);
   background: rgb(var(--c-accent) / 0.16);
   color: rgb(var(--c-ink));
 }
@@ -1015,6 +1016,8 @@ html.dark .relation-badge {
 
 .timeline-follow-label {
   background: transparent;
+  color: rgb(var(--c-ink));
+  font-weight: 500;
 }
 
 [data-timeline-bar]:hover .timeline-bar-visual,

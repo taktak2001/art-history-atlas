@@ -787,7 +787,7 @@ export function HorizontalTimeline({ movements, activeRegions }: Props) {
                           data-follow-label
                           data-full-label={movement.nameJa}
                           data-short-label={movement.shortLabel}
-                          className="timeline-follow-label pointer-events-none absolute inset-y-0 left-0 flex items-center overflow-hidden px-0.5"
+                          className="timeline-follow-label pointer-events-none absolute inset-y-0 left-0 flex items-center overflow-hidden px-px"
                         >
                           <span
                             data-label-text
