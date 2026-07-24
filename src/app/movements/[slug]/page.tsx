@@ -44,6 +44,9 @@ const BAND_TONES = {
   white: 'bg-raised',
 } as const;
 
+const SUBSECTION_HEADING_CLASS =
+  'font-serif text-xl leading-snug text-ink sm:text-[22px]';
+
 function Chapter({
   id,
   number,
@@ -86,6 +89,29 @@ function Chapter({
   );
 }
 
+function Subsection({
+  id,
+  title,
+  children,
+  className = '',
+}: {
+  id: string;
+  title: string;
+  children: ReactNode;
+  className?: string;
+}) {
+  return (
+    <section aria-labelledby={`${id}-title`} className={className}>
+      <h3 id={`${id}-title`} className={SUBSECTION_HEADING_CLASS}>
+        {title}
+      </h3>
+      <div className="detail-body mt-4 max-w-[38em] text-[15px] leading-[1.95] text-ink sm:text-base">
+        {children}
+      </div>
+    </section>
+  );
+}
+
 function Field({ label, value }: { label: string; value?: string }) {
   if (!value) return null;
   return (
@@ -102,7 +128,7 @@ function Passage({
   kind,
   children,
 }: {
-  kind: '事実' | '解釈' | '学説上の注意' | '鑑賞ポイント';
+  kind: '事実' | '学説上の注意' | '鑑賞ポイント';
   children: ReactNode;
 }) {
   if (kind === '学説上の注意') {
@@ -290,7 +316,9 @@ export default async function MovementDetailPage({
 
       <Chapter id="context" number="01" title="思想と歴史的背景" tone="paper">
         <div className="space-y-10">
-          <Passage kind="解釈">{movement.coreIdea}</Passage>
+          <Subsection id="context-core-idea" title="中心となる考え">
+            <p>{toDisplayText(movement.coreIdea)}</p>
+          </Subsection>
           <dl className="grid gap-x-12 gap-y-8 lg:grid-cols-2">
             <Field label="社会的背景" value={movement.socialContext} />
             <Field label="政治的背景" value={movement.politicalContext} />
@@ -305,18 +333,18 @@ export default async function MovementDetailPage({
       </Chapter>
 
       <Chapter id="relation" number="02" title="何が新しかったか" tone="warm">
-        <Passage kind="解釈">
-          <div className="grid gap-9 md:grid-cols-2 md:gap-12">
-            <div>
-              <h3 className="text-sm font-bold text-muted">転換したこと</h3>
-              <p className="mt-3">{toDisplayText(movement.reactionAgainst)}</p>
-            </div>
-            <div className="border-l hairline pl-6 md:pl-8">
-              <h3 className="text-sm font-bold text-muted">継承したこと</h3>
-              <p className="mt-3">{toDisplayText(movement.inheritedFrom)}</p>
-            </div>
-          </div>
-        </Passage>
+        <div className="grid gap-9 md:grid-cols-2 md:gap-12">
+          <Subsection id="relation-changed" title="転換したこと">
+            <p>{toDisplayText(movement.reactionAgainst)}</p>
+          </Subsection>
+          <Subsection
+            id="relation-inherited"
+            title="継承したこと"
+            className="border-l hairline pl-6 md:pl-8"
+          >
+            <p>{toDisplayText(movement.inheritedFrom)}</p>
+          </Subsection>
+        </div>
       </Chapter>
 
       <Chapter id="visual" number="03" title="視覚的特徴と技法" tone="white">
@@ -344,7 +372,7 @@ export default async function MovementDetailPage({
           </dl>
 
           <div>
-            <h3 className="text-sm font-bold text-muted">主要作家</h3>
+            <h3 className={SUBSECTION_HEADING_CLASS}>主要作家</h3>
             {artists.length > 0 ? (
               <ul className="mt-5 grid gap-x-10 gap-y-8 sm:grid-cols-2">
                 {artists.map((artist) => (
@@ -382,16 +410,16 @@ export default async function MovementDetailPage({
 
       <Chapter id="network" number="06" title="後世への影響" tone="white">
         <div className="space-y-12">
-          <Passage kind="解釈">
+          <Subsection id="network-legacy" title="後世に残したもの">
             <p>{toDisplayText(movement.legacy)}</p>
             <p className="mt-5">{toDisplayText(movement.contemporaryConnection)}</p>
-          </Passage>
+          </Subsection>
 
           {(outgoing.length > 0 || incoming.length > 0) && (
             <div className="grid gap-10 lg:grid-cols-2 lg:gap-14">
               {outgoing.length > 0 && (
                 <section aria-labelledby="outgoing-title">
-                  <h3 id="outgoing-title" className="text-sm font-bold text-muted">
+                  <h3 id="outgoing-title" className={SUBSECTION_HEADING_CLASS}>
                     この運動から
                   </h3>
                   <ul className="mt-5 space-y-7">
@@ -420,7 +448,7 @@ export default async function MovementDetailPage({
               )}
               {incoming.length > 0 && (
                 <section aria-labelledby="incoming-title">
-                  <h3 id="incoming-title" className="text-sm font-bold text-muted">
+                  <h3 id="incoming-title" className={SUBSECTION_HEADING_CLASS}>
                     この運動へ
                   </h3>
                   <ul className="mt-5 space-y-7">
