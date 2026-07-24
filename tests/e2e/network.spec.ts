@@ -209,6 +209,21 @@ test('関係選択時に起点・到達先と自然な反発文を表示する',
   ).toHaveCount(1);
 });
 
+test('選択ノードの詳細リンクからムーブメント詳細へ遷移する', async ({ page }) => {
+  await page.setViewportSize({ width: 390, height: 844 });
+  await page.goto('/network/');
+
+  const graph = page.getByRole('group', { name: '美術運動の関係ネットワーク図' });
+  await graph.getByRole('button', { name: 'キュビスムを選択' }).click();
+
+  const detailLink = page.getByRole('link', { name: '詳細ページへ →' });
+  await expect(detailLink).toHaveAttribute('href', /\/movements\/cubism\/$/);
+  await detailLink.click();
+
+  await expect(page).toHaveURL(/\/movements\/cubism\/$/);
+  await expect(page.getByRole('heading', { level: 1, name: 'キュビスム' })).toBeVisible();
+});
+
 test('線ラベルは背景矩形を使わない', async ({ page }) => {
   await page.goto('/network/');
   const labels = page.locator('[data-network-layer="edge-labels"]');
