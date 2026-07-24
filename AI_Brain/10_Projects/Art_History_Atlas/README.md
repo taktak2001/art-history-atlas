@@ -80,6 +80,7 @@ art-history-atlas/
 ## 開発ルール（事実）
 
 - 作業は指定ブランチで（Phase 2 は `claude/phase2-content-images`）。`main` へ force push しない。
+- 機能に変更があった場合は、コミット後その都度、作業ブランチを `origin` へ push する（ユーザー常設指示、2026-07-24）。
 - 機能単位でコミット。認証情報・APIキー・`node_modules`・`out/`・テスト生成物をコミットしない。
 - 完了時に PR を作成（自動マージしない）。PR 本文に変更点・データ件数・画像権利方針・テスト結果。
 - データ追加後は必ず `npm run validate:data`。品質ゲート: `npm run check`（typecheck+lint+validate+test）と `npm run build`。
