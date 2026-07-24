@@ -43,6 +43,17 @@ test('iPhone幅で作品グリッドが横あふれしない', async ({ page }) 
   expect(scrollW).toBeLessThanOrEqual(clientW + 1);
 });
 
+test('iPhone幅でもゴシック美術の概要が文の途中で切れない', async ({ page }) => {
+  await page.setViewportSize({ width: 390, height: 844 });
+  await page.goto('/movements/gothic/');
+
+  const summary = page.locator('[data-hero-summary]');
+  await expect(summary).toHaveText(
+    '大聖堂建築を中心に展開した中世盛期の様式。尖頭アーチ・リブ・飛梁の構造革新が高く明るい内部空間を可能にし、ステンドグラスの光が神学的意味を担った。',
+  );
+  await expect(summary).not.toContainText('…');
+});
+
 for (const movement of [
   { slug: 'prehistoric-ritual', title: '先史美術' },
   { slug: 'italian-renaissance', title: 'イタリア・ルネサンス' },

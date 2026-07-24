@@ -201,7 +201,7 @@ export default async function MovementDetailPage({
   const works = worksOf(movement);
   const outgoing = outgoingRelationships(movement.id);
   const incoming = incomingRelationships(movement.id);
-  const heroSummary = buildHeroSummary(movement.summary, movement.coreIdea);
+  const heroSummary = buildHeroSummary(movement.summary);
   const dateLabel = formatDateRange(movement).replaceAll('–', '-');
   const regions = movement.regionIds.map((region) => REGION_LABELS[region]).join('、');
   const quickSummary = [
@@ -234,7 +234,10 @@ export default async function MovementDetailPage({
               <p className="mt-3 font-serif text-base tracking-[0.08em] text-faint sm:text-lg">
                 {toDisplayText(movement.nameEn)}
               </p>
-              <p className="mt-8 max-w-[38em] font-serif text-lg leading-[1.95] text-ink sm:text-xl">
+              <p
+                className="mt-8 max-w-[38em] font-serif text-lg leading-[1.95] text-ink sm:text-xl"
+                data-hero-summary
+              >
                 {heroSummary}
               </p>
               <div className="mt-9 flex flex-wrap gap-3">
