@@ -4,7 +4,10 @@ import { MovementCard } from '@/components/MovementCard';
 import { SourceList } from '@/components/SourceList';
 import { VerificationBadge } from '@/components/Badges';
 import { WorkImage } from '@/components/WorkImage';
-import { ClassificationAccordion } from '@/components/ClassificationAccordion';
+import {
+  ClassificationAccordion,
+  classificationItems,
+} from '@/components/ClassificationAccordion';
 import { getMovement, getSources } from '@/lib/dataset';
 import type { Work } from '@/lib/schema';
 
@@ -70,6 +73,22 @@ describe('ClassificationAccordion', () => {
     expect(button).toHaveAttribute('aria-expanded', 'false');
     expect(screen.getByText(/政治・宗教・社会・文化の大きな変化に基づく/)).toBeVisible();
     expect(screen.queryByText('比較的長い年代幅を持つ')).not.toBeVisible();
+  });
+
+  it('見出し横の要約を名詞止めまたは定義句で統一する', () => {
+    const expectedSummaries = [
+      '政治・宗教・社会・文化の大きな変化に基づく、年代上の枠組み',
+      '構図・空間・色彩・光・技法など、作品に共有される視覚的特徴のまとまり',
+      '共通する問題意識や理念から、既存の美術へ新しい表現を提示した動き',
+      '地域・師弟関係・工房・教育機関・技法的伝統を共有する芸術家の系譜',
+      '共同制作・展覧会・声明・出版などを行った、実在する組織',
+      '組織や声明を必須とせず、複数の作家に共通する表現・制作上の方向性',
+      '作品の様式ではなく、美術を制作・解釈・分析するための理論的枠組み',
+    ];
+
+    expect(classificationItems.map((item) => item.summary)).toEqual(expectedSummaries);
+    expect(classificationItems.every((item) => !item.summary.endsWith('です。'))).toBe(true);
+    expect(classificationItems.every((item) => !item.summary.endsWith('。'))).toBe(true);
   });
 
   it('選択した分類の判定基準と具体例を表示し、同時に開く項目は一つにする', () => {
