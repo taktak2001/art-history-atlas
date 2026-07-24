@@ -1,7 +1,12 @@
 import type { Metadata } from 'next';
 import Link from 'next/link';
 import { ClassificationAccordion } from '@/components/ClassificationAccordion';
-import { VERIFICATION_LABELS } from '@/lib/schema';
+import {
+  VERIFICATION_LABELS,
+  VISIBILITY_LEVEL_DESCRIPTIONS,
+  VISIBILITY_LEVEL_LABELS,
+  type VisibilityLevel,
+} from '@/lib/schema';
 import {
   CORE_RELATIONSHIP_DEFINITIONS,
   RELATIONSHIP_DECISION_AID,
@@ -45,6 +50,8 @@ const sourcePolicy = [
   '自動生成された架空の引用やURLを作らない',
 ];
 
+const visibilityLevels: VisibilityLevel[] = ['core', 'standard', 'detailed'];
+
 export default function AboutPage() {
   return (
     <div className="mx-auto max-w-prose px-4 py-10">
@@ -82,6 +89,37 @@ export default function AboutPage() {
           「方法論・理論」は美術を解釈する枠組みを指します。
         </p>
         <ClassificationAccordion />
+      </section>
+
+      <section className="mt-12" aria-labelledby="visibility-range-heading">
+        <p className="text-xs uppercase tracking-[0.22em] text-faint">Level of Detail</p>
+        <h2 id="visibility-range-heading" className="mt-2 font-serif text-2xl">
+          表示する範囲
+        </h2>
+        <p className="mt-3 text-sm leading-relaxed text-muted">
+          美術史の全体像から細かな派生まで、学習目的に合わせて表示項目の範囲を切り替えられます。
+          件数は現在の収録内容に応じて表示します。
+        </p>
+        <dl
+          className="mt-5 border-y hairline"
+          aria-label="表示する範囲の凡例"
+        >
+          {visibilityLevels.map((level, index) => (
+            <div
+              key={level}
+              className={`grid gap-1 py-4 sm:grid-cols-[7rem_1fr] sm:gap-4 ${
+                index > 0 ? 'border-t hairline' : ''
+              }`}
+            >
+              <dt className="text-sm font-bold text-ink">
+                {VISIBILITY_LEVEL_LABELS[level]}
+              </dt>
+              <dd className="text-sm leading-relaxed text-muted">
+                {VISIBILITY_LEVEL_DESCRIPTIONS[level]}
+              </dd>
+            </div>
+          ))}
+        </dl>
       </section>
 
       <section className="mt-12" aria-labelledby="relationship-definition-heading">

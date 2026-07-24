@@ -64,7 +64,7 @@ function ResultCard({
           )}
           {hiddenByLod && (
             <>
-              <span>現在の表示密度では非表示</span>
+              <span>現在の表示範囲では非表示</span>
               <button
                 type="button"
                 onClick={() => onReveal(movement.visibilityLevel)}
@@ -299,7 +299,7 @@ export function MovementsExplorer() {
       )}
 
       <p className="mt-6 text-xs text-faint">
-        検索は表示密度に関係なく全30件を対象とします。作品・作家の詳細は
+        検索は表示する範囲に関係なく全30件を対象とします。作品・作家の詳細は
         <Link href="/movements/" className="prose-link">各ムーブメント</Link>
         から辿れます。
       </p>

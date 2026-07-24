@@ -1,19 +1,34 @@
 import { test, expect } from '@playwright/test';
 
-test('主要・標準・詳細をURLへ反映し、リロード後も維持する', async ({ page }) => {
+test('Aboutの凡例も基本・充実・すべてへ統一する', async ({ page }) => {
+  await page.goto('/about/');
+
+  const legend = page.getByRole('definition').filter({
+    has: page.getByText('美術史の骨格となる主要項目を表示', { exact: true }),
+  });
+  await expect(page.getByRole('heading', { name: '表示する範囲' })).toBeVisible();
+  await expect(page.getByText('基本', { exact: true })).toBeVisible();
+  await expect(page.getByText('充実', { exact: true })).toBeVisible();
+  await expect(page.getByText('すべて', { exact: true })).toBeVisible();
+  await expect(legend).toBeVisible();
+});
+
+test('基本・充実・すべてをURLへ反映し、リロード後も維持する', async ({ page }) => {
   await page.goto('/matrix/');
-  await expect(page.getByRole('button', { name: /主要\s*24/ })).toHaveAttribute(
+  await expect(page.getByRole('button', { name: /基本\s*24/ })).toHaveAttribute(
     'aria-pressed',
     'true',
   );
+  await expect(page.getByText('美術史の骨格となる主要項目を表示')).toBeVisible();
 
-  await page.getByRole('button', { name: /詳細\s*30/ }).click();
+  await page.getByRole('button', { name: /すべて\s*30/ }).click();
   await expect(page).toHaveURL(/lod=detailed/);
   await page.reload();
-  await expect(page.getByRole('button', { name: /詳細\s*30/ })).toHaveAttribute(
+  await expect(page.getByRole('button', { name: /すべて\s*30/ })).toHaveAttribute(
     'aria-pressed',
     'true',
   );
+  await expect(page.getByText('収録済みの全項目を表示')).toBeVisible();
   await expect(page.locator('[data-matrix-lod]')).toHaveAttribute(
     'data-matrix-lod',
     'detailed',
@@ -39,14 +54,14 @@ test('タイムラインは通史core、時代別standardを目的別初期値�
   await expect(page.locator('[data-timeline-bar="symbolism"]').first()).toBeVisible();
 });
 
-test('検索はLOD外の項目を見つけ、標準表示へ切り替えられる', async ({ page }) => {
+test('検索はLOD外の項目を見つけ、充実表示へ切り替えられる', async ({ page }) => {
   await page.goto('/movements/?lod=core');
   await page.getByRole('searchbox').fill('未来派');
 
-  await expect(page.getByText('現在の表示密度では非表示')).toBeVisible();
-  await page.getByRole('button', { name: '標準で表示' }).click();
+  await expect(page.getByText('現在の表示範囲では非表示')).toBeVisible();
+  await page.getByRole('button', { name: '充実で表示' }).click();
   await expect(page).toHaveURL(/lod=standard/);
-  await expect(page.getByText('現在の表示密度では非表示')).toHaveCount(0);
+  await expect(page.getByText('現在の表示範囲では非表示')).toHaveCount(0);
 });
 
 test('マトリクスはセル内件数を制限し、+Nでそのセルだけ展開する', async ({ page }) => {
@@ -90,7 +105,7 @@ test('ネットワークはLOD外ノードをDOMへ描画しない', async ({ pa
   await expect(graph).toHaveAttribute('data-network-lod', 'core');
   await expect(graph.getByRole('button', { name: '未来派を選択' })).toHaveCount(0);
 
-  await page.getByRole('button', { name: /標準\s*30/ }).click();
+  await page.getByRole('button', { name: /充実\s*30/ }).click();
   if (testInfo.project.name === 'mobile') {
     await page.getByRole('button', { name: 'すべて表示' }).click();
   }
