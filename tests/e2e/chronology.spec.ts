@@ -295,6 +295,12 @@ test('ダークモードでも時代と展示の階層を維持する', async ({
   );
   expect(pageColor).toBe('rgb(22, 22, 24)');
 
+  const eventSurface = medieval
+    .locator('[data-chronology-event]')
+    .first()
+    .locator('.chronology-event__body');
+  await expect(eventSurface).toHaveCSS('background-color', 'rgb(38, 38, 42)');
+
   if (testInfo.project.name === 'desktop') {
     await expect
       .poll(async () => (await medieval.boundingBox())?.y ?? 999)

@@ -2413,6 +2413,10 @@ html.dark .timeline-era-option[aria-current='true'] {
     );
   }
 
+  :root:not([data-theme='light']) .chronology-event__body {
+    background: rgb(var(--c-raised));
+  }
+
   :root:not([data-theme='light']) .chronology-era--earth {
     --era-accent: 202 150 110;
   }
@@ -2453,6 +2457,11 @@ html.dark .chronology-era {
     rgb(var(--era-accent) / 0.12),
     transparent 58%
   );
+}
+
+:root[data-theme='dark'] .chronology-event__body,
+html.dark .chronology-event__body {
+  background: rgb(var(--c-raised));
 }
 
 :root[data-theme='dark'] .chronology-era--earth,
