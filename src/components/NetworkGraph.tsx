@@ -10,6 +10,14 @@ import {
   RELATION_LINE_STYLE,
 } from '@/lib/network-presentation';
 import { RELATION_COLOR } from './Badges';
+import { LodControl } from '@/components/LodControl';
+import {
+  aggregateRelationshipsForVisibleMovements,
+  filterMovementsByLod,
+  getGroupMovements,
+  getMovementGroup,
+} from '@/lib/movement-hierarchy';
+import { useLodState } from '@/lib/use-lod-state';
 
 type Props = {
   movements: Movement[];
@@ -64,6 +72,8 @@ export function NetworkGraph({ movements, relationships, eraOrder }: Props) {
   const [active, setActive] = useState<Set<RelationKind>>(new Set(ALL_KINDS));
   const [isMobile, setIsMobile] = useState(false);
   const [showAllMobile, setShowAllMobile] = useState(false);
+  const [expandedGroupIds, setExpandedGroupIds] = useState<Set<string>>(new Set());
+  const { lod, setLod } = useLodState('core');
 
   useEffect(() => {
     const media = window.matchMedia('(max-width: 639px)');
@@ -79,9 +89,30 @@ export function NetworkGraph({ movements, relationships, eraOrder }: Props) {
     return () => media.removeEventListener('change', update);
   }, []);
 
+  const lodMovements = useMemo(() => {
+    const base = filterMovementsByLod(movements, lod);
+    const ids = new Set(base.map((movement) => movement.id));
+    for (const groupId of expandedGroupIds) {
+      for (const movement of getGroupMovements(groupId, movements)) {
+        ids.add(movement.id);
+      }
+    }
+    return movements.filter((movement) => ids.has(movement.id));
+  }, [expandedGroupIds, lod, movements]);
+
+  const aggregatedEdges = useMemo(
+    () =>
+      aggregateRelationshipsForVisibleMovements(
+        relationships,
+        movements,
+        new Set(lodMovements.map((movement) => movement.id)),
+      ),
+    [lodMovements, movements, relationships],
+  );
+
   const filteredEdges = useMemo(
-    () => relationships.filter((relationship) => active.has(relationship.kind)),
-    [active, relationships],
+    () => aggregatedEdges.filter((relationship) => active.has(relationship.kind)),
+    [active, aggregatedEdges],
   );
 
   const visibleEdges = useMemo(
@@ -92,10 +123,10 @@ export function NetworkGraph({ movements, relationships, eraOrder }: Props) {
   );
 
   const displayedMovements = useMemo(() => {
-    if (!isMobile || showAllMobile) return movements;
+    if (!isMobile || showAllMobile) return lodMovements;
 
     if (visibleEdges.length === 0) {
-      return [...movements]
+      return [...lodMovements]
         .sort((a, b) => a.dates.start - b.dates.start)
         .slice(0, 18);
     }
@@ -103,8 +134,8 @@ export function NetworkGraph({ movements, relationships, eraOrder }: Props) {
     const visibleIds = new Set(
       visibleEdges.flatMap((relationship) => [relationship.from, relationship.to]),
     );
-    return movements.filter((movement) => visibleIds.has(movement.id));
-  }, [isMobile, movements, showAllMobile, visibleEdges]);
+    return lodMovements.filter((movement) => visibleIds.has(movement.id));
+  }, [isMobile, lodMovements, showAllMobile, visibleEdges]);
 
   const layout = useMemo(() => {
     const colStep = isMobile ? 176 : 210;
@@ -188,12 +219,44 @@ export function NetworkGraph({ movements, relationships, eraOrder }: Props) {
   const selectedMovement = selected
     ? movements.find((movement) => movement.id === selected)
     : null;
+  const selectedGroup = selectedMovement
+    ? getMovementGroup(selectedMovement.id, movements)
+    : undefined;
+
+  const relationshipCountByNode = useMemo(() => {
+    const counts = new Map<string, number>();
+    for (const relationship of visibleEdges) {
+      counts.set(
+        relationship.from,
+        (counts.get(relationship.from) ?? 0) + relationship.aggregateCount,
+      );
+      counts.set(
+        relationship.to,
+        (counts.get(relationship.to) ?? 0) + relationship.aggregateCount,
+      );
+    }
+    return counts;
+  }, [visibleEdges]);
 
   const movementName = (id: string) =>
     movements.find((movement) => movement.id === id)?.nameJa ?? id;
 
   return (
     <div>
+      <LodControl
+        value={lod}
+        onChange={(next) => {
+          setSelected(null);
+          setExpandedGroupIds(new Set());
+          setLod(next);
+        }}
+        counts={{
+          core: filterMovementsByLod(movements, 'core').length,
+          standard: filterMovementsByLod(movements, 'standard').length,
+          detailed: filterMovementsByLod(movements, 'detailed').length,
+        }}
+      />
+
       <fieldset className="mb-4">
         <legend className="text-xs font-bold text-muted">関係タイプ</legend>
         <div className="mt-1 flex items-start justify-between gap-3">
@@ -263,6 +326,7 @@ export function NetworkGraph({ movements, relationships, eraOrder }: Props) {
         role="group"
         aria-label="美術運動の関係ネットワーク図"
         data-network-scope={isMobile && !showAllMobile ? 'important' : 'all'}
+        data-network-lod={lod}
       >
         <div
           className="relative"
@@ -379,7 +443,17 @@ export function NetworkGraph({ movements, relationships, eraOrder }: Props) {
               >
                 <button
                   type="button"
-                  onClick={() => setSelected(isSelected ? null : movement.id)}
+                  onClick={() => {
+                    if (isSelected) {
+                      setSelected(null);
+                      return;
+                    }
+                    setSelected(movement.id);
+                    const group = getMovementGroup(movement.id, movements);
+                    if (group && movement.id === group.representativeMovementId) {
+                      setExpandedGroupIds((current) => new Set(current).add(group.id));
+                    }
+                  }}
                   onDoubleClick={() => router.push(`/movements/${movement.id}/`)}
                   aria-pressed={isSelected}
                   aria-label={`${movement.nameJa}を選択`}
@@ -402,6 +476,11 @@ export function NetworkGraph({ movements, relationships, eraOrder }: Props) {
                       : movement.dates.start}
                     〜
                   </span>
+                  {(relationshipCountByNode.get(movement.id) ?? 0) > 1 && (
+                    <span className="truncate text-[9px] font-bold text-muted">
+                      関連 {relationshipCountByNode.get(movement.id)}
+                    </span>
+                  )}
                 </button>
               </div>
             );
@@ -413,6 +492,26 @@ export function NetworkGraph({ movements, relationships, eraOrder }: Props) {
         <div className="mt-4 border-l-2 border-accent bg-surface px-4 py-3">
           <h3 className="font-serif text-lg">{selectedMovement.nameJa}</h3>
           <p className="mt-1 max-w-prose text-sm text-muted">{selectedMovement.summary}</p>
+          {selectedGroup &&
+            selectedMovement.id === selectedGroup.representativeMovementId && (
+              <button
+                type="button"
+                onClick={() =>
+                  setExpandedGroupIds((current) => {
+                    const next = new Set(current);
+                    if (next.has(selectedGroup.id)) next.delete(selectedGroup.id);
+                    else next.add(selectedGroup.id);
+                    return next;
+                  })
+                }
+                aria-expanded={expandedGroupIds.has(selectedGroup.id)}
+                className="mt-3 min-h-11 border-l-2 border-accent px-3 text-xs font-bold text-ink hover:bg-raised"
+              >
+                {expandedGroupIds.has(selectedGroup.id)
+                  ? `${selectedGroup.label}を集約`
+                  : `${selectedGroup.label}の内訳を展開`}
+              </button>
+            )}
           <a
             href={`/movements/${selectedMovement.id}/`}
             className="mt-2 inline-block text-sm prose-link"
@@ -450,6 +549,11 @@ export function NetworkGraph({ movements, relationships, eraOrder }: Props) {
                   </a>
                 </p>
                 <p className="mt-1 text-xs leading-relaxed text-muted">{relationship.note}</p>
+                {relationship.aggregateCount > 1 && (
+                  <p className="mt-1 text-[11px] font-bold text-faint">
+                    {relationship.aggregateCount}件を集約
+                  </p>
+                )}
               </li>
             ))}
           </ul>

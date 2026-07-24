@@ -28,13 +28,13 @@ export const MOBILE_PRIMARY_KINDS: RelationKind[] = [
 export const MOBILE_EDGE_LIMIT = 18;
 export const MOBILE_NODE_LIMIT = 24;
 
-export function limitMobileRelationships(
-  relationships: Relationship[],
+export function limitMobileRelationships<T extends Relationship>(
+  relationships: T[],
   edgeLimit = MOBILE_EDGE_LIMIT,
   nodeLimit = MOBILE_NODE_LIMIT,
-): Relationship[] {
+): T[] {
   const nodeIds = new Set<string>();
-  const result: Relationship[] = [];
+  const result: T[] = [];
 
   for (const relationship of relationships) {
     const nextNodeIds = new Set(nodeIds);
