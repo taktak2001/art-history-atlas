@@ -12,6 +12,7 @@ import {
   MAX_COMPARE,
   compareMovements,
 } from '@/lib/compare';
+import { getMovementChildren } from '@/lib/movement-hierarchy';
 
 export function CompareBoard() {
   const searchParams = useSearchParams();
@@ -121,6 +122,11 @@ export function CompareBoard() {
                       </button>
                     </div>
                     <span className="mt-1 block text-[11px] uppercase tracking-wider text-faint">{m.nameEn}</span>
+                    {getMovementChildren(m.id, movements).length > 0 && (
+                      <span className="mt-2 block border-l-2 border-accent/50 pl-2 text-[11px] font-normal leading-relaxed text-muted">
+                        この項目は複数のサブムーブメントを含む上位分類です
+                      </span>
+                    )}
                   </th>
                 ))}
               </tr>
