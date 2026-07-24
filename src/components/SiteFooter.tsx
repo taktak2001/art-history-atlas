@@ -6,10 +6,16 @@ export function SiteFooter() {
       <div className="mx-auto max-w-layout px-4 py-10 text-sm text-muted sm:py-12">
         <div className="grid grid-cols-2 gap-x-6 gap-y-9 sm:grid-cols-[1.2fr_1fr_1fr] sm:gap-10">
           <div className="col-span-2 sm:col-span-1">
-            <Link href="/" className="inline-flex flex-col leading-none text-ink">
-              <span className="font-serif text-lg tracking-wide">美術史アトラス</span>
-              <span className="mt-1 text-[11px] uppercase tracking-[0.16em] text-faint">
-                Art History Atlas
+            <Link
+              href="/"
+              className="inline-flex flex-col leading-none text-ink"
+              aria-label="Art History Atlas"
+            >
+              <span
+                className="font-serif text-lg tracking-[0.12em]"
+                aria-hidden="true"
+              >
+                ART HISTORY ATLAS
               </span>
             </Link>
           </div>

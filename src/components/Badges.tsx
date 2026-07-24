@@ -9,6 +9,10 @@ import {
   type VerificationStatus,
   type RelationKind,
 } from '@/lib/schema';
+import {
+  RELATION_COLOR,
+  RELATION_DARK_COLOR,
+} from '@/lib/relationship-definitions';
 
 export function ClassificationBadge({ kind }: { kind: ClassificationKind }) {
   return (
@@ -50,32 +54,6 @@ export function VerificationBadge({ status }: { status: VerificationStatus }) {
     </span>
   );
 }
-
-// 関係タイプ：種類ごとに識別色を持たせつつ、必ずラベルを併記する
-// テキストとしても用いるため、紙・白背景で4.5:1以上を満たす濃さに調整
-export const RELATION_COLOR: Record<RelationKind, string> = {
-  succession: '#3f6349',
-  reaction: '#8f3a27',
-  influence: '#345d84',
-  contemporary: '#6a5f2e',
-  'regional-variant': '#5b4a86',
-  theoretical: '#42646a',
-  technical: '#665742',
-  revival: '#83582d',
-  'shared-idea': '#6a4b5a',
-};
-
-const RELATION_DARK_COLOR: Record<RelationKind, string> = {
-  succession: '#6ee7b7',
-  reaction: '#fdba74',
-  influence: '#93c5fd',
-  contemporary: '#fcd34d',
-  'regional-variant': '#c4b5fd',
-  theoretical: '#67e8f9',
-  technical: '#d6d3d1',
-  revival: '#fde047',
-  'shared-idea': '#fda4af',
-};
 
 export function RelationBadge({ kind }: { kind: RelationKind }) {
   return (

@@ -6,10 +6,10 @@ test('iPhone幅では重要関係と制限したノードだけを初期表示�
 
   const graph = page.getByRole('group', { name: '美術運動の関係ネットワーク図' });
   await expect(graph).toHaveAttribute('data-network-scope', 'important');
-  await expect(page.getByRole('button', { name: '継承', exact: true })).toHaveAttribute('aria-pressed', 'true');
-  await expect(page.getByRole('button', { name: '反発', exact: true })).toHaveAttribute('aria-pressed', 'true');
-  await expect(page.getByRole('button', { name: '影響', exact: true })).toHaveAttribute('aria-pressed', 'true');
-  await expect(page.getByRole('button', { name: '同時代', exact: true })).toHaveAttribute('aria-pressed', 'false');
+  await expect(graph).toHaveAttribute('data-network-mobile', 'true');
+  await expect(page.getByRole('combobox', { name: '表示する関係タイプ' })).toHaveValue(
+    'all',
+  );
   const edgeCount = await graph
     .locator('[data-network-layer="base-edges"] [data-network-edge]')
     .count();
@@ -30,10 +30,7 @@ test('モバイルですべての関係へ切り替えられる', async ({ page 
   await page.getByRole('button', { name: 'すべて表示' }).click();
 
   await expect(graph).toHaveAttribute('data-network-scope', 'all');
-  await expect(page.getByRole('button', { name: '理論的関連', exact: true })).toHaveAttribute(
-    'aria-pressed',
-    'true',
-  );
+  await expect(page.getByRole('option', { name: '理論的関連' })).toBeAttached();
   expect(
     await graph.locator('[data-network-layer="base-edges"] [data-network-edge]').count(),
   ).toBeGreaterThan(18);
@@ -49,6 +46,58 @@ test('PCにも表示切替と件数を常時表示する', async ({ page }) => {
   await expect(page.getByText(/関係・\d+ノード表示中/)).toBeVisible();
 });
 
+test('iPhoneでは本体が初期viewport内に入り、線の見方はoverlayで開く', async ({ page }) => {
+  await page.setViewportSize({ width: 390, height: 844 });
+  await page.goto('/network/');
+
+  const graph = page.getByRole('group', { name: '美術運動の関係ネットワーク図' });
+  const guide = page.locator('details.network-line-guide');
+  const before = await graph.boundingBox();
+  expect(before).not.toBeNull();
+  expect(before!.y).toBeLessThan(844);
+  await expect(guide).not.toHaveAttribute('open', '');
+
+  await guide.locator('summary').click();
+  await expect(guide).toHaveAttribute('open', '');
+  await expect(guide.locator('summary')).toHaveAttribute('aria-expanded', 'true');
+  await expect(guide.locator('.network-line-guide__panel')).toBeVisible();
+  await expect(guide.locator('.network-line-guide__legend li')).toHaveCount(9);
+  await expect(
+    guide.getByText(
+      '中心的な方法や問題意識を、後続運動が直接引き継ぐ関係',
+      { exact: true },
+    ),
+  ).toBeVisible();
+  await expect(guide.locator('.network-line-guide__definitions')).toHaveCount(0);
+  await expect(page.locator('.network-core-definitions')).toHaveCount(0);
+  const after = await graph.boundingBox();
+  expect(after!.y).toBeCloseTo(before!.y, 0);
+
+  await page.getByRole('heading', { name: '関係ネットワーク' }).click();
+  await expect(guide).not.toHaveAttribute('open', '');
+  await expect(guide.locator('summary')).toHaveAttribute('aria-expanded', 'false');
+});
+
+test('線の見方はEscapeで閉じ、操作説明だけを上部に残す', async ({ page }) => {
+  await page.setViewportSize({ width: 390, height: 844 });
+  await page.goto('/network/');
+
+  const guide = page.locator('details.network-line-guide');
+  const summary = guide.locator('summary');
+  await expect(
+    page.getByText('横にスワイプして移動。ノードをタップして関係を表示', {
+      exact: true,
+    }),
+  ).toBeVisible();
+  await expect(page.locator('.network-core-definitions')).toHaveCount(0);
+
+  await summary.click();
+  await expect(guide).toHaveAttribute('open', '');
+  await page.keyboard.press('Escape');
+  await expect(guide).not.toHaveAttribute('open', '');
+  await expect(summary).toBeFocused();
+});
+
 test('関係タイプごとに線種・通常線幅・方向を使い分ける', async ({ page }) => {
   await page.goto('/network/');
 
@@ -57,13 +106,43 @@ test('関係タイプごとに線種・通常線幅・方向を使い分ける',
   const succession = base.locator('[data-relation-kind="succession"] [data-network-edge]').first();
   const reaction = base.locator('[data-relation-kind="reaction"] [data-network-edge]').first();
   const influence = base.locator('[data-relation-kind="influence"] [data-network-edge]').first();
+  const expectedNormalWidth =
+    (page.viewportSize()?.width ?? 1280) <= 639 ? '2' : '2.8';
 
-  await expect(succession).toHaveAttribute('stroke-width', '2.8');
+  await expect(succession).toHaveAttribute('stroke-width', expectedNormalWidth);
   await expect(reaction).toHaveAttribute('stroke-dasharray', '9 6');
   await expect(influence).toHaveAttribute('stroke-dasharray', '18 8');
-  await expect(succession).toHaveAttribute('marker-end', 'url(#network-arrow-succession)');
-  await expect(reaction).toHaveAttribute('marker-end', 'url(#network-arrow-reaction)');
-  await expect(influence).toHaveAttribute('marker-end', 'url(#network-arrow-influence)');
+  await expect(succession).toHaveAttribute('marker-end', 'url(#base-arrow-succession)');
+  await expect(reaction).toHaveAttribute('marker-end', 'url(#base-arrow-reaction)');
+  await expect(influence).toHaveAttribute('marker-end', 'url(#base-arrow-influence)');
+});
+
+test('SVG markerは安全余白と共通仕様を持ち、無向線には付かない', async ({ page }) => {
+  await page.goto('/network/');
+  await page.getByRole('button', { name: 'すべて表示' }).click();
+
+  const graph = page.getByRole('group', { name: '美術運動の関係ネットワーク図' });
+  const base = graph.locator('[data-network-layer="base-edges"]');
+  await expect(base).toHaveAttribute('data-safe-padding', '16');
+  await expect(base).toHaveAttribute('overflow', 'visible');
+
+  const markers = base.locator('marker[data-arrow-marker]');
+  expect(await markers.count()).toBeGreaterThan(0);
+  for (const marker of await markers.all()) {
+    await expect(marker).toHaveAttribute('markerUnits', 'userSpaceOnUse');
+    await expect(marker).toHaveAttribute('markerWidth', '10');
+    await expect(marker).toHaveAttribute('markerHeight', '10');
+    await expect(marker).toHaveAttribute('overflow', 'visible');
+  }
+
+  const directed = base.locator(
+    '[data-network-edge][data-relation-kind="succession"]',
+  ).first();
+  const undirected = base.locator(
+    '[data-network-edge][data-relation-kind="contemporary"]',
+  ).first();
+  await expect(directed).toHaveAttribute('marker-end', /base-arrow-succession/);
+  await expect(undirected).not.toHaveAttribute('marker-end');
 });
 
 test('ノード選択時は強調線を無関係ノードより前、関連ノードより後ろに描く', async ({ page }) => {
@@ -74,13 +153,15 @@ test('ノード選択時は強調線を無関係ノードより前、関連ノ�
 
   const highlightedLayer = graph.locator('[data-network-layer="highlighted-edges"]');
   const baseLayer = graph.locator('[data-network-layer="base-edges"]');
+  const expectedHighlightWidth =
+    (page.viewportSize()?.width ?? 1280) <= 639 ? '3.6' : '4.6';
   await expect(highlightedLayer.locator('[data-network-edge]').first()).toHaveAttribute(
     'stroke-width',
-    '4.6',
+    expectedHighlightWidth,
   );
   await expect(baseLayer.locator('[data-network-edge]').first()).toHaveAttribute(
     'stroke-width',
-    '1.2',
+    '1.1',
   );
   await expect(baseLayer.locator('[data-network-edge]').first()).toHaveAttribute(
     'opacity',
@@ -168,11 +249,20 @@ test('関係タイプの絞り込みが図とテキスト一覧の両方へ反�
   await page.goto('/network/');
 
   const graph = page.getByRole('group', { name: '美術運動の関係ネットワーク図' });
-  await page.getByRole('button', { name: '反発', exact: true }).click();
+  await page
+    .getByRole('combobox', { name: '表示する関係タイプ' })
+    .selectOption('reaction');
 
-  await expect(page.getByRole('button', { name: '反発', exact: true })).toHaveAttribute('aria-pressed', 'false');
-  await expect(graph.locator('[data-relation-kind="reaction"]')).toHaveCount(0);
-  await expect(page.locator('[data-relation-list-item][data-relation-kind="reaction"]')).toHaveCount(0);
+  expect(await graph.locator('[data-network-edge]').count()).toBeGreaterThan(0);
+  await expect(
+    graph.locator('[data-network-edge]:not([data-relation-kind="reaction"])'),
+  ).toHaveCount(0);
+  expect(
+    await page.locator('[data-relation-list-item][data-relation-kind="reaction"]').count(),
+  ).toBeGreaterThan(0);
+  await expect(
+    page.locator('[data-relation-list-item]:not([data-relation-kind="reaction"])'),
+  ).toHaveCount(0);
 });
 
 test('ダークモードと動きを減らす設定を尊重する', async ({ page }) => {
@@ -189,3 +279,22 @@ test('ダークモードと動きを減らす設定を尊重する', async ({ pa
     .evaluate((element) => getComputedStyle(element).transitionDuration);
   expect(['0s', '0.000001s', '1e-06s']).toContain(transitionDuration);
 });
+
+for (const zoom of [1.25, 1.5]) {
+  test(`ブラウザズーム${Math.round(zoom * 100)}%相当でもmarkerと本体を表示する`, async ({
+    page,
+  }) => {
+    await page.setViewportSize({ width: 1440, height: 1000 });
+    await page.goto('/network/');
+    await page.evaluate((value) => {
+      document.documentElement.style.zoom = String(value);
+    }, zoom);
+
+    const graph = page.getByRole('group', { name: '美術運動の関係ネットワーク図' });
+    await expect(graph).toBeVisible();
+    expect(await graph.locator('marker[data-arrow-marker]').count()).toBeGreaterThan(0);
+    const box = await graph.boundingBox();
+    expect(box!.width).toBeGreaterThan(300);
+    expect(box!.height).toBeGreaterThan(200);
+  });
+}

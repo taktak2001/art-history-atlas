@@ -295,45 +295,16 @@ export function ChronologyView({ movements }: { movements: Movement[] }) {
     }
   };
 
-  const navigateToEra = (era: EraId) => {
-    setExpandedEras(new Set([era]));
-    window.requestAnimationFrame(() => {
-      document.getElementById(`era-${era}`)?.scrollIntoView({
-        behavior: window.matchMedia('(prefers-reduced-motion: reduce)').matches
-          ? 'auto'
-          : 'smooth',
-        block: 'start',
-      });
-    });
-  };
-
   return (
     <>
       <div className="chronology-controls">
-        <LodControl value={lod} onChange={setLod} counts={counts} compact />
+        <LodControl
+          value={lod}
+          onChange={setLod}
+          counts={counts}
+          exhibition
+        />
       </div>
-
-      <nav
-        aria-label="時代ナビゲーション"
-        className="chronology-era-nav"
-      >
-        <ul className="scroll-x flex gap-2">
-          {CHRONOLOGY_ERAS.map((era) => (
-            <li key={era.id} className="shrink-0">
-              <a
-                href={`#era-${era.id}`}
-                onClick={(event) => {
-                  event.preventDefault();
-                  navigateToEra(era.id);
-                }}
-                className="chronology-era-nav__link"
-              >
-                {era.label}
-              </a>
-            </li>
-          ))}
-        </ul>
-      </nav>
 
       <div
         className="chronology-gallery"
@@ -362,58 +333,81 @@ export function ChronologyView({ movements }: { movements: Movement[] }) {
                 aria-controls={panelId}
                 onClick={() => toggleEra(era.id)}
               >
+                <span className="sr-only">第{eraIndex + 1}章</span>
                 <span className="chronology-era__number" aria-hidden="true">
                   {String(eraIndex + 1).padStart(2, '0')}
                 </span>
                 <span className="chronology-era__identity">
-                  <span className="chronology-era__title">{era.label}</span>
-                  <span className="chronology-era__meta">
-                    <span className="chronology-era__range">{era.range}</span>
-                    <span aria-hidden="true">・</span>
-                    <span>{eraMovements.length}件</span>
-                  </span>
-                  {isExpanded && (
-                    <span className="chronology-era__catchphrase">
-                      「{era.catchphrase}」
+                  <span className="chronology-era__names">
+                    <span className="chronology-era__title-en">
+                      {era.labelEn}
                     </span>
-                  )}
-                </span>
-                <span className="chronology-era__action">
-                  <span className="chronology-era__toggle" aria-hidden="true">
-                    {isExpanded ? '−' : '＋'}
+                    <span className="chronology-era__title">{era.label}</span>
                   </span>
+                  <span className="chronology-era__details">
+                    <span className="chronology-era__meta">
+                      <span className="chronology-era__range">{era.range}</span>
+                      <span>
+                        {eraMovements.length}{' '}
+                        {eraMovements.length === 1 ? 'movement' : 'movements'}
+                      </span>
+                    </span>
+                    {isExpanded && (
+                      <span className="chronology-era__catchphrase">
+                        「{era.catchphrase}」
+                      </span>
+                    )}
+                  </span>
+                </span>
+                <span className="chronology-era__chevron" aria-hidden="true">
+                  <svg
+                    width="20"
+                    height="20"
+                    viewBox="0 0 24 24"
+                    aria-hidden="true"
+                    fill="none"
+                    stroke="currentColor"
+                    strokeWidth="1.5"
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                  >
+                    <path d="m9 5 7 7-7 7" />
+                  </svg>
                 </span>
               </button>
 
-              {isExpanded && (
-                <div
-                  id={panelId}
-                  className="chronology-exhibit"
-                  data-era-panel={era.id}
-                >
-                  <p className="chronology-exhibit__intro">
-                    時代の背景、代表作品、ムーブメントの継承を年代順にたどります。
-                  </p>
-                  <div className="chronology-exhibit__rail">
-                    {entries.map((entry) =>
-                      entry.kind === 'event' ? (
-                        <HistoricEventEntry
-                          key={`event-${entry.event.id}`}
-                          event={entry.event}
-                          movementById={movementById}
-                        />
-                      ) : (
-                        <MovementEntry
-                          key={`movement-${entry.movement.id}`}
-                          movement={entry.movement}
-                          allMovements={movements}
-                          visibleMovements={visible}
-                        />
-                      ),
-                    )}
-                  </div>
-                </div>
-              )}
+              <div
+                id={panelId}
+                className="chronology-exhibit"
+                data-era-panel={isExpanded ? era.id : undefined}
+                hidden={!isExpanded}
+              >
+                {isExpanded && (
+                  <>
+                    <p className="chronology-exhibit__intro">
+                      時代の背景、代表作品、ムーブメントの継承を年代順にたどります。
+                    </p>
+                    <div className="chronology-exhibit__rail">
+                      {entries.map((entry) =>
+                        entry.kind === 'event' ? (
+                          <HistoricEventEntry
+                            key={`event-${entry.event.id}`}
+                            event={entry.event}
+                            movementById={movementById}
+                          />
+                        ) : (
+                          <MovementEntry
+                            key={`movement-${entry.movement.id}`}
+                            movement={entry.movement}
+                            allMovements={movements}
+                            visibleMovements={visible}
+                          />
+                        ),
+                      )}
+                    </div>
+                  </>
+                )}
+              </div>
             </section>
           );
         })}

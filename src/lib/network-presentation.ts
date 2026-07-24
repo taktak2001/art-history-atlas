@@ -37,47 +37,6 @@ export const MOBILE_PRIMARY_KINDS: RelationKind[] = [
 export const MOBILE_EDGE_LIMIT = 18;
 export const MOBILE_NODE_LIMIT = 24;
 
-export type RelationshipDefinition = {
-  definition: string;
-  criteria: string[];
-  example: string;
-};
-
-export const CORE_RELATIONSHIP_DEFINITIONS: Record<
-  'succession' | 'influence',
-  RelationshipDefinition
-> = {
-  succession: {
-    definition:
-      '前の運動の中心的な方法・問題意識・形式を、次の運動が引き継ぎ発展させた関係。',
-    criteria: [
-      '比較的近い時代の系譜',
-      '中心的要素を引き継ぐ',
-      '後続運動の成立説明に不可欠',
-      '一部技法だけでなく運動の構造に関わる',
-    ],
-    example: '印象派 → ポスト印象派',
-  },
-  influence: {
-    definition:
-      '特定の技法・思想・作品・作家が、別の運動の一部に作用した関係。直接的な後継関係である必要はない。',
-    criteria: [
-      '時代・地域が離れていてもよい',
-      '一部の要素だけでも成立',
-      '直接の系譜ではない',
-      '複数方向から成立しうる',
-    ],
-    example: '浮世絵 → 印象派',
-  },
-};
-
-export const RELATIONSHIP_DECISION_AID = {
-  succession:
-    'その関係を除くと、後続運動の成立説明が大きく崩れる',
-  influence:
-    '成立の一因だが、直接の後継関係ではない',
-};
-
 export function isImportantRelationship(
   relationship: Pick<Relationship, 'kind'>,
 ): boolean {

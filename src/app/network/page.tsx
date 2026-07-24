@@ -9,16 +9,13 @@ export const metadata: Metadata = {
 
 export default function NetworkPage() {
   return (
-    <div className="mx-auto max-w-layout px-4 py-10">
+    <div className="network-page mx-auto max-w-layout px-4">
       <p className="text-xs uppercase tracking-[0.3em] text-faint">Network</p>
-      <h1 className="mt-3 font-serif text-3xl">関係ネットワーク</h1>
-      <p className="mt-3 max-w-prose text-sm text-muted">
-        ムーブメントを時代順の列に配置し、影響・反発・継承・同時代などの関係を線で結びます。
-        装飾ではなく「何が何への反応として成立したか」を読み解くための図です。関係タイプで絞り込み、
-        ノードを選ぶと前後関係だけを強調します。スマートフォンでは重要関係から表示し、
-        必要に応じてすべての関係へ切り替えられます。
+      <h1 className="network-page__title font-serif">関係ネットワーク</h1>
+      <p className="network-page__intro">
+        継承・反発・影響から、美術運動がどのように生まれ変化したかを辿ります。
       </p>
-      <div className="mt-8">
+      <div className="network-page__body">
         <NetworkGraph movements={movements} relationships={relationships} eraOrder={ERA_ORDER} />
       </div>
     </div>

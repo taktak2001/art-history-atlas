@@ -2,7 +2,7 @@ import { test, expect } from '@playwright/test';
 
 test('ホームからムーブメント詳細へ移動できる', async ({ page }) => {
   await page.goto('/');
-  await expect(page.getByRole('heading', { level: 1 })).toHaveText('美術史アトラス');
+  await expect(page.getByRole('heading', { level: 1 })).toHaveText('Art History Atlas');
   // 主要な転換点のカードから印象派へ
   await page.getByRole('link', { name: /印象派/ }).first().click();
   await expect(page).toHaveURL(/\/movements\/impressionism\/?$/);
@@ -106,9 +106,23 @@ test('PWA: manifestとService Workerが提供される', async ({ page, request 
   const manifest = await request.get('/manifest.webmanifest');
   expect(manifest.ok()).toBeTruthy();
   const manifestJson = await manifest.json();
-  expect(manifestJson.name).toContain('美術史アトラス');
+  expect(manifestJson.name).toBe('Art History Atlas');
+  expect(manifestJson.short_name).toBe('Art History Atlas');
   expect(manifestJson.display).toBe('standalone');
   expect(manifestJson.icons.length).toBeGreaterThanOrEqual(2);
   const sw = await request.get('/sw.js');
   expect(sw.ok()).toBeTruthy();
+  expect(await sw.text()).toContain("const VERSION = 'v3'");
+
+  const offline = await request.get('/offline.html');
+  expect(offline.ok()).toBeTruthy();
+  expect(await offline.text()).toContain('<title>オフライン | Art History Atlas</title>');
+});
+
+test('404ページも正式名称のtitle templateと読み上げ名を使う', async ({ page }) => {
+  await page.goto('/404.html');
+  await expect(page).toHaveTitle('404 | Art History Atlas');
+    await expect(page.locator('#main').getByLabel('Art History Atlas')).toBeVisible();
+  const retiredJapaneseName = ['美術史', 'アトラス'].join('');
+  await expect(page.locator('body')).not.toContainText(retiredJapaneseName);
 });
