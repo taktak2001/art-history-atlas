@@ -3,6 +3,8 @@ import { describe, expect, it } from 'vitest';
 import { ArrowMarkerDefs, RelationLine } from '@/components/RelationLine';
 import {
   getNetworkEdgeGeometry,
+  getNetworkEdgeRouteOffset,
+  getParallelEdgeRouteOffset,
   getNetworkViewBox,
   getRectangleBoundaryPoint,
   NETWORK_ARROW_GAP,
@@ -43,6 +45,71 @@ describe('network geometry', () => {
   it('描画領域に16pxの安全余白定数を持つ', () => {
     expect(NETWORK_SVG_SAFE_PADDING).toBe(16);
     expect(getNetworkViewBox(1200, 640)).toBe('0 0 1200 640');
+  });
+
+  it('長距離線の途中にノードがある場合は迂回し、近距離線は直線を保つ', () => {
+    const renaissance = { x: 40, y: 74 };
+    const baroque = { x: 252, y: 74 };
+    const cubism = { x: 888, y: 74 };
+    const positions = [renaissance, baroque, cubism];
+
+    expect(
+      getNetworkEdgeRouteOffset(
+        renaissance,
+        baroque,
+        148,
+        58,
+        positions,
+      ),
+    ).toBe(0);
+
+    const longRouteOffset = getNetworkEdgeRouteOffset(
+      renaissance,
+      cubism,
+      148,
+      58,
+      positions,
+    );
+    expect(longRouteOffset).toBeLessThan(0);
+
+    const direct = getNetworkEdgeGeometry(
+      renaissance,
+      baroque,
+      148,
+      58,
+      true,
+    );
+    const routed = getNetworkEdgeGeometry(
+      renaissance,
+      cubism,
+      148,
+      58,
+      true,
+      undefined,
+      longRouteOffset,
+    );
+    expect(routed.midY).toBeLessThan(direct.midY);
+    expect(routed.d).not.toBe(direct.d);
+  });
+
+  it('同じ端点を持つ継承と反発を別レーンへ分ける', () => {
+    const edges = [
+      {
+        id: 'reaction-renaissance-baroque',
+        from: 'renaissance',
+        to: 'baroque',
+        kind: 'reaction',
+      },
+      {
+        id: 'succession-renaissance-baroque',
+        from: 'renaissance',
+        to: 'baroque',
+        kind: 'succession',
+      },
+    ];
+
+    expect(getParallelEdgeRouteOffset(edges[1], edges)).toBe(0);
+    expect(getParallelEdgeRouteOffset(edges[0], edges)).toBe(-24);
   });
 });
 

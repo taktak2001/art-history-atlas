@@ -186,6 +186,38 @@ test('ノード選択時は強調線を無関係ノードより前、関連ノ�
   );
 });
 
+test('ルネサンスから伸びる反発線をバロックへの継承線と分離する', async ({
+  page,
+}) => {
+  await page.setViewportSize({ width: 390, height: 844 });
+  await page.goto('/network/');
+
+  const graph = page.getByRole('group', { name: '美術運動の関係ネットワーク図' });
+  const base = graph.locator('[data-network-layer="base-edges"]');
+  const collapsedSuccession = base.locator(
+    '[data-network-edge-id="lod-succession-italian-renaissance-baroque"]',
+  );
+  const collapsedReaction = base.locator(
+    '[data-network-edge-id="lod-reaction-italian-renaissance-baroque"]',
+  );
+
+  await expect(collapsedSuccession).toHaveAttribute('data-route-offset', '0');
+  await expect(collapsedReaction).toHaveAttribute('data-route-offset', '-24');
+
+  await graph.getByRole('button', { name: 'イタリア・ルネサンスを選択' }).click();
+
+  const highlighted = graph.locator('[data-network-layer="highlighted-edges"]');
+  const succession = highlighted.locator(
+    '[data-network-edge-id="lod-succession-italian-renaissance-baroque"]',
+  );
+  const longReaction = highlighted.locator(
+    '[data-network-edge-id="lod-reaction-italian-renaissance-cubism"]',
+  );
+
+  await expect(succession).toHaveAttribute('data-route-offset', '0');
+  await expect(longReaction).toHaveAttribute('data-route-offset', /^-\d+$/);
+});
+
 test('関係選択時に起点・到達先と自然な反発文を表示する', async ({ page }) => {
   await page.goto('/network/');
 
