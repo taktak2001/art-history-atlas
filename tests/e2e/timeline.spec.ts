@@ -10,6 +10,8 @@ test('通史はコンパクトな俯瞰表示と1行ラベルを使う', async (
   await expect(track).toHaveAttribute('data-timeline-mode', 'survey');
   await expect(modeButton(page, '通史')).toHaveAttribute('aria-current', 'true');
   await expect(page.getByRole('button', { name: '通史へ戻る' })).toHaveCount(0);
+  await expect(page.getByRole('navigation', { name: '時代ナビゲーション' })).toHaveCount(0);
+  await expect(page.getByText('時代へ移動', { exact: true })).toHaveCount(0);
 
   const width = await track.evaluate((element) => element.getBoundingClientRect().width);
   if (testInfo.project.name === 'mobile') {

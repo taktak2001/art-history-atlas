@@ -26,7 +26,6 @@ import {
   timelineTicks,
   timelineWidthForMode,
   yearToTimelineX,
-  type TimelineEraBand,
   type TimelineModeId,
 } from '@/lib/timeline-presentation';
 
@@ -94,7 +93,6 @@ export function HorizontalTimeline({ movements, activeRegions }: Props) {
     active: false,
   });
   const [modeId, setModeId] = useState<TimelineModeId>('survey');
-  const [activeEraLabel, setActiveEraLabel] = useState<string | null>(null);
   const [activeMovementId, setActiveMovementId] = useState<string | null>(null);
   const [expandedMovementIds, setExpandedMovementIds] = useState<Set<string>>(
     new Set(),
@@ -400,7 +398,6 @@ export function HorizontalTimeline({ movements, activeRegions }: Props) {
   const selectMode = (nextMode: TimelineModeId) => {
     const nextModeDefinition = timelineModeById(nextMode);
     pendingJump.current = nextModeDefinition.focusYear;
-    setActiveEraLabel(null);
     setActiveMovementId(null);
     if (nextMode === modeId) {
       scrollToYear(nextModeDefinition.focusYear);
@@ -408,18 +405,6 @@ export function HorizontalTimeline({ movements, activeRegions }: Props) {
     }
     applyPurposeDefault(nextMode === 'survey' ? 'core' : 'standard');
     setModeId(nextMode);
-  };
-
-  const jumpToEra = (era: TimelineEraBand) => {
-    setActiveMovementId(null);
-    setActiveEraLabel(era.label);
-    if (era.mode === modeId) {
-      scrollToYear(era.jumpYear);
-      return;
-    }
-    pendingJump.current = era.jumpYear;
-    applyPurposeDefault(era.mode === 'survey' ? 'core' : 'standard');
-    setModeId(era.mode);
   };
 
   const toggleExpansion = (id: string) => {
@@ -494,26 +479,6 @@ export function HorizontalTimeline({ movements, activeRegions }: Props) {
           </div>
         </div>
 
-        <nav aria-label="時代ナビゲーション">
-          <p className="mb-2 hidden text-xs font-bold text-ink sm:block">時代へ移動</p>
-          <div className="scroll-x flex border-y hairline bg-raised sm:grid sm:grid-cols-8 sm:overflow-hidden sm:rounded-sm sm:border">
-            {TIMELINE_ERA_BANDS.map((era) => (
-              <button
-                key={era.label}
-                type="button"
-                onClick={() => jumpToEra(era)}
-                aria-current={activeEraLabel === era.label ? 'true' : undefined}
-                className={`min-h-11 min-w-[72px] shrink-0 border-r px-2 py-1.5 text-xs transition-colors active:translate-y-px sm:min-w-0 ${
-                  activeEraLabel === era.label
-                    ? 'border-b-[3px] border-b-accent bg-ink text-paper'
-                    : 'hairline text-muted hover:bg-surface hover:text-ink'
-                }`}
-              >
-                {era.label}
-              </button>
-            ))}
-          </div>
-        </nav>
       </div>
 
       <section
