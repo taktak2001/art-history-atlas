@@ -1,3 +1,4 @@
+import type { CSSProperties } from 'react';
 import {
   CLASSIFICATION_LABELS,
   REGION_LABELS,
@@ -64,16 +65,30 @@ export const RELATION_COLOR: Record<RelationKind, string> = {
   'shared-idea': '#6a4b5a',
 };
 
+const RELATION_DARK_COLOR: Record<RelationKind, string> = {
+  succession: '#6ee7b7',
+  reaction: '#fdba74',
+  influence: '#93c5fd',
+  contemporary: '#fcd34d',
+  'regional-variant': '#c4b5fd',
+  theoretical: '#67e8f9',
+  technical: '#d6d3d1',
+  revival: '#fde047',
+  'shared-idea': '#fda4af',
+};
+
 export function RelationBadge({ kind }: { kind: RelationKind }) {
   return (
     <span
-      className="inline-flex items-center gap-1.5 rounded-sm px-2 py-0.5 text-xs"
-      style={{ color: RELATION_COLOR[kind] }}
+      className="relation-badge inline-flex items-center gap-1.5 rounded-sm px-2 py-0.5 text-xs"
+      style={{
+        '--relation-color': RELATION_COLOR[kind],
+        '--relation-color-dark': RELATION_DARK_COLOR[kind],
+      } as CSSProperties}
     >
       <span
         aria-hidden="true"
-        className="inline-block h-2 w-2 rounded-full"
-        style={{ backgroundColor: RELATION_COLOR[kind] }}
+        className="relation-badge__mark inline-block h-2 w-2 rounded-full"
       />
       {RELATION_LABELS[kind]}
     </span>

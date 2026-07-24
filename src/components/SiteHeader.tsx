@@ -29,14 +29,12 @@ export function SiteHeader() {
         <Link
           href="/"
           className="site-wordmark"
-          aria-label="Art History Atlas ホーム"
           onClick={() => setOpen(false)}
         >
-          <span className="sr-only">Art History Atlas</span>
-          <span className="site-wordmark__stack" aria-hidden="true">
-            <span className="site-wordmark__line"><span>A</span><span>R</span><span>T</span></span>
-            <span className="site-wordmark__line"><span>H</span><span>I</span><span>S</span><span>T</span><span>O</span><span>R</span><span>Y</span></span>
-            <span className="site-wordmark__line"><span>A</span><span>T</span><span>L</span><span>A</span><span>S</span></span>
+          <span className="site-wordmark__stack">
+            <span className="site-wordmark__line">ART</span>
+            <span className="site-wordmark__line">HISTORY</span>
+            <span className="site-wordmark__line">ATLAS</span>
           </span>
         </Link>
 

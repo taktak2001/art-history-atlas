@@ -94,20 +94,20 @@ export default function HomePage() {
       </section>
 
       {/* 2. 時代を選ぶ入口 */}
-      <section className="py-12" aria-labelledby="eras-heading">
+      <section className="home-section" aria-labelledby="eras-heading">
         <HomeSectionHeading
           id="eras-heading"
           title="Explore by Era"
           description="時代ごとの価値基準から読む"
         />
-        <div className="mt-6 grid grid-cols-2 gap-px bg-line sm:grid-cols-4">
+        <div className="mt-5 grid grid-cols-2 gap-px bg-line sm:grid-cols-4">
           {ERA_ORDER.map((era) => {
             const count = movements.filter((m) => m.era === era).length;
             return (
               <Link
                 key={era}
                 href={`/chronology/#era-${era}`}
-                className="flex flex-col gap-1 bg-raised p-4 hover:bg-surface"
+                className="home-compact-card flex flex-col gap-1 bg-raised hover:bg-surface"
               >
                 <span className="font-serif text-lg">{ERA_LABELS[era]}</span>
                 <span className="text-xs text-faint">{count}件</span>
@@ -118,13 +118,13 @@ export default function HomePage() {
       </section>
 
       {/* 4. 主要な転換点 */}
-      <section className="border-t hairline py-12" aria-labelledby="turning-heading">
+      <section className="home-section border-t hairline" aria-labelledby="turning-heading">
         <HomeSectionHeading
           id="turning-heading"
           title="Turning Points"
           description="視点・空間・制度の前提が変わった局面"
         />
-        <div className="mt-6 grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+        <div className="home-card-grid mt-5 grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
           {turningPoints.map((id) => {
             const m = getMovement(id);
             return m ? <MovementCard key={id} movement={m} /> : null;
@@ -133,19 +133,19 @@ export default function HomePage() {
       </section>
 
       {/* 5. 何への反発として生まれたか */}
-      <section className="border-t hairline py-12" aria-labelledby="reaction-heading">
+      <section className="home-section border-t hairline" aria-labelledby="reaction-heading">
         <HomeSectionHeading
           id="reaction-heading"
           title="Reactions & Breaks"
           description="前時代への応答と反発を辿る"
         />
-        <ul className="mt-6 space-y-3">
+        <ul className="mt-5 space-y-3">
           {reactionEdges.map((r) => {
             const from = getMovement(r.from);
             const to = getMovement(r.to);
             if (!from || !to) return null;
             return (
-              <li key={r.id} className="border hairline bg-raised p-4">
+              <li key={r.id} className="home-compact-card border hairline bg-raised">
                 <div className="flex flex-wrap items-center gap-2 text-sm">
                   <Link href={`/movements/${to.id}/`} className="font-serif text-ink hover:text-accent">
                     {to.nameJa}
@@ -156,41 +156,41 @@ export default function HomePage() {
                     {from.nameJa}
                   </Link>
                 </div>
-                <p className="mt-2 text-sm text-muted">{r.note}</p>
+                <p className="home-body-copy mt-1.5 text-sm text-muted">{r.note}</p>
               </li>
             );
           })}
         </ul>
-        <Link href="/network/" className="mt-4 inline-block text-sm prose-link">
+        <Link href="/network/" className="mt-3 inline-block text-sm prose-link">
           関係ネットワーク全体を見る →
         </Link>
       </section>
 
       {/* 6. 地域別表示への導線 */}
-      <section className="border-t hairline py-12" aria-labelledby="region-heading">
+      <section className="home-section border-t hairline" aria-labelledby="region-heading">
         <HomeSectionHeading
           id="region-heading"
           title="Across Regions"
           description="同時代の地域差を比較する"
         />
-        <Link href="/matrix/" className="mt-4 inline-block rounded-sm border hairline px-5 py-3 text-sm hover:border-ink/40">
+        <Link href="/matrix/" className="mt-3 inline-block rounded-sm border hairline px-5 py-2.5 text-sm hover:border-ink/40">
           時代×地域マトリクスを開く →
         </Link>
       </section>
 
       {/* 7. 注目比較 */}
-      <section className="border-t hairline py-12" aria-labelledby="compare-heading">
+      <section className="home-section border-t hairline" aria-labelledby="compare-heading">
         <HomeSectionHeading
           id="compare-heading"
           title="Comparisons"
           description="2つのムーブメントを並べて読む"
         />
-        <div className="mt-6 grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+        <div className="mt-5 grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
           {featuredComparisons.map((c) => (
             <Link
               key={c.label}
               href={`/compare/?ids=${c.ids.join(',')}`}
-              className="border hairline bg-raised p-4 text-sm hover:border-ink/30"
+              className="home-compact-card border hairline bg-raised text-sm hover:border-ink/30"
             >
               <span className="font-serif text-base text-ink">{c.label}</span>
               <span className="mt-1 block text-xs text-faint">比較して読む →</span>
@@ -200,13 +200,13 @@ export default function HomePage() {
       </section>
 
       {/* 8. 最近追加されたムーブメント */}
-      <section className="border-t hairline py-12" aria-labelledby="recent-heading">
+      <section className="home-section border-t hairline" aria-labelledby="recent-heading">
         <HomeSectionHeading
           id="recent-heading"
           title="Latest Additions"
           description="最近追加したムーブメント"
         />
-        <div className="mt-6 grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+        <div className="home-card-grid mt-5 grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
           {recent.map((m) => (
             <MovementCard key={m.id} movement={m} />
           ))}
@@ -214,17 +214,17 @@ export default function HomePage() {
       </section>
 
       {/* 9. 情報の出典・編集方針 */}
-      <section className="border-t hairline py-12" aria-labelledby="policy-heading">
+      <section className="home-section border-t hairline" aria-labelledby="policy-heading">
         <HomeSectionHeading
           id="policy-heading"
           title="Sources & Methodology"
           description="出典・編集方針・分類基準"
         />
-        <p className="mt-4 max-w-prose text-sm leading-relaxed text-muted">
+        <p className="home-body-copy mt-3 max-w-prose text-sm text-muted">
           記述は美術館・大学・研究機関等の公開資料に基づきます。複数資料で確認できない事項は断定せず、年代に諸説がある場合は幅を持たせ、
           学術的に議論のある内容は「見解の一つ」と明示します。事実と解釈を区別し、出典を各記述に紐づけています。
         </p>
-        <div className="mt-4 flex flex-wrap gap-3">
+        <div className="mt-3 flex flex-wrap gap-3">
           <Link href="/sources/" className="text-sm prose-link">出典一覧を見る →</Link>
           <Link href="/about/" className="text-sm prose-link">編集方針・分類基準の詳細 →</Link>
         </div>
