@@ -662,7 +662,7 @@ export const movements: Movement[] = [
     keywords: ['ロマン主義', '崇高', '主観', '自然', 'フリードリヒ', 'ドラクロワ', 'ターナー'],
     artistIds: ['artist-friedrich', 'artist-delacroix', 'artist-turner'],
     workIds: ['work-wanderer-sea-of-fog'],
-    sourceIds: ['smarthistory-romanticism'],
+    sourceIds: ['smarthistory-romanticism', 'tate-romanticism'],
     verification: 'verified',
   },
 
@@ -714,7 +714,7 @@ export const movements: Movement[] = [
     keywords: ['写実主義', 'クールベ', '労働', '同時代性', '独立展', 'ミレー'],
     artistIds: ['artist-courbet', 'artist-millet'],
     workIds: [],
-    sourceIds: ['smarthistory-realism'],
+    sourceIds: ['smarthistory-realism', 'tate-realism'],
     verification: 'verified',
   },
 
@@ -820,7 +820,7 @@ export const movements: Movement[] = [
     keywords: ['ポスト印象派', 'セザンヌ', 'ゴッホ', 'ゴーギャン', '構造', '形式の自律', '点描'],
     artistIds: ['artist-cezanne', 'artist-van-gogh', 'artist-gauguin'],
     workIds: ['work-starry-night'],
-    sourceIds: ['tate-post-impressionism'],
+    sourceIds: ['tate-post-impressionism', 'met-post-impressionism'],
     verification: 'verified',
   },
 
@@ -871,7 +871,7 @@ export const movements: Movement[] = [
     keywords: ['象徴主義', '内面', '夢', '世紀末', 'モロー', 'ルドン', '暗示'],
     artistIds: ['artist-moreau', 'artist-redon'],
     workIds: [],
-    sourceIds: ['tate-symbolism'],
+    sourceIds: ['tate-symbolism', 'met-symbolism'],
     verification: 'verified',
   },
 
@@ -924,7 +924,7 @@ export const movements: Movement[] = [
     keywords: ['キュビスム', 'ピカソ', 'ブラック', '複数視点', '平面性', 'コラージュ', 'セザンヌ'],
     artistIds: ['artist-picasso', 'artist-braque'],
     workIds: ['work-demoiselles-avignon'],
-    sourceIds: ['tate-cubism'],
+    sourceIds: ['tate-cubism', 'moma-cubism'],
     verification: 'verified',
   },
 
@@ -976,7 +976,7 @@ export const movements: Movement[] = [
     keywords: ['未来派', 'マリネッティ', '速度', '機械', '力線', 'ボッチョーニ', '宣言'],
     artistIds: ['artist-boccioni', 'artist-balla'],
     workIds: ['work-unique-forms'],
-    sourceIds: ['tate-futurism'],
+    sourceIds: ['tate-futurism', 'moma-futurism'],
     verification: 'verified',
   },
 
@@ -1029,7 +1029,7 @@ export const movements: Movement[] = [
     keywords: ['ダダ', 'デュシャン', 'レディメイド', '反芸術', '制度批判', 'フォトモンタージュ', '第一次世界大戦'],
     artistIds: ['artist-duchamp'],
     workIds: ['work-fountain'],
-    sourceIds: ['smarthistory-dada'],
+    sourceIds: ['smarthistory-dada', 'moma-dada'],
     verification: 'verified',
   },
 
@@ -1081,7 +1081,7 @@ export const movements: Movement[] = [
     keywords: ['シュルレアリスム', 'ブルトン', '無意識', '夢', 'オートマティスム', 'ダリ', 'ミロ', 'フロイト'],
     artistIds: ['artist-dali', 'artist-miro'],
     workIds: ['work-persistence-memory'],
-    sourceIds: ['tate-surrealism'],
+    sourceIds: ['tate-surrealism', 'moma-surrealism'],
     verification: 'verified',
   },
 
@@ -1135,7 +1135,7 @@ export const movements: Movement[] = [
     keywords: ['抽象表現主義', 'ポロック', 'ロスコ', 'アクション・ペインティング', 'カラーフィールド', '崇高', 'ニューヨーク'],
     artistIds: ['artist-pollock', 'artist-rothko'],
     workIds: ['work-autumn-rhythm'],
-    sourceIds: ['tate-abstract-expressionism'],
+    sourceIds: ['tate-abstract-expressionism', 'moma-abstract-expressionism'],
     verification: 'verified',
   },
 
@@ -1188,7 +1188,7 @@ export const movements: Movement[] = [
     keywords: ['具体', '吉原治良', '白髪一雄', '田中敦子', '物質', '行為', '戦後日本前衛', '宣言'],
     artistIds: ['artist-yoshihara', 'artist-shiraga', 'artist-tanaka-atsuko'],
     workIds: ['work-electric-dress'],
-    sourceIds: ['gugg-gutai', 'gugg-gutai-concept'],
+    sourceIds: ['gugg-gutai', 'gugg-gutai-concept', 'tate-gutai'],
     verification: 'verified',
   },
 
@@ -1238,7 +1238,7 @@ export const movements: Movement[] = [
     keywords: ['ポップアート', 'ウォーホル', 'リキテンスタイン', '大衆文化', '消費社会', 'シルクスクリーン', '複製'],
     artistIds: ['artist-warhol', 'artist-lichtenstein'],
     workIds: ['work-campbells-soup'],
-    sourceIds: ['tate-pop-art'],
+    sourceIds: ['tate-pop-art', 'moma-pop-art'],
     verification: 'verified',
   },
 
@@ -1291,7 +1291,7 @@ export const movements: Movement[] = [
     keywords: ['ミニマリズム', 'ジャッド', 'フレイヴィン', '物体性', '工業素材', '展示空間', '反復'],
     artistIds: ['artist-judd', 'artist-flavin'],
     workIds: [],
-    sourceIds: ['tate-minimalism'],
+    sourceIds: ['tate-minimalism', 'moma-minimalism'],
     verification: 'verified',
   },
 
@@ -1346,7 +1346,7 @@ export const movements: Movement[] = [
     keywords: ['コンセプチュアル・アート', '観念', '脱物質化', '制度批判', '言語', 'コスース', 'ルウィット'],
     artistIds: ['artist-kosuth', 'artist-lewitt'],
     workIds: [],
-    sourceIds: ['tate-conceptual-art'],
+    sourceIds: ['tate-conceptual-art', 'moma-conceptual-art'],
     verification: 'verified',
   },
 
@@ -1395,8 +1395,8 @@ export const movements: Movement[] = [
     keywords: ['ポストミニマリズム', 'プロセス・アート', 'エヴァ・ヘス', 'セラ', '重力', '素材', '過程'],
     artistIds: ['artist-hesse', 'artist-serra'],
     workIds: [],
-    sourceIds: ['tate-minimalism', 'tate-installation-art'],
-    verification: 'single-source',
+    sourceIds: ['tate-process-art', 'moma-postminimalism'],
+    verification: 'verified',
   },
 
   /* 27 ─────────────────────────────────────────────── */
@@ -1437,9 +1437,9 @@ export const movements: Movement[] = [
     marketExhibition: '恒久的な光の空間・特設インスタレーションが主要な形式。',
     audience: '美術館来場者。時間をかけた知覚経験が求められる。',
     legacy:
-      '光と知覚を素材とする方法は、後の没入型・体験型のインスタレーション（teamLab等を含む系譜）へ大きく影響した。',
+      '光と知覚を素材とする方法は、後の没入型・体験型のインスタレーションと関心を共有する。ただし直接の系譜としてteamLab等へ「発展」したと単純化はできず、共通点（光・知覚・環境）と相違点（技術・制作体制・目的）を分けて捉える必要がある。',
     contemporaryConnection:
-      '光・空間・鑑賞者の身体を統合する経験の設計は、現代の没入型デジタルインスタレーションの直接の先駆の一つである。',
+      '光・空間・鑑賞者の知覚を扱う点で、後の没入型デジタル作品と関心を共有する。ただし両者は直接の師弟・系譜関係ではなく、技術（アナログな光の制御 対 リアルタイム演算）・制作体制（個人 対 学際的集団）・目的（知覚の還元的探究 対 多感覚的な環境体験）が大きく異なり、半世紀の歴史的隔たりがある点に注意したい。',
     viewingPoints: [
       '「もの」ではなく「知覚の経験」を作品とする点を意識する',
       '時間をかけて目が慣れる過程を体験する',
@@ -1448,7 +1448,7 @@ export const movements: Movement[] = [
     keywords: ['ライト・アンド・スペース', 'タレル', 'アーヴィン', '光', '知覚', '空間', '没入', '南カリフォルニア'],
     artistIds: ['artist-turrell', 'artist-irwin'],
     workIds: [],
-    sourceIds: ['gugg-turrell'],
+    sourceIds: ['gugg-turrell', 'tate-turrell'],
     verification: 'verified',
   },
 
@@ -1495,16 +1495,17 @@ export const movements: Movement[] = [
     legacy:
       '「作らない」「関係を見せる」という態度は、素材・場・関係を扱う現代美術に大きな影響を与え、日本発の重要な現代美術として国際的に位置づけられる。',
     contemporaryConnection:
-      'ミニマリズム／ポストミニマリズム／ライト・アンド・スペースと同時代的に共鳴し、素材・場・身体を扱う現代の作品に連続する。',
+      'ミニマリズム／ポストミニマリズム／ライト・アンド・スペースと同時代的に共鳴し、素材・場・身体を扱う現代の作品に連続する。同じ1960年代末にイタリアで興ったアルテ・ポーヴェラとは、日常的・自然的な素材を用い近代産業社会や作品の商品化を問い直す点で並行するが、両者は直接の影響関係にあったわけではない。アルテ・ポーヴェラが政治性・演劇性・変容を強調したのに対し、もの派は「作らない」こと・現前・関係の静けさを重んじる違いがあり、別個の文脈で並行して生じた現象として比較すべきである。',
     viewingPoints: [
       '「何を作ったか」より「どう置いたか・どんな関係が生じるか」を見る',
       'ミニマル/ポストミニマルとの同時代的関係を意識する',
+      '同時代のアルテ・ポーヴェラとの共通点・相違点（直接の影響ではない）を比較する',
       '「作らない」ことの思想的背景を読む',
     ],
     keywords: ['もの派', '李禹煥', '関根伸夫', 'もの', '関係', '場', '現前', '戦後日本前衛'],
     artistIds: ['artist-lee-ufan', 'artist-sekine'],
     workIds: [],
-    sourceIds: ['gugg-lee-ufan', 'gugg-lee-ufan-teaching', 'smarthistory-showa'],
+    sourceIds: ['gugg-lee-ufan', 'gugg-lee-ufan-teaching', 'smarthistory-showa', 'tate-arte-povera'],
     verification: 'verified',
   },
 
@@ -1600,11 +1601,11 @@ export const movements: Movement[] = [
     legacy:
       '（現在進行中）美術と技術・興行・都市の関係を再編しつつある。評価の定着は今後の課題で、批評的議論も続いている。',
     contemporaryConnection:
-      'バロックの巻き込み、ライト・アンド・スペースの知覚環境、没入型インスタレーションの系譜の現代的到達点の一つとして位置づけられる。',
+      'バロックの鑑賞者の巻き込み（イリュージョニズム）、ライト・アンド・スペースの知覚環境、インスタレーションの場の統合と、関心の面で共鳴する。ただしこれらは「バロック→ライト&スペース→teamLab」といった一本の発展史ではない。共通するのは「見る対象から入り込む環境へ」という志向であり、相違するのは技術（リアルタイム演算・センサー）・制作主体（学際的集団）・興行や都市開発との結びつきである。歴史的にも数十年〜数世紀の隔たりがあり、直線的な因果ではなく問題意識の反復・再構成として理解するのが妥当である。',
     viewingPoints: [
       '「見る」から「入り込む・関わる」への転換を意識する',
-      'バロックやライト&スペースとの歴史的連続を読む',
-      '技術・興行・美術の新しい関係を批判的に考える',
+      'バロックやライト&スペースとの共通点・相違点・歴史的距離を分けて考える',
+      '技術・興行・美術の新しい関係を批判的に考える（評価はなお定まっていない）',
     ],
     keywords: ['デジタルアート', '没入型', 'teamLab', 'インスタレーション', '身体', '相互作用', '境界のない', '現代美術'],
     artistIds: ['artist-teamlab'],
