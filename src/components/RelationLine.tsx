@@ -1,7 +1,9 @@
-import type { SVGProps } from 'react';
+'use client';
+
+import { useId, type SVGProps } from 'react';
 import type { RelationKind } from '@/lib/schema';
 import { RELATION_LINE_STYLE } from '@/lib/network-presentation';
-import { RELATION_COLOR } from '@/components/Badges';
+import { RELATION_COLOR } from '@/lib/relationship-definitions';
 
 export const ARROW_MARKER_SPEC = {
   width: 10,
@@ -100,5 +102,34 @@ export function RelationLine({
       data-relation-kind={kind}
       data-line-state={state}
     />
+  );
+}
+
+export function RelationLineSample({
+  kind,
+  active = true,
+}: {
+  kind: RelationKind;
+  active?: boolean;
+}) {
+  const markerPrefix = `sample-${useId().replaceAll(':', '')}`;
+
+  return (
+    <svg
+      aria-hidden="true"
+      className="shrink-0"
+      width="60"
+      height="16"
+      viewBox="0 0 60 16"
+      overflow="visible"
+    >
+      <ArrowMarkerDefs idPrefix={markerPrefix} kinds={[kind]} />
+      <RelationLine
+        kind={kind}
+        d={`M 2 8 L ${RELATION_LINE_STYLE[kind].arrow ? 50 : 58} 8`}
+        markerPrefix={markerPrefix}
+        state={active ? 'normal' : 'dimmed'}
+      />
+    </svg>
   );
 }

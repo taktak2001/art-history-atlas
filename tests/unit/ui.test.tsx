@@ -8,6 +8,7 @@ import {
   ClassificationAccordion,
   classificationItems,
 } from '@/components/ClassificationAccordion';
+import { RelationshipStandards } from '@/components/RelationshipStandards';
 import { getMovement, getSources } from '@/lib/dataset';
 import type { Work } from '@/lib/schema';
 import { LodControl } from '@/components/LodControl';
@@ -126,6 +127,76 @@ describe('ClassificationAccordion', () => {
 
     fireEvent.keyDown(theoryButton, { key: 'Home' });
     expect(periodButton).toHaveFocus();
+  });
+});
+
+describe('RelationshipStandards', () => {
+  it('9種類と関係データの読み方を初期状態ですべて閉じる', () => {
+    render(<RelationshipStandards />);
+
+    const triggers = document.querySelectorAll<HTMLButtonElement>(
+      '.relationship-accordion__trigger',
+    );
+    expect(triggers).toHaveLength(9);
+    for (const trigger of triggers) {
+      expect(trigger).toHaveAttribute('aria-expanded', 'false');
+      const panelId = trigger.getAttribute('aria-controls')!;
+      expect(document.getElementById(panelId)).not.toBeVisible();
+    }
+
+    expect(
+      document.getElementById('relationship-reading-button'),
+    ).toHaveAttribute('aria-expanded', 'false');
+  });
+
+  it('選択した関係だけを開き、詳細7項目を表示する', () => {
+    render(<RelationshipStandards />);
+    const succession = document.getElementById(
+      'relationship-succession-button',
+    )!;
+    const influence = document.getElementById(
+      'relationship-influence-button',
+    )!;
+    const panel = document.getElementById(
+      'relationship-succession-panel',
+    )!;
+
+    fireEvent.click(succession);
+    expect(succession).toHaveAttribute('aria-expanded', 'true');
+    expect(within(panel).getByText('詳細定義')).toBeVisible();
+    expect(within(panel).getByText('判定基準')).toBeVisible();
+    expect(within(panel).getByText('該当しないケース')).toBeVisible();
+    expect(within(panel).getByText('典型例')).toBeVisible();
+    expect(within(panel).getByText('判断上の注意')).toBeVisible();
+    expect(within(panel).getByText('図上の表現')).toBeVisible();
+    expect(within(panel).getByText('source / target の読み方')).toBeVisible();
+
+    fireEvent.click(influence);
+    expect(succession).toHaveAttribute('aria-expanded', 'false');
+    expect(influence).toHaveAttribute('aria-expanded', 'true');
+  });
+
+  it('矢印キーとHome・Endで関係見出し間を移動できる', () => {
+    render(<RelationshipStandards />);
+    const succession = document.getElementById(
+      'relationship-succession-button',
+    )!;
+    const reaction = document.getElementById(
+      'relationship-reaction-button',
+    )!;
+    const sharedIdea = document.getElementById(
+      'relationship-shared-idea-button',
+    )!;
+
+    succession.focus();
+    fireEvent.keyDown(succession, { key: 'ArrowRight' });
+    expect(reaction).toHaveFocus();
+
+    fireEvent.keyDown(reaction, { key: 'End' });
+    expect(sharedIdea).toHaveFocus();
+
+    fireEvent.keyDown(sharedIdea, { key: 'Home' });
+    expect(succession).toHaveFocus();
   });
 });
 

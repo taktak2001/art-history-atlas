@@ -2,7 +2,6 @@
 
 import {
   useEffect,
-  useId,
   useMemo,
   useRef,
   useState,
@@ -14,18 +13,21 @@ import { useRouter } from 'next/navigation';
 import type { Movement, Relationship, RelationKind, EraId } from '@/lib/schema';
 import { RELATION_LABELS, ERA_LABELS } from '@/lib/schema';
 import {
-  CORE_RELATIONSHIP_DEFINITIONS,
   formatRelationshipStatement,
   isImportantRelationship,
   limitMobileRelationships,
   RELATION_LINE_STYLE,
-  RELATIONSHIP_DECISION_AID,
 } from '@/lib/network-presentation';
-import { RELATION_COLOR } from './Badges';
+import {
+  RELATION_COLOR,
+  RELATIONSHIP_DEFINITIONS,
+  RELATION_KINDS,
+} from '@/lib/relationship-definitions';
 import { LodControl } from '@/components/LodControl';
 import {
   ArrowMarkerDefs,
   RelationLine,
+  RelationLineSample,
 } from '@/components/RelationLine';
 import {
   getNetworkEdgeGeometry,
@@ -62,7 +64,7 @@ type Layout = {
   safePad: number;
 };
 
-const ALL_KINDS = Object.keys(RELATION_LABELS) as RelationKind[];
+const ALL_KINDS = RELATION_KINDS;
 
 const ERA_JUMP_LABELS: Record<EraId, string> = {
   'prehistoric-ancient': '先史',
@@ -74,29 +76,6 @@ const ERA_JUMP_LABELS: Record<EraId, string> = {
   postwar: '戦後',
   contemporary: '現代',
 };
-
-function LineSample({ kind, active = true }: { kind: RelationKind; active?: boolean }) {
-  const markerPrefix = `sample-${useId().replaceAll(':', '')}`;
-
-  return (
-    <svg
-      aria-hidden="true"
-      className="shrink-0"
-      width="54"
-      height="16"
-      viewBox="0 0 54 16"
-      overflow="visible"
-    >
-      <ArrowMarkerDefs idPrefix={markerPrefix} kinds={[kind]} />
-      <RelationLine
-        kind={kind}
-        d={`M 2 8 L ${RELATION_LINE_STYLE[kind].arrow ? 44 : 52} 8`}
-        markerPrefix={markerPrefix}
-        state={active ? 'normal' : 'dimmed'}
-      />
-    </svg>
-  );
-}
 
 function getEdgeGeometry(
   relationship: Pick<Relationship, 'from' | 'to' | 'kind'>,
@@ -584,12 +563,21 @@ export function NetworkGraph({ movements, relationships, eraOrder }: Props) {
               <ul className="network-line-guide__legend" aria-label="関係タイプの凡例">
                 {ALL_KINDS.map((kind) => (
                   <li key={kind}>
-                    <LineSample kind={kind} />
-                    <span className="font-bold text-ink">
-                      {RELATION_LABELS[kind]}
+                    <RelationLineSample kind={kind} />
+                    <span>
+                      <span className="block font-bold text-ink">
+                        {RELATIONSHIP_DEFINITIONS[kind].label}
+                      </span>
+                      <span className="block text-faint">
+                        {RELATIONSHIP_DEFINITIONS[kind].shortDefinition}
+                      </span>
                     </span>
                     <span className="text-faint">
-                      {RELATION_LINE_STYLE[kind].arrow ? '有向' : '無向'}
+                      {RELATIONSHIP_DEFINITIONS[kind].visualEncoding.lineLabel}
+                      {' / '}
+                      {RELATIONSHIP_DEFINITIONS[kind].visualEncoding.arrow
+                        ? '有向'
+                        : '無向'}
                     </span>
                   </li>
                 ))}
@@ -597,20 +585,20 @@ export function NetworkGraph({ movements, relationships, eraOrder }: Props) {
               <div className="network-line-guide__definitions">
                 {(['succession', 'influence'] as const).map((kind) => (
                   <section key={kind}>
-                    <h3>{RELATION_LABELS[kind]}</h3>
-                    <p>{CORE_RELATIONSHIP_DEFINITIONS[kind].definition}</p>
+                    <h3>{RELATIONSHIP_DEFINITIONS[kind].label}</h3>
+                    <p>{RELATIONSHIP_DEFINITIONS[kind].fullDefinition}</p>
                     <ul>
-                      {CORE_RELATIONSHIP_DEFINITIONS[kind].criteria.map(
+                      {RELATIONSHIP_DEFINITIONS[kind].criteria.map(
                         (criterion) => (
                           <li key={criterion}>{criterion}</li>
                         ),
                       )}
                     </ul>
                     <p>
-                      例: {CORE_RELATIONSHIP_DEFINITIONS[kind].example}
+                      例: {RELATIONSHIP_DEFINITIONS[kind].examples[0]}
                     </p>
                     <p>
-                      判定補助: {RELATIONSHIP_DECISION_AID[kind]}
+                      判定補助: {RELATIONSHIP_DEFINITIONS[kind].cautions[0]}
                     </p>
                   </section>
                 ))}
@@ -624,14 +612,12 @@ export function NetworkGraph({ movements, relationships, eraOrder }: Props) {
         </div>
 
         <dl className="network-core-definitions">
-          <div>
-            <dt>継承</dt>
-            <dd>中心的な方法や問題意識を、後続運動が直接引き継ぐ関係</dd>
-          </div>
-          <div>
-            <dt>影響</dt>
-            <dd>技法・思想・作品の一部が、別の運動へ作用した関係</dd>
-          </div>
+          {(['succession', 'influence'] as const).map((kind) => (
+            <div key={kind}>
+              <dt>{RELATIONSHIP_DEFINITIONS[kind].label}</dt>
+              <dd>{RELATIONSHIP_DEFINITIONS[kind].shortDefinition}</dd>
+            </div>
+          ))}
         </dl>
       </section>
 
@@ -914,7 +900,7 @@ export function NetworkGraph({ movements, relationships, eraOrder }: Props) {
             <dd className="text-ink">{movementName(selectedEdge.to)}</dd>
             <dt className="font-bold text-faint">関係</dt>
             <dd className="flex items-center gap-2 text-ink">
-              <LineSample kind={selectedEdge.kind} />
+              <RelationLineSample kind={selectedEdge.kind} />
               {RELATION_LABELS[selectedEdge.kind]}
             </dd>
             <dt className="font-bold text-faint">説明</dt>
@@ -979,10 +965,11 @@ export function NetworkGraph({ movements, relationships, eraOrder }: Props) {
                   type="button"
                   onClick={() => selectEdge(relationship)}
                   aria-pressed={selectedEdgeId === relationship.id}
+                  aria-describedby={`relationship-definition-${relationship.id}`}
                   className="w-full min-h-11 text-left"
                 >
                   <span className="flex items-center gap-2">
-                    <LineSample kind={relationship.kind} />
+                    <RelationLineSample kind={relationship.kind} />
                     <span className="font-bold text-ink">
                       {RELATION_LABELS[relationship.kind]}
                     </span>
@@ -998,6 +985,12 @@ export function NetworkGraph({ movements, relationships, eraOrder }: Props) {
                       {relationship.aggregateCount}件を集約
                     </span>
                   )}
+                  <span
+                    id={`relationship-definition-${relationship.id}`}
+                    className="sr-only"
+                  >
+                    {RELATIONSHIP_DEFINITIONS[relationship.kind].shortDefinition}
+                  </span>
                 </button>
               </li>
             ))}

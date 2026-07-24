@@ -61,6 +61,12 @@ test('iPhoneでは本体が初期viewport内に入り、線の見方はoverlay�
   await expect(guide).toHaveAttribute('open', '');
   await expect(guide.locator('.network-line-guide__panel')).toBeVisible();
   await expect(guide.locator('.network-line-guide__legend li')).toHaveCount(9);
+  await expect(
+    guide.getByText(
+      '中心的な方法や問題意識を、後続運動が直接引き継ぐ関係',
+      { exact: true },
+    ),
+  ).toBeVisible();
   const after = await graph.boundingBox();
   expect(after!.y).toBeCloseTo(before!.y, 0);
 });
