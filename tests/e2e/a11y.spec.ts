@@ -50,6 +50,21 @@ test('アクセシビリティ: 分類詳細を展開した編集方針', async 
   expect(serious, '分類詳細の展開時に重大なアクセシビリティ違反').toEqual([]);
 });
 
+test('アクセシビリティ: 展示を展開した縦型年表', async ({ page }) => {
+  await page.goto('/chronology/');
+  await page.locator('#era-renaissance').getByRole('button').click();
+
+  const results = await new AxeBuilder({ page })
+    .withTags(['wcag2a', 'wcag2aa', 'wcag21a', 'wcag21aa'])
+    .analyze();
+  const serious = results.violations.filter(
+    (violation) =>
+      violation.impact === 'serious' || violation.impact === 'critical',
+  );
+
+  expect(serious, '展示展開時に重大なアクセシビリティ違反').toEqual([]);
+});
+
 test('アクセシビリティ: ノードを選択した関係ネットワーク', async ({ page }) => {
   await page.goto('/network/');
   const graph = page.getByRole('group', { name: '美術運動の関係ネットワーク図' });

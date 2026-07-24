@@ -150,3 +150,768 @@ h1, h2, h3, h4 {
   text-decoration: underline;
   text-decoration-thickness: 1px;
 }
+
+/* 縦型年表：静かな常設展示として時代の切り替わりを見せる */
+.chronology-page {
+  padding: 3rem 0 6rem;
+}
+
+.chronology-page__header,
+.chronology-page__body {
+  width: min(100% - 2rem, 72rem);
+  margin-inline: auto;
+}
+
+.chronology-page__header {
+  padding-block: 1rem 3rem;
+}
+
+.chronology-controls {
+  max-width: 36rem;
+}
+
+.chronology-era-nav {
+  position: sticky;
+  top: 4rem;
+  z-index: 30;
+  margin: 1.5rem -1rem 0;
+  padding: 0.5rem 1rem;
+  border-block: 1px solid rgb(var(--c-line));
+  background: rgb(var(--c-paper) / 0.94);
+  backdrop-filter: blur(18px) saturate(140%);
+}
+
+.chronology-era-nav__link {
+  display: inline-flex;
+  min-height: 2.75rem;
+  align-items: center;
+  padding-inline: 0.85rem;
+  border-bottom: 1px solid transparent;
+  color: rgb(var(--c-muted));
+  font-size: 0.75rem;
+  font-weight: 700;
+  white-space: nowrap;
+  text-underline-offset: 0.3em;
+}
+
+.chronology-era-nav__link:hover {
+  border-color: currentColor;
+  color: rgb(var(--c-ink));
+}
+
+.chronology-gallery {
+  margin-top: 2.5rem;
+  border-top: 1px solid rgb(var(--c-line));
+}
+
+.chronology-era {
+  --era-accent: 111 82 58;
+  --era-wash: 237 229 216;
+  scroll-margin-top: 8rem;
+  border-bottom: 1px solid rgb(var(--c-line));
+  background: linear-gradient(
+    90deg,
+    rgb(var(--era-wash) / 0.26),
+    transparent 54%
+  );
+}
+
+.chronology-era--earth {
+  --era-accent: 116 75 52;
+  --era-wash: 221 205 181;
+}
+
+.chronology-era--sacred {
+  --era-accent: 73 83 109;
+  --era-wash: 211 216 228;
+}
+
+.chronology-era--humanist {
+  --era-accent: 132 70 48;
+  --era-wash: 232 207 189;
+}
+
+.chronology-era--court {
+  --era-accent: 100 71 94;
+  --era-wash: 224 210 220;
+}
+
+.chronology-era--industrial {
+  --era-accent: 66 86 83;
+  --era-wash: 204 218 214;
+}
+
+.chronology-era--avant-garde {
+  --era-accent: 116 54 48;
+  --era-wash: 226 202 198;
+}
+
+.chronology-era--material {
+  --era-accent: 78 82 72;
+  --era-wash: 214 216 204;
+}
+
+.chronology-era--digital {
+  --era-accent: 62 82 105;
+  --era-wash: 203 215 226;
+}
+
+.chronology-era__hero {
+  position: relative;
+  display: grid;
+  width: 100%;
+  min-height: 17rem;
+  grid-template-columns: 4rem minmax(0, 1fr) auto;
+  gap: 1.5rem;
+  align-items: end;
+  padding: 2.5rem 2rem;
+  overflow: hidden;
+  color: rgb(var(--c-ink));
+  text-align: left;
+}
+
+.chronology-era__hero::before {
+  position: absolute;
+  inset: 0 auto 0 0;
+  width: 0.28rem;
+  background: rgb(var(--era-accent));
+  content: '';
+}
+
+.chronology-era__hero::after {
+  position: absolute;
+  inset: 1.5rem 1.5rem auto auto;
+  width: 5rem;
+  height: 1px;
+  background: rgb(var(--era-accent) / 0.5);
+  content: '';
+}
+
+.chronology-era__hero:hover {
+  background: rgb(var(--era-wash) / 0.2);
+}
+
+.chronology-era__hero:active {
+  background: rgb(var(--era-wash) / 0.34);
+}
+
+.chronology-era__number {
+  align-self: start;
+  color: rgb(var(--era-accent));
+  font-family: var(--font-serif);
+  font-size: 0.8rem;
+  letter-spacing: 0.16em;
+}
+
+.chronology-era__identity {
+  display: flex;
+  min-width: 0;
+  flex-direction: column;
+}
+
+.chronology-era__range {
+  color: rgb(var(--era-accent));
+  font-size: 0.75rem;
+  font-weight: 700;
+  letter-spacing: 0.16em;
+}
+
+.chronology-era__title {
+  margin-top: 0.55rem;
+  font-family: var(--font-serif);
+  font-size: clamp(2.35rem, 6vw, 4.7rem);
+  font-weight: 500;
+  line-height: 1.05;
+  letter-spacing: -0.035em;
+}
+
+.chronology-era__catchphrase {
+  margin-top: 1.15rem;
+  color: rgb(var(--c-muted));
+  font-family: var(--font-serif);
+  font-size: clamp(0.95rem, 2vw, 1.15rem);
+}
+
+.chronology-era__action {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+  color: rgb(var(--c-muted));
+  font-size: 0.75rem;
+  white-space: nowrap;
+}
+
+.chronology-era__toggle {
+  display: grid;
+  width: 2.75rem;
+  height: 2.75rem;
+  place-items: center;
+  border: 1px solid rgb(var(--era-accent) / 0.65);
+  border-radius: 50%;
+  color: rgb(var(--era-accent));
+  font-size: 1.25rem;
+  line-height: 1;
+}
+
+.chronology-exhibit {
+  padding: 0 2rem 4rem 6rem;
+}
+
+.chronology-exhibit__intro {
+  max-width: 36rem;
+  padding-block: 1.25rem 2rem;
+  border-top: 1px solid rgb(var(--era-accent) / 0.3);
+  color: rgb(var(--c-muted));
+  font-size: 0.8rem;
+  letter-spacing: 0.04em;
+}
+
+.chronology-exhibit__rail {
+  position: relative;
+}
+
+.chronology-exhibit__rail::before {
+  position: absolute;
+  inset: 0 auto 0 5.35rem;
+  width: 1px;
+  background: rgb(var(--era-accent) / 0.28);
+  content: '';
+}
+
+.chronology-movement,
+.chronology-event {
+  position: relative;
+  display: grid;
+  grid-template-columns: 6.75rem minmax(0, 1fr);
+  gap: 2rem;
+  padding-block: 2.75rem;
+}
+
+.chronology-movement::before,
+.chronology-event::before {
+  position: absolute;
+  top: 3.15rem;
+  left: 5rem;
+  z-index: 2;
+  width: 0.75rem;
+  height: 0.75rem;
+  border: 2px solid rgb(var(--c-paper));
+  border-radius: 50%;
+  background: rgb(var(--era-accent));
+  box-shadow: 0 0 0 1px rgb(var(--era-accent));
+  content: '';
+}
+
+.chronology-movement__date,
+.chronology-event__year {
+  color: rgb(var(--era-accent));
+  font-variant-numeric: tabular-nums;
+}
+
+.chronology-movement__start,
+.chronology-event__year {
+  font-family: var(--font-serif);
+  font-size: clamp(1.75rem, 3vw, 2.55rem);
+  font-weight: 700;
+  line-height: 1;
+  letter-spacing: -0.04em;
+}
+
+.chronology-movement__exhibit {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(13rem, 19rem);
+  column-gap: 2.5rem;
+  padding-bottom: 1rem;
+  border-bottom: 1px solid rgb(var(--c-line));
+}
+
+.chronology-movement__heading {
+  align-self: end;
+}
+
+.chronology-classification,
+.chronology-kicker {
+  color: rgb(var(--era-accent));
+  font-size: 0.68rem;
+  font-weight: 800;
+  letter-spacing: 0.16em;
+}
+
+.chronology-title-link {
+  text-decoration-color: transparent;
+  text-decoration-line: underline;
+  text-decoration-thickness: 1px;
+  text-underline-offset: 0.2em;
+}
+
+.chronology-title-link:hover {
+  color: rgb(var(--era-accent));
+  text-decoration-color: currentColor;
+}
+
+.chronology-work {
+  grid-row: span 2;
+  align-self: start;
+  color: rgb(var(--c-muted));
+}
+
+.chronology-work__image > div,
+.chronology-work__image figure > div {
+  background: rgb(var(--c-paper) / 0.6);
+}
+
+.chronology-work__caption {
+  display: flex;
+  flex-direction: column;
+  gap: 0.1rem;
+  margin-top: 0.8rem;
+  font-size: 0.7rem;
+  line-height: 1.55;
+}
+
+.chronology-work--empty {
+  display: grid;
+  min-height: 12rem;
+  place-items: center;
+  border-block: 1px solid rgb(var(--c-line));
+  background:
+    linear-gradient(135deg, transparent 49.7%, rgb(var(--c-line)) 50%, transparent 50.3%);
+}
+
+.chronology-movement__text {
+  padding-top: 2rem;
+}
+
+.chronology-cause {
+  display: grid;
+  grid-template-columns: 7rem minmax(0, 1fr);
+  gap: 1rem;
+  align-items: baseline;
+  margin-top: 1.75rem;
+  padding-block: 0.9rem;
+  border-block: 1px solid rgb(var(--era-accent) / 0.28);
+}
+
+.chronology-cause__label {
+  color: rgb(var(--c-faint));
+  font-size: 0.68rem;
+  font-weight: 800;
+  letter-spacing: 0.1em;
+}
+
+.chronology-cause__flow {
+  overflow: hidden;
+  color: rgb(var(--c-ink));
+  font-family: var(--font-serif);
+  font-size: 0.9rem;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.chronology-tags {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.45rem;
+  margin-top: 1.25rem;
+}
+
+.chronology-tags li {
+  display: inline-flex;
+  min-height: 2rem;
+  align-items: center;
+  border: 1px solid rgb(var(--c-line));
+  border-radius: 999px;
+  color: rgb(var(--c-muted));
+  font-size: 0.7rem;
+  line-height: 1.4;
+}
+
+.chronology-tags li span {
+  margin-right: 0.45rem;
+  padding: 0.32rem 0.5rem;
+  border-right: 1px solid rgb(var(--c-line));
+  color: rgb(var(--era-accent));
+  font-size: 0.62rem;
+  font-weight: 800;
+}
+
+.chronology-tags li {
+  padding-right: 0.65rem;
+}
+
+.chronology-card-footer {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 1rem 2rem;
+  align-items: center;
+  justify-content: space-between;
+  margin-top: 2rem;
+  padding-top: 1rem;
+}
+
+.chronology-read-link,
+.chronology-impact-link {
+  color: rgb(var(--era-accent));
+  font-size: 0.75rem;
+  font-weight: 800;
+  text-decoration: underline;
+  text-decoration-thickness: 1px;
+  text-underline-offset: 0.25em;
+}
+
+.chronology-next-link {
+  display: inline-grid;
+  grid-template-columns: auto auto auto;
+  gap: 0.5rem;
+  align-items: baseline;
+  color: rgb(var(--c-muted));
+  font-size: 0.7rem;
+}
+
+.chronology-next-link strong {
+  color: rgb(var(--c-ink));
+  font-family: var(--font-serif);
+  font-size: 0.9rem;
+}
+
+.chronology-relationship {
+  position: relative;
+  display: grid;
+  min-height: 4.5rem;
+  grid-template-columns: 6.75rem auto minmax(0, 1fr) auto;
+  gap: 0.75rem;
+  align-items: center;
+  color: rgb(var(--c-faint));
+  font-size: 0.68rem;
+}
+
+.chronology-relationship__line {
+  width: calc(100% - 1.4rem);
+  justify-self: end;
+  border-top: 1px solid rgb(var(--era-accent) / 0.55);
+}
+
+.chronology-relationship__label {
+  color: rgb(var(--era-accent));
+  font-weight: 800;
+  letter-spacing: 0.12em;
+}
+
+.chronology-relationship__description {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.chronology-relationship__arrow {
+  color: rgb(var(--era-accent));
+  font-size: 1rem;
+}
+
+.chronology-event {
+  margin-block: 1.5rem;
+}
+
+.chronology-event::before {
+  border-radius: 0;
+  transform: rotate(45deg);
+}
+
+.chronology-event__body {
+  padding: 1.75rem 2rem;
+  border-block: 1px solid rgb(var(--era-accent) / 0.46);
+  background: rgb(var(--era-wash) / 0.34);
+}
+
+.chronology-event__title {
+  margin-top: 0.55rem;
+  color: rgb(var(--c-ink));
+  font-family: var(--font-serif);
+  font-size: clamp(1.5rem, 3vw, 2.15rem);
+  letter-spacing: -0.02em;
+}
+
+.chronology-event__impact {
+  display: grid;
+  grid-template-columns: 2rem minmax(0, 1fr);
+  gap: 0.75rem;
+  margin-top: 1.25rem;
+  padding-top: 1.15rem;
+  border-top: 1px solid rgb(var(--era-accent) / 0.25);
+}
+
+.chronology-event__impact-mark {
+  color: rgb(var(--era-accent));
+  font-family: var(--font-serif);
+  font-size: 1.25rem;
+}
+
+@media (max-width: 767px) {
+  .chronology-page {
+    padding-top: 1.5rem;
+  }
+
+  .chronology-page__header {
+    padding-bottom: 2rem;
+  }
+
+  .chronology-era-nav {
+    margin-inline: -1rem;
+    padding-inline: 1rem;
+  }
+
+  .chronology-gallery {
+    margin-inline: -1rem;
+  }
+
+  .chronology-era__hero {
+    min-height: 14.5rem;
+    grid-template-columns: 2rem minmax(0, 1fr);
+    gap: 1rem;
+    align-items: start;
+    padding: 1.75rem 1.25rem 1.5rem 1.5rem;
+  }
+
+  .chronology-era__hero::after {
+    inset: 1rem 1rem auto auto;
+    width: 2.5rem;
+  }
+
+  .chronology-era__title {
+    margin-top: 0.8rem;
+    font-size: clamp(2.2rem, 12vw, 3.4rem);
+  }
+
+  .chronology-era__catchphrase {
+    max-width: 18rem;
+    margin-top: 1rem;
+    font-size: 0.92rem;
+    line-height: 1.8;
+  }
+
+  .chronology-era__action {
+    grid-column: 2;
+    align-self: end;
+    justify-content: space-between;
+    margin-top: auto;
+  }
+
+  .chronology-exhibit {
+    padding: 0 1.25rem 3rem;
+  }
+
+  .chronology-exhibit__intro {
+    padding-block: 1.25rem;
+  }
+
+  .chronology-exhibit__rail::before {
+    left: 4.5rem;
+  }
+
+  .chronology-movement,
+  .chronology-event {
+    grid-template-columns: 4.8rem minmax(0, 1fr);
+    gap: 0.75rem;
+    padding-block: 2.25rem;
+  }
+
+  .chronology-movement::before,
+  .chronology-event::before {
+    top: 2.65rem;
+    left: 4.15rem;
+  }
+
+  .chronology-movement__start,
+  .chronology-event__year {
+    font-size: 1.22rem;
+    letter-spacing: -0.03em;
+  }
+
+  .chronology-movement__exhibit {
+    display: flex;
+    min-width: 0;
+    flex-direction: column;
+    gap: 0;
+  }
+
+  .chronology-work {
+    order: 2;
+    width: 100%;
+    margin-top: 1.5rem;
+  }
+
+  .chronology-work__image > div,
+  .chronology-work__image figure > div {
+    aspect-ratio: 16 / 10;
+  }
+
+  .chronology-movement__text {
+    order: 3;
+    padding-top: 1.5rem;
+  }
+
+  .chronology-cause {
+    display: flex;
+    flex-direction: column;
+    gap: 0.45rem;
+  }
+
+  .chronology-cause__flow {
+    width: 100%;
+    font-size: 0.82rem;
+  }
+
+  .chronology-tags {
+    flex-wrap: nowrap;
+    margin-right: -1.25rem;
+    padding-right: 1.25rem;
+    overflow-x: auto;
+    scrollbar-width: none;
+  }
+
+  .chronology-tags::-webkit-scrollbar {
+    display: none;
+  }
+
+  .chronology-tags li {
+    flex: none;
+  }
+
+  .chronology-card-footer {
+    align-items: flex-start;
+    flex-direction: column;
+  }
+
+  .chronology-read-link,
+  .chronology-next-link,
+  .chronology-impact-link {
+    min-height: 2.75rem;
+    align-items: center;
+  }
+
+  .chronology-read-link,
+  .chronology-impact-link {
+    display: inline-flex;
+  }
+
+  .chronology-next-link {
+    display: inline-flex;
+    flex-wrap: wrap;
+  }
+
+  .chronology-relationship {
+    min-height: 4rem;
+    grid-template-columns: 4.8rem auto minmax(0, 1fr) auto;
+    gap: 0.5rem;
+  }
+
+  .chronology-relationship__description {
+    font-size: 0.62rem;
+  }
+
+  .chronology-event {
+    margin-block: 0.75rem;
+  }
+
+  .chronology-event__body {
+    padding: 1.4rem 1rem;
+  }
+}
+
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme='light']) .chronology-era {
+    background: linear-gradient(
+      90deg,
+      rgb(var(--era-accent) / 0.12),
+      transparent 58%
+    );
+  }
+
+  :root:not([data-theme='light']) .chronology-era--earth {
+    --era-accent: 202 150 110;
+  }
+
+  :root:not([data-theme='light']) .chronology-era--sacred {
+    --era-accent: 150 166 204;
+  }
+
+  :root:not([data-theme='light']) .chronology-era--humanist {
+    --era-accent: 210 137 102;
+  }
+
+  :root:not([data-theme='light']) .chronology-era--court {
+    --era-accent: 183 145 178;
+  }
+
+  :root:not([data-theme='light']) .chronology-era--industrial {
+    --era-accent: 137 171 166;
+  }
+
+  :root:not([data-theme='light']) .chronology-era--avant-garde {
+    --era-accent: 211 125 117;
+  }
+
+  :root:not([data-theme='light']) .chronology-era--material {
+    --era-accent: 161 171 145;
+  }
+
+  :root:not([data-theme='light']) .chronology-era--digital {
+    --era-accent: 133 166 199;
+  }
+}
+
+:root[data-theme='dark'] .chronology-era,
+html.dark .chronology-era {
+  background: linear-gradient(
+    90deg,
+    rgb(var(--era-accent) / 0.12),
+    transparent 58%
+  );
+}
+
+:root[data-theme='dark'] .chronology-era--earth,
+html.dark .chronology-era--earth {
+  --era-accent: 202 150 110;
+}
+
+:root[data-theme='dark'] .chronology-era--sacred,
+html.dark .chronology-era--sacred {
+  --era-accent: 150 166 204;
+}
+
+:root[data-theme='dark'] .chronology-era--humanist,
+html.dark .chronology-era--humanist {
+  --era-accent: 210 137 102;
+}
+
+:root[data-theme='dark'] .chronology-era--court,
+html.dark .chronology-era--court {
+  --era-accent: 183 145 178;
+}
+
+:root[data-theme='dark'] .chronology-era--industrial,
+html.dark .chronology-era--industrial {
+  --era-accent: 137 171 166;
+}
+
+:root[data-theme='dark'] .chronology-era--avant-garde,
+html.dark .chronology-era--avant-garde {
+  --era-accent: 211 125 117;
+}
+
+:root[data-theme='dark'] .chronology-era--material,
+html.dark .chronology-era--material {
+  --era-accent: 161 171 145;
+}
+
+:root[data-theme='dark'] .chronology-era--digital,
+html.dark .chronology-era--digital {
+  --era-accent: 133 166 199;
+}
+
+@media (prefers-reduced-transparency: reduce) {
+  .chronology-era-nav {
+    background: rgb(var(--c-paper));
+    backdrop-filter: none;
+  }
+}
