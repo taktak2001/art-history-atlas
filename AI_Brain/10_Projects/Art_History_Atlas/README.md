@@ -1,8 +1,9 @@
 # Art History Atlas — AI_Brain README
 
-> このディレクトリ（`AI_Brain/_Modules/Projects/Art_History_Atlas/`）は、Claude Code / Codex / ChatGPT が**共通認識**として参照するための知識ベースです。人間にも読めますが、第一の読者は将来のAIセッションです。曖昧表現を避け、**事実・推論・未確認**を区別して記述します。
+> このディレクトリ（`AI_Brain/10_Projects/Art_History_Atlas/`）は、Claude Code / Codex / ChatGPT が**共通認識**として参照するための知識ベースです。人間にも読めますが、第一の読者は将来のAIセッションです。曖昧表現を避け、**事実・推論・未確認**を区別して記述します。
 >
-> 配置に関する前提（推論）: 指定の `AI_Brain/` は、他に指定がないため **art-history-atlas リポジトリ内のルート直下**に置いています（唯一プッシュ可能で永続化できる場所のため）。別リポジトリ/別パスへ移す場合は本ファイル群をそのまま移動可能です。
+> 正規の配置: ユーザーの Obsidian Vault（iCloud Drive → Obsidian → `AI_Brain/`）内の **`10_Projects/Art_History_Atlas/`**（`ArtWatcher` / `PlaceOrganizer` と同じ階層）。
+> 補足: これらのファイルは art-history-atlas GitHub リポジトリ内にもミラーされている（`AI_Brain/10_Projects/Art_History_Atlas/`）。AIサンドボックスからユーザーのローカル iCloud/Obsidian へ直接書き込めないため、更新時はリポジトリ側を編集し、ユーザーが Vault へ反映する運用とする。
 
 ## プロジェクト概要
 
