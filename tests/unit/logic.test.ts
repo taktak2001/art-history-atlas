@@ -5,6 +5,7 @@ import {
   formatYear,
   formatDateRange,
   getMovement,
+  movements,
   relationships,
 } from '@/lib/dataset';
 import {
@@ -162,23 +163,26 @@ describe('年代フォーマット', () => {
 });
 
 describe('詳細ページの導入要旨', () => {
-  it('既存データから80〜120字の要旨を作る', () => {
-    const movement = getMovement('italian-renaissance')!;
-    const summary = buildHeroSummary(movement.summary, movement.coreIdea);
+  it('全ムーブメントで編集済みの短い概要を省略せず表示する', () => {
+    expect(movements).toHaveLength(30);
 
-    expect(summary.length).toBeGreaterThanOrEqual(80);
-    expect(summary.length).toBeLessThanOrEqual(120);
-    expect(summary.startsWith(movement.summary)).toBe(true);
+    for (const movement of movements) {
+      const summary = buildHeroSummary(movement.summary);
+
+      expect(summary).toBe(movement.summary.replaceAll('—', '-').replaceAll('–', '-'));
+      expect(summary).toMatch(/[。！？]$/);
+      expect(summary).not.toContain('…');
+      expect(summary.length).toBeLessThanOrEqual(90);
+    }
   });
 
-  it('長文は120字以内で自然に切る', () => {
-    const summary = buildHeroSummary(
-      'これは導入要旨です。'.repeat(20),
-      '補足の中心思想です。',
-    );
+  it('ゴシック美術の概要を自然な文末で終える', () => {
+    const movement = getMovement('gothic')!;
+    const summary = buildHeroSummary(movement.summary);
 
-    expect(summary.length).toBeLessThanOrEqual(120);
-    expect(summary.length).toBeGreaterThanOrEqual(80);
+    expect(summary).toBe(
+      '大聖堂建築を中心に展開した中世盛期の様式。尖頭アーチ・リブ・飛梁の構造革新が高く明るい内部空間を可能にし、ステンドグラスの光が神学的意味を担った。',
+    );
   });
 });
 
