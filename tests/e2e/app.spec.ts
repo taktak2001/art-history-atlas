@@ -72,7 +72,7 @@ test('横型タイムラインを時代別に切り替え、対象年代だけ�
     'true',
   );
   await expect(page.getByRole('region', { name: '現在の表示範囲' })).toContainText(
-    '1750〜1950',
+    '1700〜2000',
   );
   await expect(page.locator('[data-timeline-bar="impressionism"]').first()).toBeVisible();
   await expect(page.getByRole('link', { name: /スーパーフラット/ })).toHaveCount(0);

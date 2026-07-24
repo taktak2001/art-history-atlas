@@ -1,6 +1,8 @@
 import type { Movement } from '@/lib/schema';
 
 export const TIMELINE_NOW = 2026;
+export const ERA_DOMAIN_PADDING_RATIO = 0.125;
+export const ERA_DOMAIN_MIN_SPAN = 200;
 
 export type TimelineModeId =
   | 'survey'
@@ -174,6 +176,47 @@ export function movementOverlapsMode(movement: Movement, mode: TimelineMode) {
   return movement.dates.start < mode.end && end > mode.start;
 }
 
+function eraDomainRoundingStep(span: number) {
+  if (span <= 800) return 100;
+  if (span <= 2000) return 250;
+  return 500;
+}
+
+/**
+ * 時代区分は表示対象の抽出境界として維持し、描画軸だけを実データへ寄せる。
+ * 境界をまたぐムーブメントは時代区分との交差部分を使うため、隣の時代まで
+ * 不必要に拡大せず、端のバーには十分な余白を確保できる。
+ */
+export function fitTimelineModeToMovements(
+  mode: TimelineMode,
+  movements: Movement[],
+) {
+  if (mode.id === 'survey' || movements.length === 0) return mode;
+
+  const extents = movements.map((movement) => clipMovementToMode(movement, mode));
+  const minimumStart = Math.min(...extents.map((extent) => extent.start));
+  const maximumEnd = Math.max(...extents.map((extent) => extent.end));
+  const dataSpan = Math.max(1, maximumEnd - minimumStart);
+  const paddedSpan = Math.max(
+    ERA_DOMAIN_MIN_SPAN,
+    dataSpan * (1 + ERA_DOMAIN_PADDING_RATIO * 2),
+  );
+  const center = (minimumStart + maximumEnd) / 2;
+  const roundingStep = eraDomainRoundingStep(paddedSpan);
+  const start =
+    Math.floor((center - paddedSpan / 2) / roundingStep) * roundingStep;
+  const end =
+    Math.ceil((center + paddedSpan / 2) / roundingStep) * roundingStep;
+
+  return {
+    ...mode,
+    start,
+    end,
+    tickStep: roundingStep,
+    focusYear: clamp(mode.focusYear, start, end),
+  };
+}
+
 export function timelineWidthForMode(
   mode: TimelineMode,
   movementCount: number,
@@ -211,12 +254,29 @@ export function yearToTimelineX(year: number, mode: TimelineMode, width: number)
   return progress * width;
 }
 
-export function timelineTicks(mode: TimelineMode) {
+const niceMultiplier = (minimum: number) => {
+  for (const multiplier of [1, 2, 4, 5, 10, 20, 50, 100]) {
+    if (multiplier >= minimum) return multiplier;
+  }
+  return Math.ceil(minimum / 100) * 100;
+};
+
+export function timelineTicks(mode: TimelineMode, width?: number) {
   if (mode.id === 'survey') return SURVEY_TICKS;
 
+  const span = mode.end - mode.start;
+  const maximumTickCount = width
+    ? Math.max(2, Math.floor(width / 72))
+    : Number.POSITIVE_INFINITY;
+  const rawTickCount = span / mode.tickStep;
+  const multiplier = niceMultiplier(rawTickCount / maximumTickCount);
+  const visibleTickStep = mode.tickStep * multiplier;
   const ticks: number[] = [];
-  const first = Math.ceil(mode.start / mode.tickStep) * mode.tickStep;
-  for (let year = first; year <= mode.end; year += mode.tickStep) ticks.push(year);
+  const first = Math.ceil(mode.start / visibleTickStep) * visibleTickStep;
+  for (let year = first; year <= mode.end; year += visibleTickStep) {
+    ticks.push(year);
+  }
+  if (ticks[0] !== mode.start) ticks.unshift(mode.start);
   if (ticks.at(-1) !== mode.end) ticks.push(mode.end);
   return ticks;
 }
