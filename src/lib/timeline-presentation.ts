@@ -4,6 +4,7 @@ export const TIMELINE_NOW = 2026;
 
 export type TimelineModeId =
   | 'survey'
+  | 'prehistoric'
   | 'ancient'
   | 'medieval'
   | 'early-modern'
@@ -17,7 +18,10 @@ export type TimelineMode = {
   end: number;
   minWidth: number;
   maxWidth: number;
+  mobileMinWidth: number;
+  mobileMaxWidth: number;
   tickStep: number;
+  focusYear: number;
   description: string;
 };
 
@@ -37,8 +41,24 @@ export const TIMELINE_MODES: TimelineMode[] = [
     end: TIMELINE_NOW,
     minWidth: 1180,
     maxWidth: 1180,
+    mobileMinWidth: 760,
+    mobileMaxWidth: 760,
     tickStep: 0,
+    focusYear: -40000,
     description: '全体の流れと同時代の重なりを、少ない横移動で俯瞰します。',
+  },
+  {
+    id: 'prehistoric',
+    label: '先史',
+    start: -40000,
+    end: -3000,
+    minWidth: 1000,
+    maxWidth: 1200,
+    mobileMinWidth: 720,
+    mobileMaxWidth: 800,
+    tickStep: 5000,
+    focusYear: -40000,
+    description: '先史美術の長い時間幅を、実年代に基づく線形軸で確認します。',
   },
   {
     id: 'ancient',
@@ -47,7 +67,10 @@ export const TIMELINE_MODES: TimelineMode[] = [
     end: 500,
     minWidth: 1000,
     maxWidth: 1200,
+    mobileMinWidth: 740,
+    mobileMaxWidth: 800,
     tickStep: 250,
+    focusYear: -480,
     description: '古代地中海世界と初期キリスト教美術を、詳細な年代目盛りで比較します。',
   },
   {
@@ -57,7 +80,10 @@ export const TIMELINE_MODES: TimelineMode[] = [
     end: 1450,
     minWidth: 1200,
     maxWidth: 1500,
+    mobileMinWidth: 820,
+    mobileMaxWidth: 900,
     tickStep: 100,
+    focusYear: 330,
     description: 'ビザンティンからゴシック、初期ルネサンスへの連続と転換を比較します。',
   },
   {
@@ -67,7 +93,10 @@ export const TIMELINE_MODES: TimelineMode[] = [
     end: 1800,
     minWidth: 1600,
     maxWidth: 2000,
+    mobileMinWidth: 920,
+    mobileMaxWidth: 1000,
     tickStep: 25,
+    focusYear: 1400,
     description: 'ルネサンスからバロック、ロココまでの地域差と重なりを比較します。',
   },
   {
@@ -77,7 +106,10 @@ export const TIMELINE_MODES: TimelineMode[] = [
     end: 1950,
     minWidth: 1800,
     maxWidth: 2400,
+    mobileMinWidth: 1000,
+    mobileMaxWidth: 1100,
     tickStep: 10,
+    focusYear: 1750,
     description: '古典の再編からモダニズム成立までを、読めるラベル幅で比較します。',
   },
   {
@@ -87,13 +119,16 @@ export const TIMELINE_MODES: TimelineMode[] = [
     end: TIMELINE_NOW,
     minWidth: 1800,
     maxWidth: 2400,
+    mobileMinWidth: 1100,
+    mobileMaxWidth: 1200,
     tickStep: 10,
+    focusYear: 1900,
     description: 'モダニズム、戦後美術、現代美術の並行する動きを比較します。',
   },
 ];
 
 export const TIMELINE_ERA_BANDS: TimelineEraBand[] = [
-  { label: '先史', start: -40000, end: -3000, mode: 'survey', jumpYear: -40000 },
+  { label: '先史', start: -40000, end: -3000, mode: 'prehistoric', jumpYear: -40000 },
   { label: '古代', start: -3000, end: 500, mode: 'ancient', jumpYear: -480 },
   { label: '中世', start: 500, end: 1400, mode: 'medieval', jumpYear: 700 },
   { label: 'ルネサンス', start: 1400, end: 1600, mode: 'early-modern', jumpYear: 1400 },
@@ -139,9 +174,20 @@ export function movementOverlapsMode(movement: Movement, mode: TimelineMode) {
   return movement.dates.start < mode.end && end > mode.start;
 }
 
-export function timelineWidthForMode(mode: TimelineMode, movementCount: number) {
-  if (mode.id === 'survey') return mode.minWidth;
-  return clamp(mode.minWidth + Math.max(0, movementCount - 2) * 50, mode.minWidth, mode.maxWidth);
+export function timelineWidthForMode(
+  mode: TimelineMode,
+  movementCount: number,
+  compact = false,
+) {
+  const minWidth = compact ? mode.mobileMinWidth : mode.minWidth;
+  const maxWidth = compact ? mode.mobileMaxWidth : mode.maxWidth;
+  if (mode.id === 'survey') return minWidth;
+  const densityStep = compact ? 24 : 50;
+  return clamp(
+    minWidth + Math.max(0, movementCount - 2) * densityStep,
+    minWidth,
+    maxWidth,
+  );
 }
 
 export function yearToTimelineX(year: number, mode: TimelineMode, width: number) {
@@ -185,6 +231,79 @@ export function clipMovementToMode(movement: Movement, mode: TimelineMode) {
   };
 }
 
-export function timelineBarMinimumWidth(mode: TimelineMode) {
-  return mode.id === 'survey' ? 64 : 136;
+export function timelineBarVisualWidth(startX: number, endX: number) {
+  return Math.max(1, endX - startX);
+}
+
+type FollowLabelInput = {
+  barStart: number;
+  barEnd: number;
+  labelWidth: number;
+  viewportLeft: number;
+  viewportRight: number;
+  innerPadding?: number;
+  minimumTravel?: number;
+};
+
+export type FollowLabelResult = {
+  x: number;
+  followsViewport: boolean;
+};
+
+export function calculateFollowLabelX({
+  barStart,
+  barEnd,
+  labelWidth,
+  viewportLeft,
+  viewportRight,
+  innerPadding = 8,
+  minimumTravel = 24,
+}: FollowLabelInput): FollowLabelResult {
+  const minimumX = barStart + innerPadding;
+  const maximumX = Math.max(minimumX, barEnd - labelWidth - innerPadding);
+  const barWidth = Math.max(0, barEnd - barStart);
+  const intersectsViewport = barEnd > viewportLeft && barStart < viewportRight;
+  const fullyVisible = barStart >= viewportLeft && barEnd <= viewportRight;
+  const hasRoomToFollow =
+    barWidth >= labelWidth + innerPadding * 2 + minimumTravel;
+  const followsViewport = intersectsViewport && !fullyVisible && hasRoomToFollow;
+
+  return {
+    x: followsViewport
+      ? clamp(viewportLeft + innerPadding, minimumX, maximumX)
+      : minimumX,
+    followsViewport,
+  };
+}
+
+type TimelineLabelChoiceInput = {
+  name: string;
+  shortLabel?: string;
+  availableWidth: number;
+  nameWidth: number;
+  shortLabelWidth?: number;
+};
+
+export type TimelineLabelChoice = {
+  label: string;
+  variant: 'full' | 'short' | 'ellipsis';
+};
+
+export function chooseTimelineLabel({
+  name,
+  shortLabel,
+  availableWidth,
+  nameWidth,
+  shortLabelWidth,
+}: TimelineLabelChoiceInput): TimelineLabelChoice {
+  if (nameWidth <= availableWidth) {
+    return { label: name, variant: 'full' };
+  }
+  if (shortLabel && (shortLabelWidth ?? Number.POSITIVE_INFINITY) <= availableWidth) {
+    return { label: shortLabel, variant: 'short' };
+  }
+  return {
+    label: shortLabel ?? name,
+    variant: 'ellipsis',
+  };
 }

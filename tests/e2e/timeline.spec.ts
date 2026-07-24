@@ -3,7 +3,7 @@ import { test, expect, type Page } from '@playwright/test';
 const modeButton = (page: Page, name: string) =>
   page.getByRole('group', { name: '表示モード' }).getByRole('button', { name, exact: true });
 
-test('通史はコンパクトな俯瞰表示と1行ラベルを使う', async ({ page }) => {
+test('通史はコンパクトな俯瞰表示と1行ラベルを使う', async ({ page }, testInfo) => {
   await page.goto('/timeline/');
 
   const track = page.locator('[data-timeline-track]');
@@ -12,24 +12,39 @@ test('通史はコンパクトな俯瞰表示と1行ラベルを使う', async (
   await expect(page.getByRole('button', { name: '通史へ戻る' })).toHaveCount(0);
 
   const width = await track.evaluate((element) => element.getBoundingClientRect().width);
-  expect(width).toBeGreaterThanOrEqual(1100);
-  expect(width).toBeLessThanOrEqual(1300);
+  if (testInfo.project.name === 'mobile') {
+    expect(width).toBe(760);
+  } else {
+    expect(width).toBeGreaterThanOrEqual(1100);
+    expect(width).toBeLessThanOrEqual(1300);
+  }
 
   const surveyLabel = page.locator('[data-timeline-bar="impressionism"] .timeline-label-survey').first();
   await expect(surveyLabel).toBeVisible();
   expect(await surveyLabel.evaluate((element) => getComputedStyle(element).whiteSpace)).toBe('nowrap');
 });
 
-test('時代別モードは密度に応じた詳細幅と目盛りを使う', async ({ page }) => {
+test('時代別モードは端末と密度に応じた幅と詳細目盛りを使う', async ({ page }, testInfo) => {
   await page.goto('/timeline/');
 
-  const expectations = [
-    { label: '古代', min: 1000, max: 1200 },
-    { label: '中世', min: 1200, max: 1500 },
-    { label: '近世', min: 1600, max: 2000 },
-    { label: '近代', min: 1800, max: 2400 },
-    { label: '現代', min: 1800, max: 2400 },
-  ];
+  const mobile = testInfo.project.name === 'mobile';
+  const expectations = mobile
+    ? [
+        { label: '先史', min: 720, max: 800 },
+        { label: '古代', min: 740, max: 800 },
+        { label: '中世', min: 820, max: 900 },
+        { label: '近世', min: 920, max: 1000 },
+        { label: '近代', min: 1000, max: 1100 },
+        { label: '現代', min: 1100, max: 1200 },
+      ]
+    : [
+        { label: '先史', min: 1000, max: 1200 },
+        { label: '古代', min: 1000, max: 1200 },
+        { label: '中世', min: 1200, max: 1500 },
+        { label: '近世', min: 1600, max: 2000 },
+        { label: '近代', min: 1800, max: 2400 },
+        { label: '現代', min: 1800, max: 2400 },
+      ];
 
   for (const expected of expectations) {
     await modeButton(page, expected.label).click();
@@ -68,7 +83,8 @@ test('近代では対象範囲、使用レーン、クリップ表示だけを�
   expect(emptyLanes).toBe(0);
 });
 
-test('詳細ラベルは2行まで表示し、フォーカスで正式情報を示す', async ({ page }) => {
+test('詳細ラベルは2行まで表示し、PCのフォーカスで正式情報を示す', async ({ page }, testInfo) => {
+  test.skip(testInfo.project.name !== 'desktop', 'desktop project only');
   await page.goto('/timeline/');
   await modeButton(page, '現代').click();
 
@@ -88,10 +104,14 @@ test('詳細ラベルは2行まで表示し、フォーカスで正式情報を�
   });
   expect(labelStyle.whiteSpace).toBe('normal');
   expect(labelStyle.lineClamp).toBe('2');
-  expect(await conceptual.evaluate((element) => element.getBoundingClientRect().width)).toBeGreaterThanOrEqual(136);
+  expect(
+    await conceptual
+      .locator('[data-timeline-hit-area]')
+      .evaluate((element) => element.getBoundingClientRect().height),
+  ).toBeGreaterThanOrEqual(44);
 });
 
-test('iPhone幅では表示状態と地域列が固定され、タップで詳細を示す', async ({ page }, testInfo) => {
+test('iPhone幅では表示状態と地域列が固定され、1タップで詳細へ移動する', async ({ page }, testInfo) => {
   test.skip(testInfo.project.name !== 'mobile', 'mobile project only');
   await page.goto('/timeline/');
   await modeButton(page, '近代').tap();
@@ -101,19 +121,111 @@ test('iPhone幅では表示状態と地域列が固定され、タップで詳�
   expect(await status.evaluate((element) => getComputedStyle(element).position)).toBe('sticky');
   expect(await regionColumn.evaluate((element) => getComputedStyle(element).position)).toBe('sticky');
 
-  const impressionism = page.locator('[data-timeline-bar="impressionism"]').first();
-  await impressionism.tap();
-  await expect(page).toHaveURL(/\/timeline\/\?lod=standard$/);
-  await expect(page.locator('[data-movement-inspector]')).toContainText('印象派');
-
   const minimumTarget = await modeButton(page, '近代').evaluate(
     (element) => element.getBoundingClientRect().height,
   );
   expect(minimumTarget).toBeGreaterThanOrEqual(44);
-  const bottomPadding = await page.locator('main > div').evaluate(
-    (element) => parseFloat(getComputedStyle(element).paddingBottom),
+
+  const impressionism = page.locator('[data-timeline-bar="impressionism"]').first();
+  await impressionism.tap();
+  await expect(page).toHaveURL(/\/movements\/impressionism\/$/);
+  await expect(page.locator('[data-movement-inspector]')).toHaveCount(0);
+
+  await page.goBack();
+  await expect(page.locator('[data-timeline-track]')).toBeVisible();
+  const bottomPadding = await page.locator('main > div').evaluate((element) =>
+    parseFloat(getComputedStyle(element).paddingBottom),
   );
   expect(bottomPadding).toBeGreaterThanOrEqual(16);
+});
+
+test('先史と古代の主要ムーブメントを正しいモードへ表示する', async ({ page }) => {
+  await page.goto('/timeline/');
+
+  await modeButton(page, '先史').click();
+  await expect(page.locator('[data-timeline-bar="prehistoric-ritual"]').first()).toBeVisible();
+
+  await modeButton(page, '古代').click();
+  const greek = page.locator('[data-timeline-bar="ancient-greek-classical"]').first();
+  const byzantine = page.locator('[data-timeline-bar="early-christian-byzantine"]').first();
+  await expect(greek).toBeVisible();
+  await expect(byzantine).toBeVisible();
+
+  const trackWidth = await page
+    .locator('[data-timeline-track]')
+    .evaluate((element) => element.getBoundingClientRect().width);
+  const coordinates = await greek.evaluate((element) => ({
+    start: Number((element as HTMLElement).dataset.barStart),
+    end: Number((element as HTMLElement).dataset.barEnd),
+    width: element.getBoundingClientRect().width,
+  }));
+  expect(coordinates.start).toBeCloseTo((2520 / 3500) * trackWidth, 1);
+  expect(coordinates.end).toBeCloseTo((2677 / 3500) * trackWidth, 1);
+  expect(coordinates.width).toBeCloseTo(coordinates.end - coordinates.start, 1);
+});
+
+test('空レーンを描画せず、スマホのタイムライン高を圧縮する', async ({ page }, testInfo) => {
+  test.skip(testInfo.project.name !== 'mobile', 'mobile project only');
+  await page.goto('/timeline/');
+  await modeButton(page, '中世').tap();
+
+  const laneCount = await page.locator('[data-timeline-lane]').count();
+  const emptyLaneCount = await page.locator('[data-timeline-lane]').evaluateAll((lanes) =>
+    lanes.filter((lane) => lane.querySelector('[data-timeline-bar]') === null).length,
+  );
+  expect(laneCount).toBeGreaterThan(0);
+  expect(emptyLaneCount).toBe(0);
+
+  const trackHeight = await page
+    .locator('[data-timeline-track]')
+    .evaluate((element) => element.getBoundingClientRect().height);
+  expect(trackHeight).toBeLessThanOrEqual(844 * 0.75);
+});
+
+test('長期間バーのラベルは横スクロール後も可視領域へ追従する', async ({ page }) => {
+  await page.goto('/timeline/');
+  await modeButton(page, '中世').click();
+
+  const viewport = page.locator('[data-timeline-scroll]');
+  const bar = page.locator('[data-timeline-bar="early-christian-byzantine"]').first();
+  const label = bar.locator('[data-follow-label]');
+  await expect(label).toBeVisible();
+
+  await viewport.evaluate((element) => {
+    element.scrollLeft = Math.min(500, element.scrollWidth - element.clientWidth);
+    element.dispatchEvent(new Event('scroll'));
+  });
+  await expect(label).toHaveAttribute('data-label-following', 'true');
+
+  await expect
+    .poll(async () => {
+      const [viewportBox, labelBox] = await Promise.all([
+        viewport.evaluate((element) => element.getBoundingClientRect()),
+        label.evaluate((element) => element.getBoundingClientRect()),
+      ]);
+      return (
+        labelBox.left >= viewportBox.left &&
+        labelBox.right <= viewportBox.right + 1
+      );
+    })
+    .toBe(true);
+});
+
+test('先史美術の追従ラベルは正式名称か短縮名を維持する', async ({ page }, testInfo) => {
+  test.skip(testInfo.project.name !== 'mobile', 'mobile project only');
+  await page.goto('/timeline/');
+  await modeButton(page, '先史').click();
+
+  const viewport = page.locator('[data-timeline-scroll]');
+  const bar = page.locator('[data-timeline-bar="prehistoric-ritual"]').first();
+  const label = bar.locator('[data-follow-label]');
+  await viewport.evaluate((element) => {
+    element.scrollLeft = Math.min(320, element.scrollWidth - element.clientWidth);
+    element.dispatchEvent(new Event('scroll'));
+  });
+  await expect(label).toHaveAttribute('data-label-following', 'true');
+  await expect(label).toHaveAttribute('data-label-variant', /full|short/);
+  await expect(bar).toHaveAttribute('title', /先史美術/);
 });
 
 test('ダークモードとPWA standalone設定を維持する', async ({ page, request }) => {

@@ -27,12 +27,15 @@ import {
 } from '@/lib/network-presentation';
 import {
   TIMELINE_MODES,
+  calculateFollowLabelX,
+  chooseTimelineLabel,
   clipMovementToMode,
   movementOverlapsMode,
-  timelineBarMinimumWidth,
+  timelineBarVisualWidth,
   timelineModeById,
   timelineTicks,
   timelineWidthForMode,
+  yearToTimelineX,
 } from '@/lib/timeline-presentation';
 
 describe('検索', () => {
@@ -203,6 +206,8 @@ describe('横型タイムラインの表示設定', () => {
     expect(timelineWidthForMode(ancient, 2)).toBe(1000);
     expect(timelineWidthForMode(modern, 12)).toBe(2300);
     expect(timelineWidthForMode(contemporary, 16)).toBe(2400);
+    expect(timelineWidthForMode(ancient, 2, true)).toBe(740);
+    expect(timelineWidthForMode(modern, 12, true)).toBe(1100);
   });
 
   it('すべての時代別モードが指定した幅の目安内に収まる', () => {
@@ -213,10 +218,9 @@ describe('横型タイムラインの表示設定', () => {
     }
   });
 
-  it('詳細モードはバーの最低幅を136pxにする', () => {
-    expect(timelineBarMinimumWidth(timelineModeById('survey'))).toBe(64);
-    expect(timelineBarMinimumWidth(timelineModeById('early-modern'))).toBe(136);
-    expect(timelineBarMinimumWidth(timelineModeById('modern'))).toBe(136);
+  it('バー本体は実年代の座標差を保ち、最低幅で伸ばさない', () => {
+    expect(timelineBarVisualWidth(720, 765)).toBe(45);
+    expect(timelineBarVisualWidth(200, 200)).toBe(1);
   });
 
   it('表示範囲外を除外し、またぐムーブメントを端でクリップする', () => {
@@ -240,5 +244,113 @@ describe('横型タイムラインの表示設定', () => {
   it('時代別モードの年代目盛りを通史より詳細化する', () => {
     expect(timelineTicks(timelineModeById('modern'))).toHaveLength(21);
     expect(timelineTicks(timelineModeById('contemporary')).length).toBeGreaterThan(10);
+  });
+
+  it('BCEとCEを同じ線形座標関数で変換する', () => {
+    const ancient = timelineModeById('ancient');
+    expect(yearToTimelineX(-3000, ancient, 700)).toBe(0);
+    expect(yearToTimelineX(-480, ancient, 700)).toBeCloseTo(504);
+    expect(yearToTimelineX(500, ancient, 700)).toBe(700);
+  });
+
+  it('目盛りとバー開始年は同じ座標になる', () => {
+    const ancient = timelineModeById('ancient');
+    const greek = getMovement('ancient-greek-classical')!;
+    const clipped = clipMovementToMode(greek, ancient);
+    expect(yearToTimelineX(clipped.start, ancient, 1000)).toBe(
+      yearToTimelineX(-480, ancient, 1000),
+    );
+  });
+
+  it('先史美術と古代ギリシア美術を各時代モードに含める', () => {
+    expect(
+      movementOverlapsMode(
+        getMovement('prehistoric-ritual')!,
+        timelineModeById('prehistoric'),
+      ),
+    ).toBe(true);
+    expect(
+      movementOverlapsMode(
+        getMovement('ancient-greek-classical')!,
+        timelineModeById('ancient'),
+      ),
+    ).toBe(true);
+  });
+});
+
+describe('横型タイムラインの追従ラベル', () => {
+  it('バー開始位置より左へ出ない', () => {
+    const result = calculateFollowLabelX({
+      barStart: 200,
+      barEnd: 900,
+      labelWidth: 120,
+      viewportLeft: 0,
+      viewportRight: 390,
+    });
+    expect(result.x).toBe(208);
+  });
+
+  it('バー終了位置より右へ出ない', () => {
+    const result = calculateFollowLabelX({
+      barStart: 100,
+      barEnd: 700,
+      labelWidth: 120,
+      viewportLeft: 650,
+      viewportRight: 1040,
+    });
+    expect(result.x).toBe(572);
+    expect(result.x + 120 + 8).toBeLessThanOrEqual(700);
+  });
+
+  it('長いバーではviewport左端へ追従する', () => {
+    const result = calculateFollowLabelX({
+      barStart: 0,
+      barEnd: 1000,
+      labelWidth: 140,
+      viewportLeft: 360,
+      viewportRight: 750,
+    });
+    expect(result).toEqual({ x: 368, followsViewport: true });
+  });
+
+  it('短いバーでは通常の開始位置を使う', () => {
+    const result = calculateFollowLabelX({
+      barStart: 300,
+      barEnd: 430,
+      labelWidth: 100,
+      viewportLeft: 350,
+      viewportRight: 740,
+    });
+    expect(result).toEqual({ x: 308, followsViewport: false });
+  });
+
+  it('正式名称、shortLabel、ellipsisの順に切り替える', () => {
+    expect(
+      chooseTimelineLabel({
+        name: '初期キリスト教・ビザンティン美術',
+        shortLabel: '初期キリスト教・ビザンティン',
+        availableWidth: 220,
+        nameWidth: 200,
+        shortLabelWidth: 170,
+      }),
+    ).toMatchObject({ variant: 'full' });
+    expect(
+      chooseTimelineLabel({
+        name: '初期キリスト教・ビザンティン美術',
+        shortLabel: '初期キリスト教・ビザンティン',
+        availableWidth: 180,
+        nameWidth: 200,
+        shortLabelWidth: 170,
+      }),
+    ).toMatchObject({ variant: 'short' });
+    expect(
+      chooseTimelineLabel({
+        name: '初期キリスト教・ビザンティン美術',
+        shortLabel: '初期キリスト教・ビザンティン',
+        availableWidth: 120,
+        nameWidth: 200,
+        shortLabelWidth: 170,
+      }),
+    ).toMatchObject({ variant: 'ellipsis' });
   });
 });

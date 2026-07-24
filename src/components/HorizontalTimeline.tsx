@@ -1,7 +1,7 @@
 'use client';
 
 import Link from 'next/link';
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import type { Movement, RegionId } from '@/lib/schema';
 import { CLASSIFICATION_LABELS, REGION_LABELS } from '@/lib/schema';
 import { LodControl } from '@/components/LodControl';
@@ -17,9 +17,11 @@ import {
   TIMELINE_ERA_BANDS,
   TIMELINE_MODES,
   TIMELINE_NOW,
+  calculateFollowLabelX,
+  chooseTimelineLabel,
   clipMovementToMode,
   movementOverlapsMode,
-  timelineBarMinimumWidth,
+  timelineBarVisualWidth,
   timelineModeById,
   timelineTicks,
   timelineWidthForMode,
@@ -33,13 +35,27 @@ type Props = {
   activeRegions: RegionId[];
 };
 
-const HEADER_H = 60;
+const DESKTOP_HEADER_H = 60;
+const MOBILE_HEADER_H = 56;
 const SURVEY_SUMMARY_H = 54;
 const SURVEY_BAR_H = 26;
-const DETAIL_BAR_H = 44;
-const BAR_GAP = 8;
-const LANE_PAD_Y = 8;
-const MIN_LANE_H = 46;
+const DESKTOP_DETAIL_BAR_H = 44;
+const MOBILE_DETAIL_BAR_H = 26;
+const DESKTOP_BAR_GAP = 8;
+const MOBILE_BAR_GAP = 3;
+const DESKTOP_LANE_PAD_Y = 8;
+const MOBILE_LANE_PAD_Y = 4;
+const DESKTOP_MIN_LANE_H = 46;
+const MOBILE_MIN_LANE_H = 54;
+const LABEL_INNER_PADDING = 8;
+const LABEL_TEXT_PADDING = 4;
+
+type LabelGeometry = {
+  element: HTMLElement;
+  barStart: number;
+  barEnd: number;
+  labelWidth: number;
+};
 
 const SURVEY_PRIORITY = new Set([
   'gothic',
@@ -62,24 +78,28 @@ const SURVEY_PRIORITY = new Set([
 
 const fmtYear = (year: number) => {
   if (year === TIMELINE_NOW) return '現在';
+  if (year === 0) return '紀元境界';
   return year < 0 ? `前${Math.abs(year).toLocaleString('ja-JP')}` : `${year}`;
 };
 
 export function HorizontalTimeline({ movements, activeRegions }: Props) {
   const scrollRef = useRef<HTMLDivElement>(null);
+  const trackRef = useRef<HTMLDivElement>(null);
   const pendingJump = useRef<number | null>(null);
-  const lastPointerType = useRef<string>('mouse');
-  const touchNavigationTarget = useRef<string | null>(null);
+  const labelAnimationFrame = useRef<number | null>(null);
+  const labelGeometries = useRef<LabelGeometry[]>([]);
   const drag = useRef<{ startX: number; scrollLeft: number; active: boolean }>({
     startX: 0,
     scrollLeft: 0,
     active: false,
   });
   const [modeId, setModeId] = useState<TimelineModeId>('survey');
+  const [activeEraLabel, setActiveEraLabel] = useState<string | null>(null);
   const [activeMovementId, setActiveMovementId] = useState<string | null>(null);
   const [expandedMovementIds, setExpandedMovementIds] = useState<Set<string>>(
     new Set(),
   );
+  const [isCompactTimeline, setIsCompactTimeline] = useState(false);
   const { lod, setLod, applyPurposeDefault } = useLodState('core');
 
   const mode = timelineModeById(modeId);
@@ -107,10 +127,39 @@ export function HorizontalTimeline({ movements, activeRegions }: Props) {
     [lodMovements, mode],
   );
   const timelineWidth = useMemo(
-    () => timelineWidthForMode(mode, modeMovements.length),
-    [mode, modeMovements.length],
+    () => timelineWidthForMode(mode, modeMovements.length, isCompactTimeline),
+    [isCompactTimeline, mode, modeMovements.length],
   );
-  const barHeight = mode.id === 'survey' ? SURVEY_BAR_H : DETAIL_BAR_H;
+  const headerHeight = isCompactTimeline ? MOBILE_HEADER_H : DESKTOP_HEADER_H;
+  const barHeight =
+    mode.id === 'survey'
+      ? SURVEY_BAR_H
+      : isCompactTimeline
+        ? MOBILE_DETAIL_BAR_H
+        : DESKTOP_DETAIL_BAR_H;
+  const barGap = isCompactTimeline ? MOBILE_BAR_GAP : DESKTOP_BAR_GAP;
+  const lanePaddingY = isCompactTimeline
+    ? MOBILE_LANE_PAD_Y
+    : DESKTOP_LANE_PAD_Y;
+  const minimumLaneHeight = isCompactTimeline
+    ? MOBILE_MIN_LANE_H
+    : DESKTOP_MIN_LANE_H;
+
+  useEffect(() => {
+    const coarsePointer = window.matchMedia(
+      '(hover: none) and (pointer: coarse)',
+    );
+    const narrowViewport = window.matchMedia('(max-width: 639px)');
+    const update = () =>
+      setIsCompactTimeline(coarsePointer.matches || narrowViewport.matches);
+    update();
+    coarsePointer.addEventListener('change', update);
+    narrowViewport.addEventListener('change', update);
+    return () => {
+      coarsePointer.removeEventListener('change', update);
+      narrowViewport.removeEventListener('change', update);
+    };
+  }, []);
 
   // 通史では先史と古代を個別の長大バーにせず、専用の要約帯にまとめる。
   const plottedMovements = useMemo(
@@ -130,11 +179,10 @@ export function HorizontalTimeline({ movements, activeRegions }: Props) {
             const clipped = clipMovementToMode(movement, mode);
             const startX = yearToTimelineX(clipped.start, mode, timelineWidth);
             const endX = yearToTimelineX(clipped.end, mode, timelineWidth);
-            const minWidth = timelineBarMinimumWidth(mode);
-            const width = Math.min(timelineWidth, Math.max(minWidth, endX - startX));
+            const width = timelineBarVisualWidth(startX, endX);
             return {
               movement,
-              left: Math.min(startX, timelineWidth - width),
+              left: startX,
               width,
               ...clipped,
             };
@@ -151,7 +199,7 @@ export function HorizontalTimeline({ movements, activeRegions }: Props) {
 
         const rowEnds: number[] = [];
         const items = candidates.map((item) => {
-          let row = rowEnds.findIndex((end) => item.left >= end + BAR_GAP);
+          let row = rowEnds.findIndex((end) => item.left >= end + barGap);
           if (row === -1) {
             row = rowEnds.length;
             rowEnds.push(0);
@@ -164,25 +212,37 @@ export function HorizontalTimeline({ movements, activeRegions }: Props) {
           region,
           items,
           height: Math.max(
-            MIN_LANE_H,
-            rowEnds.length * (barHeight + BAR_GAP) + LANE_PAD_Y * 2 - BAR_GAP,
+            minimumLaneHeight,
+            rowEnds.length * (barHeight + barGap) +
+              lanePaddingY * 2 -
+              barGap,
           ),
         };
       })
       .filter((lane) => lane.items.length > 0);
-  }, [activeRegions, plottedMovements, mode, timelineWidth, barHeight]);
+  }, [
+    activeRegions,
+    plottedMovements,
+    mode,
+    timelineWidth,
+    barHeight,
+    barGap,
+    lanePaddingY,
+    minimumLaneHeight,
+  ]);
 
   const laneOffsets = useMemo(() => {
-    let offset = HEADER_H + (mode.id === 'survey' ? SURVEY_SUMMARY_H : 0);
+    let offset =
+      headerHeight + (mode.id === 'survey' ? SURVEY_SUMMARY_H : 0);
     return laneLayouts.map((lane) => {
       const top = offset;
       offset += lane.height;
       return { ...lane, top };
     });
-  }, [laneLayouts, mode.id]);
+  }, [headerHeight, laneLayouts, mode.id]);
 
   const chartHeight =
-    HEADER_H +
+    headerHeight +
     (mode.id === 'survey' ? SURVEY_SUMMARY_H : 0) +
     laneLayouts.reduce((sum, lane) => sum + lane.height, 0);
 
@@ -207,6 +267,111 @@ export function HorizontalTimeline({ movements, activeRegions }: Props) {
         !isMovementVisibleAtLod(movement, lod),
     );
   }, [activeMovement, lod, movements]);
+
+  const scheduleTimelineLabelUpdate = () => {
+    if (labelAnimationFrame.current !== null) return;
+    labelAnimationFrame.current = requestAnimationFrame(() => {
+      labelAnimationFrame.current = null;
+      const viewport = scrollRef.current;
+      if (!viewport) return;
+      const viewportLeft = viewport.scrollLeft;
+      const viewportRight = viewportLeft + viewport.clientWidth;
+
+      for (const geometry of labelGeometries.current) {
+        const position = calculateFollowLabelX({
+          barStart: geometry.barStart,
+          barEnd: geometry.barEnd,
+          labelWidth: geometry.labelWidth,
+          viewportLeft,
+          viewportRight,
+          innerPadding: LABEL_INNER_PADDING,
+        });
+        const offset = position.x - geometry.barStart;
+        geometry.element.style.transform = `translate3d(${offset}px, 0, 0)`;
+        geometry.element.dataset.labelFollowing = position.followsViewport
+          ? 'true'
+          : 'false';
+      }
+    });
+  };
+
+  useLayoutEffect(() => {
+    const track = trackRef.current;
+    const viewport = scrollRef.current;
+    if (!track || !viewport) return;
+
+    const canvas = document.createElement('canvas');
+    const context = canvas.getContext('2d');
+    const nextGeometries: LabelGeometry[] = [];
+    const labels = track.querySelectorAll<HTMLElement>('[data-follow-label]');
+
+    for (const element of labels) {
+      const bar = element.closest<HTMLElement>('[data-timeline-bar]');
+      const textElement = element.querySelector<HTMLElement>('[data-label-text]');
+      if (!bar || !textElement) continue;
+      const barStart = Number(bar.dataset.barStart);
+      const barEnd = Number(bar.dataset.barEnd);
+      const availableWidth = Math.max(
+        1,
+        barEnd - barStart - LABEL_INNER_PADDING * 2,
+      );
+      const name = element.dataset.fullLabel ?? '';
+      const shortLabel = element.dataset.shortLabel || undefined;
+      const computedStyle = getComputedStyle(textElement);
+      if (context) {
+        context.font = computedStyle.font;
+      }
+      const nameWidth = context?.measureText(name).width ?? element.scrollWidth;
+      const shortLabelWidth = shortLabel
+        ? context?.measureText(shortLabel).width
+        : undefined;
+      const choice = chooseTimelineLabel({
+        name,
+        shortLabel,
+        availableWidth,
+        nameWidth,
+        shortLabelWidth,
+      });
+
+      textElement.textContent = choice.label;
+      element.dataset.labelVariant = choice.variant;
+      element.style.maxWidth = `${availableWidth}px`;
+      const chosenWidth =
+        choice.variant === 'full'
+          ? nameWidth
+          : choice.variant === 'short'
+            ? shortLabelWidth ?? nameWidth
+            : Math.min(shortLabelWidth ?? nameWidth, availableWidth);
+      nextGeometries.push({
+        element,
+        barStart,
+        barEnd,
+        labelWidth: Math.max(
+          1,
+          Math.min(chosenWidth + LABEL_TEXT_PADDING, availableWidth),
+        ),
+      });
+    }
+
+    labelGeometries.current = nextGeometries;
+    scheduleTimelineLabelUpdate();
+    const observer =
+      typeof ResizeObserver === 'undefined'
+        ? null
+        : new ResizeObserver(scheduleTimelineLabelUpdate);
+    observer?.observe(viewport);
+
+    return () => {
+      observer?.disconnect();
+      labelGeometries.current = [];
+      if (labelAnimationFrame.current !== null) {
+        cancelAnimationFrame(labelAnimationFrame.current);
+        labelAnimationFrame.current = null;
+      }
+    };
+    // Geometry is rebuilt when the rendered mode, width, or lane layout changes.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isCompactTimeline, laneOffsets, mode.id, timelineWidth]);
 
   const scrollToYear = (year: number, behavior: ScrollBehavior = 'smooth') => {
     const element = scrollRef.current;
@@ -233,10 +398,12 @@ export function HorizontalTimeline({ movements, activeRegions }: Props) {
   }, [modeId]);
 
   const selectMode = (nextMode: TimelineModeId) => {
-    pendingJump.current = null;
+    const nextModeDefinition = timelineModeById(nextMode);
+    pendingJump.current = nextModeDefinition.focusYear;
+    setActiveEraLabel(null);
     setActiveMovementId(null);
     if (nextMode === modeId) {
-      scrollRef.current?.scrollTo({ left: 0, behavior: 'smooth' });
+      scrollToYear(nextModeDefinition.focusYear);
       return;
     }
     applyPurposeDefault(nextMode === 'survey' ? 'core' : 'standard');
@@ -245,6 +412,7 @@ export function HorizontalTimeline({ movements, activeRegions }: Props) {
 
   const jumpToEra = (era: TimelineEraBand) => {
     setActiveMovementId(null);
+    setActiveEraLabel(era.label);
     if (era.mode === modeId) {
       scrollToYear(era.jumpYear);
       return;
@@ -303,14 +471,18 @@ export function HorizontalTimeline({ movements, activeRegions }: Props) {
         />
         <div>
           <p className="mb-2 text-xs font-bold text-ink">表示モード</p>
-          <div className="grid grid-cols-3 gap-1.5 sm:grid-cols-6" role="group" aria-label="表示モード">
+          <div
+            className="scroll-x flex gap-1.5 pb-1 sm:grid sm:grid-cols-7 sm:overflow-visible sm:pb-0"
+            role="group"
+            aria-label="表示モード"
+          >
             {TIMELINE_MODES.map((item) => (
               <button
                 key={item.id}
                 type="button"
                 onClick={() => selectMode(item.id)}
                 aria-current={item.id === mode.id ? 'true' : undefined}
-                className={`min-h-11 rounded-sm border px-3 py-2 text-sm font-medium transition-colors active:translate-y-px ${
+                className={`min-h-11 min-w-[72px] shrink-0 rounded-sm border px-3 py-2 text-sm font-medium transition-colors active:translate-y-px sm:min-w-0 ${
                   item.id === mode.id
                     ? 'border-ink border-b-[3px] border-b-accent bg-ink text-paper'
                     : 'hairline bg-raised text-muted hover:border-ink hover:text-ink'
@@ -323,17 +495,18 @@ export function HorizontalTimeline({ movements, activeRegions }: Props) {
         </div>
 
         <nav aria-label="時代ナビゲーション">
-          <p className="mb-2 text-xs font-bold text-ink">時代へ移動</p>
-          <div className="grid grid-cols-4 overflow-hidden rounded-sm border hairline bg-raised sm:grid-cols-8">
-            {TIMELINE_ERA_BANDS.map((era, index) => (
+          <p className="mb-2 hidden text-xs font-bold text-ink sm:block">時代へ移動</p>
+          <div className="scroll-x flex border-y hairline bg-raised sm:grid sm:grid-cols-8 sm:overflow-hidden sm:rounded-sm sm:border">
+            {TIMELINE_ERA_BANDS.map((era) => (
               <button
                 key={era.label}
                 type="button"
                 onClick={() => jumpToEra(era)}
-                className={`min-h-11 px-1.5 py-2 text-xs text-muted transition-colors hover:bg-surface hover:text-ink active:translate-y-px ${
-                  index % 4 !== 0 ? 'border-l hairline' : ''
-                } ${index >= 4 ? 'border-t hairline sm:border-t-0' : ''} ${
-                  index > 0 && index % 4 === 0 ? 'sm:border-l' : ''
+                aria-current={activeEraLabel === era.label ? 'true' : undefined}
+                className={`min-h-11 min-w-[72px] shrink-0 border-r px-2 py-1.5 text-xs transition-colors active:translate-y-px sm:min-w-0 ${
+                  activeEraLabel === era.label
+                    ? 'border-b-[3px] border-b-accent bg-ink text-paper'
+                    : 'hairline text-muted hover:bg-surface hover:text-ink'
                 }`}
               >
                 {era.label}
@@ -344,13 +517,13 @@ export function HorizontalTimeline({ movements, activeRegions }: Props) {
       </div>
 
       <section
-        className="sticky top-[69px] z-30 mt-4 border-y hairline bg-paper/95 px-3 py-3 backdrop-blur sm:static sm:bg-surface sm:px-4 sm:py-4"
+        className="sticky top-[69px] z-30 mt-3 max-h-[120px] border-y hairline bg-paper/95 px-3 py-2 backdrop-blur sm:static sm:mt-4 sm:max-h-none sm:bg-surface sm:px-4 sm:py-4"
         aria-label="現在の表示範囲"
         data-timeline-status
       >
         <div className="flex min-h-11 items-center justify-between gap-4">
           <div aria-live="polite">
-            <p className="text-[11px] font-bold tracking-[0.08em] text-muted">表示中</p>
+            <p className="hidden text-[11px] font-bold tracking-[0.08em] text-muted sm:block">表示中</p>
             <p className="flex flex-wrap items-baseline gap-x-3">
               <span className="font-serif text-xl text-ink">{mode.label}</span>
               <span className="text-xs tabular-nums text-muted">
@@ -362,16 +535,18 @@ export function HorizontalTimeline({ movements, activeRegions }: Props) {
             <button
               type="button"
               onClick={() => selectMode('survey')}
-              className="min-h-11 shrink-0 rounded-sm border hairline bg-raised px-3 text-xs font-medium text-ink hover:border-ink active:translate-y-px"
+              className="min-h-11 shrink-0 px-2 text-xs font-medium text-ink underline decoration-hairline underline-offset-4 hover:decoration-ink active:translate-y-px sm:rounded-sm sm:border sm:bg-raised sm:px-3 sm:no-underline"
             >
               通史へ戻る
             </button>
           )}
         </div>
-        <p className="mt-1 text-xs leading-relaxed text-muted sm:text-sm">{mode.description}</p>
+        <p className="mt-0.5 line-clamp-2 text-xs leading-relaxed text-muted sm:mt-1 sm:text-sm">
+          {mode.description}
+        </p>
       </section>
 
-      {activeMovement && (
+      {activeMovement && !isCompactTimeline && (
         <div
           className="border-x border-b hairline bg-raised px-3 py-3 sm:px-4"
           role="status"
@@ -423,10 +598,13 @@ export function HorizontalTimeline({ movements, activeRegions }: Props) {
 
       <div className="mt-3 flex overflow-hidden rounded-sm border hairline bg-raised">
         <div
-          className="sticky left-0 z-20 w-[96px] shrink-0 border-r hairline bg-raised sm:w-36"
+          className="sticky left-0 z-20 w-20 shrink-0 border-r hairline bg-raised sm:w-36"
           data-region-column
         >
-          <div className="flex items-end px-2 pb-2 text-[10px] text-faint" style={{ height: HEADER_H }}>
+          <div
+            className="flex items-end px-2 pb-2 text-[10px] text-faint"
+            style={{ height: headerHeight }}
+          >
             地域
           </div>
           {mode.id === 'survey' && (
@@ -451,15 +629,18 @@ export function HorizontalTimeline({ movements, activeRegions }: Props) {
 
         <div
           ref={scrollRef}
+          data-timeline-scroll
           className="scroll-x relative min-w-0 flex-1 cursor-grab touch-pan-x select-none overscroll-x-contain active:cursor-grabbing"
           onPointerDown={onPointerDown}
           onPointerMove={onPointerMove}
           onPointerUp={onPointerUp}
           onPointerLeave={onPointerUp}
+          onScroll={scheduleTimelineLabelUpdate}
           role="group"
           aria-label={`${mode.label}の横型タイムライン。横にスワイプまたはドラッグして移動できます`}
         >
           <div
+            ref={trackRef}
             className="relative"
             data-timeline-track
             data-timeline-mode={mode.id}
@@ -467,7 +648,10 @@ export function HorizontalTimeline({ movements, activeRegions }: Props) {
             data-lane-count={laneLayouts.length}
             style={{ width: timelineWidth, height: chartHeight }}
           >
-            <div className="absolute inset-x-0 top-0 border-b hairline" style={{ height: HEADER_H }}>
+            <div
+              className="absolute inset-x-0 top-0 border-b hairline"
+              style={{ height: headerHeight }}
+            >
               {visibleEraBands.map((era, index) => {
                 const left = yearToTimelineX(
                   Math.max(era.start, mode.start),
@@ -496,6 +680,7 @@ export function HorizontalTimeline({ movements, activeRegions }: Props) {
             {ticks.map((tick) => (
               <div
                 key={tick}
+                data-timeline-tick={tick}
                 className="absolute bottom-0 top-7 border-l hairline"
                 style={{ left: yearToTimelineX(tick, mode, timelineWidth) }}
                 aria-hidden="true"
@@ -517,7 +702,7 @@ export function HorizontalTimeline({ movements, activeRegions }: Props) {
             {mode.id === 'survey' && (
               <div
                 className="absolute inset-x-0 border-b hairline bg-surface/30"
-                style={{ top: HEADER_H, height: SURVEY_SUMMARY_H }}
+                style={{ top: headerHeight, height: SURVEY_SUMMARY_H }}
               >
                 {[
                   {
@@ -582,79 +767,80 @@ export function HorizontalTimeline({ movements, activeRegions }: Props) {
                       data-clipped-start={clippedStart || undefined}
                       data-clipped-end={clippedEnd || undefined}
                       data-hierarchy-level={isExpandedDetail ? 'child' : 'root'}
+                      data-bar-start={left}
+                      data-bar-end={left + width}
+                      data-visual-width={width}
                       onMouseEnter={(event) => {
-                        // Touch browsers may synthesize mouseenter after a tap. Also keep a
-                        // keyboard-focused bar authoritative so the inspector does not jump
-                        // to whichever overlapping bar happens to sit under the pointer.
                         const focusedBar =
                           event.currentTarget.ownerDocument.querySelector(
                             '[data-timeline-bar]:focus',
                           );
-                        if (
-                          lastPointerType.current !== 'touch' &&
-                          focusedBar === null
-                        ) {
+                        if (!isCompactTimeline && focusedBar === null) {
                           setActiveMovementId(movement.id);
                         }
                       }}
-                      onFocus={() => setActiveMovementId(movement.id)}
+                      onFocus={() => {
+                        if (!isCompactTimeline) {
+                          setActiveMovementId(movement.id);
+                        }
+                      }}
                       onPointerDown={(event) => {
-                        lastPointerType.current = event.pointerType;
-                        if (event.pointerType === 'touch') {
-                          // Capture the selection state before the tap focuses the link.
-                          // The first tap opens the inspector; only a later tap navigates.
-                          touchNavigationTarget.current =
-                            activeMovementId === movement.id ? movement.id : null;
-                        } else {
+                        if (event.pointerType === 'mouse') {
                           setActiveMovementId(movement.id);
                         }
                       }}
-                      onClick={(event) => {
-                        if (
-                          lastPointerType.current === 'touch' &&
-                          touchNavigationTarget.current !== movement.id
-                        ) {
-                          event.preventDefault();
-                          setActiveMovementId(movement.id);
-                        }
-                      }}
-                      className={`absolute flex items-center overflow-hidden rounded-sm border px-2 text-left text-[11px] leading-tight transition-colors hover:border-accent hover:bg-accent/30 focus-visible:z-20 active:translate-y-px ${
-                        isPriority
-                          ? 'border-accent/50 bg-accent/20 text-ink'
-                          : 'hairline bg-raised/90 text-muted'
-                      } ${isExpandedDetail ? 'ml-2 border-l-2 opacity-80' : ''}`}
+                      className="group absolute text-left text-[11px] leading-tight focus-visible:z-20 active:translate-y-px"
                       style={{
-                        left: left + (isExpandedDetail ? 8 : 0),
-                        top: LANE_PAD_Y + row * (barHeight + BAR_GAP),
-                        width: Math.max(1, width - (isExpandedDetail ? 8 : 0)),
+                        left,
+                        top: lanePaddingY + row * (barHeight + barGap),
+                        width,
                         height: isExpandedDetail ? barHeight - 6 : barHeight,
                       }}
                     >
-                      {clippedStart && (
-                        <span
-                          className="absolute inset-y-0 left-0 z-10 flex w-3 items-center bg-gradient-to-r from-paper/90 to-transparent text-[10px]"
-                          aria-hidden="true"
-                        >
-                          ‹
-                        </span>
-                      )}
                       <span
-                        className={
-                          mode.id === 'survey'
-                            ? 'timeline-label-survey block w-full'
-                            : 'timeline-label-detail block w-full'
-                        }
+                        className="absolute left-1/2 top-1/2 h-11 min-w-11 -translate-x-1/2 -translate-y-1/2"
+                        aria-hidden="true"
+                        data-timeline-hit-area
+                      />
+                      <span
+                        className={`pointer-events-none absolute inset-0 overflow-hidden rounded-sm border transition-colors group-hover:border-accent group-hover:bg-accent/30 group-focus-visible:border-ink ${
+                          isPriority
+                            ? 'border-accent/50 bg-accent/20 text-ink'
+                            : 'hairline bg-raised/90 text-muted'
+                        } ${isExpandedDetail ? 'border-l-2 opacity-80' : ''}`}
+                        aria-hidden="true"
+                        data-timeline-bar-visual
                       >
-                        {mode.id === 'survey' ? movement.shortLabel ?? movement.nameJa : movement.nameJa}
-                      </span>
-                      {clippedEnd && (
+                        {clippedStart && (
+                          <span className="absolute inset-y-0 left-0 z-10 flex w-3 items-center bg-gradient-to-r from-paper/90 to-transparent text-[10px]">
+                            ‹
+                          </span>
+                        )}
                         <span
-                          className="absolute inset-y-0 right-0 z-10 flex w-3 items-center justify-end bg-gradient-to-l from-paper/90 to-transparent text-[10px]"
-                          aria-hidden="true"
+                          data-follow-label
+                          data-full-label={movement.nameJa}
+                          data-short-label={movement.shortLabel}
+                          className={`pointer-events-none absolute inset-y-0 left-0 flex items-center overflow-hidden px-0.5 ${
+                            isPriority ? 'bg-accent/15' : 'bg-surface/80'
+                          }`}
                         >
-                          ›
+                          <span
+                            data-label-text
+                            className={
+                              mode.id === 'survey'
+                                ? 'timeline-label-survey block w-full'
+                                : 'timeline-label-detail w-full'
+                            }
+                          >
+                            {movement.nameJa}
+                          </span>
                         </span>
-                      )}
+                        {clippedEnd && (
+                          <span className="absolute inset-y-0 right-0 z-10 flex w-3 items-center justify-end bg-gradient-to-l from-paper/90 to-transparent text-[10px]">
+                            ›
+                          </span>
+                        )}
+                      </span>
                     </Link>
                   );
                 })}
@@ -665,7 +851,10 @@ export function HorizontalTimeline({ movements, activeRegions }: Props) {
       </div>
 
       <p className="mt-2 text-xs text-faint">
-        横にスワイプ、または余白をドラッグして移動できます。バーはホバーまたはフォーカスで詳細を表示し、タッチでは2回目の選択で詳細ページを開きます。
+        <span className="sm:hidden">横にスワイプして移動。タップで詳細</span>
+        <span className="hidden sm:inline">
+          横スクロール、または余白をドラッグして移動できます。バーはホバーまたはフォーカスで概要を表示し、クリックで詳細を開きます。
+        </span>
       </p>
 
       <details className="mt-4 rounded-sm border hairline bg-surface p-3">

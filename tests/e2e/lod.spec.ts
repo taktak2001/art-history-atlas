@@ -69,12 +69,12 @@ test('一覧は階層表示でグループ文脈を示す', async ({ page }) => 
   await expect(page.getByRole('heading', { name: '印象派周辺' })).toBeVisible();
 });
 
-test('スマホの通史coreで代表項目からグループ内訳を展開する', async ({ page }, testInfo) => {
-  test.skip(testInfo.project.name !== 'mobile', 'mobile project only');
+test('PCの通史coreで代表項目からグループ内訳を展開する', async ({ page }, testInfo) => {
+  test.skip(testInfo.project.name !== 'desktop', 'desktop project only');
   await page.goto('/timeline/?lod=core');
 
   const cubism = page.locator('[data-timeline-bar="cubism"]').first();
-  await cubism.tap();
+  await cubism.hover();
   await expect(page.locator('[data-movement-inspector]')).toContainText('キュビスム');
   await page.locator('[data-timeline-expand="cubism"]').click();
   await expect(page.locator('[data-timeline-bar="futurism"]').first()).toBeVisible();
