@@ -59,6 +59,7 @@ test('iPhoneでは本体が初期viewport内に入り、線の見方はoverlay�
 
   await guide.locator('summary').click();
   await expect(guide).toHaveAttribute('open', '');
+  await expect(guide.locator('summary')).toHaveAttribute('aria-expanded', 'true');
   await expect(guide.locator('.network-line-guide__panel')).toBeVisible();
   await expect(guide.locator('.network-line-guide__legend li')).toHaveCount(9);
   await expect(
@@ -67,8 +68,34 @@ test('iPhoneでは本体が初期viewport内に入り、線の見方はoverlay�
       { exact: true },
     ),
   ).toBeVisible();
+  await expect(guide.locator('.network-line-guide__definitions')).toHaveCount(0);
+  await expect(page.locator('.network-core-definitions')).toHaveCount(0);
   const after = await graph.boundingBox();
   expect(after!.y).toBeCloseTo(before!.y, 0);
+
+  await page.getByRole('heading', { name: '関係ネットワーク' }).click();
+  await expect(guide).not.toHaveAttribute('open', '');
+  await expect(guide.locator('summary')).toHaveAttribute('aria-expanded', 'false');
+});
+
+test('線の見方はEscapeで閉じ、操作説明だけを上部に残す', async ({ page }) => {
+  await page.setViewportSize({ width: 390, height: 844 });
+  await page.goto('/network/');
+
+  const guide = page.locator('details.network-line-guide');
+  const summary = guide.locator('summary');
+  await expect(
+    page.getByText('横にスワイプして移動。ノードをタップして関係を表示', {
+      exact: true,
+    }),
+  ).toBeVisible();
+  await expect(page.locator('.network-core-definitions')).toHaveCount(0);
+
+  await summary.click();
+  await expect(guide).toHaveAttribute('open', '');
+  await page.keyboard.press('Escape');
+  await expect(guide).not.toHaveAttribute('open', '');
+  await expect(summary).toBeFocused();
 });
 
 test('関係タイプごとに線種・通常線幅・方向を使い分ける', async ({ page }) => {

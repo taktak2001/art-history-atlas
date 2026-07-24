@@ -97,6 +97,8 @@ function getEdgeGeometry(
 export function NetworkGraph({ movements, relationships, eraOrder }: Props) {
   const router = useRouter();
   const scrollRef = useRef<HTMLDivElement | null>(null);
+  const lineGuideRef = useRef<HTMLDetailsElement | null>(null);
+  const lineGuideSummaryRef = useRef<HTMLElement | null>(null);
   const dragRef = useRef({
     active: false,
     pointerId: -1,
@@ -111,6 +113,7 @@ export function NetworkGraph({ movements, relationships, eraOrder }: Props) {
     useState<RelationKindFilter>('all');
   const [relationScope, setRelationScope] = useState<RelationScope>('important');
   const [isMobile, setIsMobile] = useState(false);
+  const [isLineGuideOpen, setIsLineGuideOpen] = useState(false);
   const [activeEra, setActiveEra] = useState<EraId>(eraOrder[0]);
   const [expandedGroupIds, setExpandedGroupIds] = useState<Set<string>>(new Set());
   const { lod, setLod } = useLodState('core');
@@ -122,6 +125,39 @@ export function NetworkGraph({ movements, relationships, eraOrder }: Props) {
     media.addEventListener('change', update);
     return () => media.removeEventListener('change', update);
   }, []);
+
+  useEffect(() => {
+    if (!isLineGuideOpen) return;
+
+    const closeLineGuide = () => {
+      if (lineGuideRef.current) {
+        lineGuideRef.current.open = false;
+      }
+      setIsLineGuideOpen(false);
+    };
+
+    const handlePointerDown = (event: globalThis.PointerEvent) => {
+      if (
+        event.target instanceof Node &&
+        !lineGuideRef.current?.contains(event.target)
+      ) {
+        closeLineGuide();
+      }
+    };
+
+    const handleKeyDown = (event: globalThis.KeyboardEvent) => {
+      if (event.key !== 'Escape') return;
+      closeLineGuide();
+      lineGuideSummaryRef.current?.focus();
+    };
+
+    document.addEventListener('pointerdown', handlePointerDown);
+    document.addEventListener('keydown', handleKeyDown);
+    return () => {
+      document.removeEventListener('pointerdown', handlePointerDown);
+      document.removeEventListener('keydown', handleKeyDown);
+    };
+  }, [isLineGuideOpen]);
 
   const lodMovements = useMemo(() => {
     const base = filterMovementsByLod(movements, lod);
@@ -548,11 +584,20 @@ export function NetworkGraph({ movements, relationships, eraOrder }: Props) {
             </select>
           </label>
 
-          <details className="network-line-guide">
-            <summary>
+          <details
+            ref={lineGuideRef}
+            className="network-line-guide"
+            onToggle={(event) => setIsLineGuideOpen(event.currentTarget.open)}
+          >
+            <summary
+              ref={lineGuideSummaryRef}
+              aria-controls="network-line-guide-panel"
+              aria-expanded={isLineGuideOpen}
+            >
               線の見方 <span aria-hidden="true">ⓘ</span>
             </summary>
             <div
+              id="network-line-guide-panel"
               className="network-line-guide__panel"
               tabIndex={0}
               aria-label="関係線の詳しい見方"
@@ -582,27 +627,6 @@ export function NetworkGraph({ movements, relationships, eraOrder }: Props) {
                   </li>
                 ))}
               </ul>
-              <div className="network-line-guide__definitions">
-                {(['succession', 'influence'] as const).map((kind) => (
-                  <section key={kind}>
-                    <h3>{RELATIONSHIP_DEFINITIONS[kind].label}</h3>
-                    <p>{RELATIONSHIP_DEFINITIONS[kind].fullDefinition}</p>
-                    <ul>
-                      {RELATIONSHIP_DEFINITIONS[kind].criteria.map(
-                        (criterion) => (
-                          <li key={criterion}>{criterion}</li>
-                        ),
-                      )}
-                    </ul>
-                    <p>
-                      例: {RELATIONSHIP_DEFINITIONS[kind].examples[0]}
-                    </p>
-                    <p>
-                      判定補助: {RELATIONSHIP_DEFINITIONS[kind].cautions[0]}
-                    </p>
-                  </section>
-                ))}
-              </div>
             </div>
           </details>
 
@@ -611,14 +635,6 @@ export function NetworkGraph({ movements, relationships, eraOrder }: Props) {
           </p>
         </div>
 
-        <dl className="network-core-definitions">
-          {(['succession', 'influence'] as const).map((kind) => (
-            <div key={kind}>
-              <dt>{RELATIONSHIP_DEFINITIONS[kind].label}</dt>
-              <dd>{RELATIONSHIP_DEFINITIONS[kind].shortDefinition}</dd>
-            </div>
-          ))}
-        </dl>
       </section>
 
       <div className="network-operation-row">
