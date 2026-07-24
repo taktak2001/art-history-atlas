@@ -812,13 +812,16 @@ html.dark .relation-badge {
 }
 
 .timeline-label-detail {
-  display: -webkit-box;
   overflow: hidden;
-  white-space: normal;
-  -webkit-box-orient: vertical;
-  -webkit-line-clamp: 2;
+  white-space: nowrap;
+  overflow-wrap: normal;
+  word-break: keep-all;
+  text-overflow: ellipsis;
+  color: rgb(var(--c-ink));
   font-size: 0.625rem;
-  line-height: 0.6875rem;
+  font-weight: 600;
+  font-synthesis: weight;
+  line-height: 1.25;
   text-align: center;
 }
 
@@ -1017,7 +1020,8 @@ html.dark .relation-badge {
 .timeline-follow-label {
   background: transparent;
   color: rgb(var(--c-ink));
-  font-weight: 500;
+  font-weight: 600;
+  font-synthesis: weight;
 }
 
 [data-timeline-bar]:hover .timeline-bar-visual,

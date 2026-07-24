@@ -20,6 +20,7 @@ import {
   calculateFollowLabelX,
   chooseTimelineLabel,
   clipMovementToMode,
+  fitTimelineModeToMovements,
   movementOverlapsMode,
   timelineBarVisualWidth,
   timelineModeById,
@@ -48,6 +49,8 @@ const DESKTOP_MIN_LANE_H = 62;
 const MOBILE_MIN_LANE_H = 60;
 const LABEL_INNER_PADDING = 8;
 const LABEL_TEXT_PADDING = 4;
+const DESKTOP_DETAIL_LABEL_FOOTPRINT = 140;
+const MOBILE_DETAIL_LABEL_FOOTPRINT = 120;
 
 type LabelGeometry = {
   element: HTMLElement;
@@ -124,9 +127,14 @@ export function HorizontalTimeline({ movements, activeRegions }: Props) {
     () => lodMovements.filter((movement) => movementOverlapsMode(movement, mode)),
     [lodMovements, mode],
   );
+  const displayMode = useMemo(
+    () => fitTimelineModeToMovements(mode, modeMovements),
+    [mode, modeMovements],
+  );
   const timelineWidth = useMemo(
-    () => timelineWidthForMode(mode, modeMovements.length, isCompactTimeline),
-    [isCompactTimeline, mode, modeMovements.length],
+    () =>
+      timelineWidthForMode(displayMode, modeMovements.length, isCompactTimeline),
+    [displayMode, isCompactTimeline, modeMovements.length],
   );
   const headerHeight = isCompactTimeline ? MOBILE_HEADER_H : DESKTOP_HEADER_H;
   const barHeight =
@@ -175,8 +183,16 @@ export function HorizontalTimeline({ movements, activeRegions }: Props) {
           .filter((movement) => movement.regionIds.includes(region))
           .map((movement) => {
             const clipped = clipMovementToMode(movement, mode);
-            const startX = yearToTimelineX(clipped.start, mode, timelineWidth);
-            const endX = yearToTimelineX(clipped.end, mode, timelineWidth);
+            const startX = yearToTimelineX(
+              clipped.start,
+              displayMode,
+              timelineWidth,
+            );
+            const endX = yearToTimelineX(
+              clipped.end,
+              displayMode,
+              timelineWidth,
+            );
             const width = timelineBarVisualWidth(startX, endX);
             return {
               movement,
@@ -202,7 +218,16 @@ export function HorizontalTimeline({ movements, activeRegions }: Props) {
             row = rowEnds.length;
             rowEnds.push(0);
           }
-          rowEnds[row] = item.left + item.width;
+          const labelFootprint =
+            mode.id === 'survey'
+              ? item.width
+              : Math.max(
+                  item.width,
+                  isCompactTimeline
+                    ? MOBILE_DETAIL_LABEL_FOOTPRINT
+                    : DESKTOP_DETAIL_LABEL_FOOTPRINT,
+                );
+          rowEnds[row] = item.left + labelFootprint;
           return { ...item, row };
         });
 
@@ -222,9 +247,11 @@ export function HorizontalTimeline({ movements, activeRegions }: Props) {
     activeRegions,
     plottedMovements,
     mode,
+    displayMode,
     timelineWidth,
     barHeight,
     barGap,
+    isCompactTimeline,
     lanePaddingY,
     minimumLaneHeight,
   ]);
@@ -247,7 +274,7 @@ export function HorizontalTimeline({ movements, activeRegions }: Props) {
   const visibleEraBands = TIMELINE_ERA_BANDS.filter(
     (era) => era.start < mode.end && era.end > mode.start,
   );
-  const ticks = timelineTicks(mode);
+  const ticks = timelineTicks(displayMode, timelineWidth);
   const majorTickStride =
     mode.id === 'survey' ? 1 : Math.max(1, Math.ceil((ticks.length - 1) / 4));
   const activeMovement =
@@ -311,10 +338,19 @@ export function HorizontalTimeline({ movements, activeRegions }: Props) {
       if (!bar || !textElement) continue;
       const barStart = Number(bar.dataset.barStart);
       const barEnd = Number(bar.dataset.barEnd);
-      const availableWidth = Math.max(
+      const barAvailableWidth = Math.max(
         1,
         barEnd - barStart - LABEL_INNER_PADDING * 2,
       );
+      const availableWidth =
+        mode.id === 'survey'
+          ? barAvailableWidth
+          : Math.max(
+              barAvailableWidth,
+              isCompactTimeline
+                ? MOBILE_DETAIL_LABEL_FOOTPRINT
+                : DESKTOP_DETAIL_LABEL_FOOTPRINT,
+            );
       const name = element.dataset.fullLabel ?? '';
       const shortLabel = element.dataset.shortLabel || undefined;
       const computedStyle = getComputedStyle(textElement);
@@ -373,14 +409,22 @@ export function HorizontalTimeline({ movements, activeRegions }: Props) {
     };
     // Geometry is rebuilt when the rendered mode, width, or lane layout changes.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [isCompactTimeline, laneOffsets, mode.id, timelineWidth]);
+  }, [
+    displayMode.end,
+    displayMode.start,
+    isCompactTimeline,
+    laneOffsets,
+    mode.id,
+    timelineWidth,
+  ]);
 
   const scrollToYear = (year: number, behavior: ScrollBehavior = 'smooth') => {
     const element = scrollRef.current;
     if (!element) return;
     const left = Math.max(
       0,
-      yearToTimelineX(year, mode, timelineWidth) - element.clientWidth * 0.18,
+      yearToTimelineX(year, displayMode, timelineWidth) -
+        element.clientWidth * 0.18,
     );
     element.scrollTo({ left, behavior });
   };
@@ -491,7 +535,8 @@ export function HorizontalTimeline({ movements, activeRegions }: Props) {
             <p className="flex flex-wrap items-baseline gap-x-3">
               <span className="timeline-status__title">{mode.label}</span>
               <span className="timeline-status__range">
-                {fmtYear(mode.start)}–{mode.end === TIMELINE_NOW ? '現在' : fmtYear(mode.end)}
+                {fmtYear(displayMode.start)}〜
+                {displayMode.end === TIMELINE_NOW ? '現在' : fmtYear(displayMode.end)}
               </span>
             </p>
           </div>
@@ -607,6 +652,9 @@ export function HorizontalTimeline({ movements, activeRegions }: Props) {
             data-timeline-mode={mode.id}
             data-timeline-lod={lod}
             data-lane-count={laneLayouts.length}
+            data-scale-start={displayMode.start}
+            data-scale-end={displayMode.end}
+            data-scale-rounding={displayMode.tickStep}
             style={{ width: timelineWidth, height: chartHeight }}
           >
             <div
@@ -616,12 +664,12 @@ export function HorizontalTimeline({ movements, activeRegions }: Props) {
               {visibleEraBands.map((era) => {
                 const left = yearToTimelineX(
                   Math.max(era.start, mode.start),
-                  mode,
+                  displayMode,
                   timelineWidth,
                 );
                 const right = yearToTimelineX(
                   Math.min(era.end, mode.end),
-                  mode,
+                  displayMode,
                   timelineWidth,
                 );
                 return (
@@ -649,14 +697,16 @@ export function HorizontalTimeline({ movements, activeRegions }: Props) {
                   className={`timeline-gridline absolute bottom-0 top-7 ${
                     isMajorTick ? 'timeline-gridline--major' : 'timeline-gridline--minor'
                   }`}
-                  style={{ left: yearToTimelineX(tick, mode, timelineWidth) }}
+                  style={{
+                    left: yearToTimelineX(tick, displayMode, timelineWidth),
+                  }}
                   aria-hidden="true"
                 >
                   <span
                     className={`timeline-tick-label absolute top-0 whitespace-nowrap px-1 text-[10px] tabular-nums ${
-                      tick === mode.start
+                      tick === displayMode.start
                         ? ''
-                        : tick === mode.end
+                        : tick === displayMode.end
                           ? '-translate-x-full'
                           : '-translate-x-1/2'
                     }`}
@@ -688,8 +738,16 @@ export function HorizontalTimeline({ movements, activeRegions }: Props) {
                     end: 500,
                   },
                 ].map((summary) => {
-                  const left = yearToTimelineX(summary.start, mode, timelineWidth);
-                  const right = yearToTimelineX(summary.end, mode, timelineWidth);
+                  const left = yearToTimelineX(
+                    summary.start,
+                    displayMode,
+                    timelineWidth,
+                  );
+                  const right = yearToTimelineX(
+                    summary.end,
+                    displayMode,
+                    timelineWidth,
+                  );
                   return (
                     <Link
                       key={summary.id}
