@@ -2,10 +2,14 @@
 
 import Link from 'next/link';
 import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
-import type { Movement, RegionId } from '@/lib/schema';
+import type { Movement, RegionId, Relationship } from '@/lib/schema';
 import { CLASSIFICATION_LABELS, REGION_LABELS } from '@/lib/schema';
 import { LodControl } from '@/components/LodControl';
-import { TimelineViewerFrame } from '@/components/TimelineViewerFrame';
+import {
+  TimelineViewerFrame,
+  type TimelineViewerNode,
+  type TimelineViewerRegion,
+} from '@/components/TimelineViewerFrame';
 import {
   filterMovementsByLod,
   getGroupMovements,
@@ -30,9 +34,11 @@ import {
   yearToTimelineX,
   type TimelineModeId,
 } from '@/lib/timeline-presentation';
+import type { TimelineViewerSemanticLevel } from '@/lib/timeline-viewer';
 
 type Props = {
   movements: Movement[];
+  relationships: Relationship[];
   activeRegions: RegionId[];
 };
 
@@ -79,13 +85,34 @@ const SURVEY_PRIORITY = new Set([
   'mono-ha',
 ]);
 
+const SURVEY_SUMMARIES = [
+  {
+    id: 'prehistoric-ritual',
+    label: '先史の造形',
+    note: '像・洞窟画・祭祀',
+    start: -40000,
+    end: -3000,
+  },
+  {
+    id: 'ancient-greek-classical',
+    label: '古代の規範',
+    note: '比例・理想美・公共性',
+    start: -3000,
+    end: 500,
+  },
+] as const;
+
 const fmtYear = (year: number) => {
   if (year === TIMELINE_NOW) return '現在';
   if (year === 0) return '紀元境界';
   return year < 0 ? `前${Math.abs(year).toLocaleString('ja-JP')}` : `${year}`;
 };
 
-export function HorizontalTimeline({ movements, activeRegions }: Props) {
+export function HorizontalTimeline({
+  movements,
+  relationships,
+  activeRegions,
+}: Props) {
   const scrollRef = useRef<HTMLDivElement>(null);
   const trackRef = useRef<HTMLDivElement>(null);
   const pendingJump = useRef<number | null>(null);
@@ -106,11 +133,20 @@ export function HorizontalTimeline({ movements, activeRegions }: Props) {
   );
   const [isCompactTimeline, setIsCompactTimeline] = useState(false);
   const [isViewerMode, setIsViewerMode] = useState(false);
+  const [viewerSemanticLevel, setViewerSemanticLevel] =
+    useState<TimelineViewerSemanticLevel>('standard');
   const { lod, setLod, applyPurposeDefault } = useLodState('core');
 
   const mode = timelineModeById(modeId);
+  const viewerLod =
+    viewerSemanticLevel === 'detailed'
+      ? 'detailed'
+      : viewerSemanticLevel === 'contextual'
+        ? 'standard'
+        : 'core';
+  const effectiveLod = isViewerMode ? viewerLod : lod;
   const lodMovements = useMemo(() => {
-    const visible = filterMovementsByLod(movements, lod);
+    const visible = filterMovementsByLod(movements, effectiveLod);
     const visibleIds = new Set(visible.map((movement) => movement.id));
     const expanded = movements.filter((movement) => {
       if (visibleIds.has(movement.id)) return false;
@@ -122,11 +158,30 @@ export function HorizontalTimeline({ movements, activeRegions }: Props) {
         );
       });
     });
-    return [...visible, ...expanded];
-  }, [expandedMovementIds, lod, movements]);
+    const selected =
+      isViewerMode && activeMovementId
+        ? movements.find((movement) => movement.id === activeMovementId)
+        : undefined;
+    const retainedSelection =
+      selected && !visibleIds.has(selected.id) && !expanded.includes(selected)
+        ? [selected]
+        : [];
+    return [...visible, ...expanded, ...retainedSelection];
+  }, [
+    activeMovementId,
+    effectiveLod,
+    expandedMovementIds,
+    isViewerMode,
+    movements,
+  ]);
   const baseVisibleIds = useMemo(
-    () => new Set(filterMovementsByLod(movements, lod).map((movement) => movement.id)),
-    [lod, movements],
+    () =>
+      new Set(
+        filterMovementsByLod(movements, effectiveLod).map(
+          (movement) => movement.id,
+        ),
+      ),
+    [effectiveLod, movements],
   );
   const modeMovements = useMemo(
     () => lodMovements.filter((movement) => movementOverlapsMode(movement, mode)),
@@ -297,9 +352,131 @@ export function HorizontalTimeline({ movements, activeRegions }: Props) {
     return [...children, ...groupMembers].filter(
       (movement, index, all) =>
         all.findIndex((candidate) => candidate.id === movement.id) === index &&
-        !isMovementVisibleAtLod(movement, lod),
+        !isMovementVisibleAtLod(movement, effectiveLod),
     );
-  }, [activeMovement, lod, movements]);
+  }, [activeMovement, effectiveLod, movements]);
+  const relationshipCounts = useMemo(() => {
+    const counts = new Map<string, number>();
+    for (const relationship of relationships) {
+      counts.set(
+        relationship.from,
+        (counts.get(relationship.from) ?? 0) + 1,
+      );
+      counts.set(relationship.to, (counts.get(relationship.to) ?? 0) + 1);
+    }
+    return counts;
+  }, [relationships]);
+  const viewerNodes = useMemo<TimelineViewerNode[]>(() => {
+    const nodes: TimelineViewerNode[] = laneOffsets.flatMap((lane) =>
+      lane.items.map(({ movement, left, width, row }) => ({
+        key: `${lane.region}-${movement.id}`,
+        movementId: movement.id,
+        href: `/movements/${movement.id}/`,
+        nameJa: movement.nameJa,
+        nameEn: movement.nameEn,
+        shortLabel: movement.shortLabel,
+        dateLabel: `${fmtYear(movement.dates.start)}〜${
+          movement.dates.end === null ? '現在' : fmtYear(movement.dates.end)
+        }`,
+        regionLabel: movement.regionIds
+          .map((region) => REGION_LABELS[region])
+          .join('・'),
+        classificationLabel: CLASSIFICATION_LABELS[movement.classification],
+        relationCount: relationshipCounts.get(movement.id) ?? 0,
+        summary: movement.summary,
+        barStart: left,
+        barEnd: left + width,
+        centerY:
+          lane.top +
+          lanePaddingY +
+          row * (barHeight + barGap) +
+          barHeight / 2,
+        priority: mode.id !== 'survey' || SURVEY_PRIORITY.has(movement.id),
+        selected: activeMovementId === movement.id,
+      })),
+    );
+
+    if (mode.id !== 'survey') return nodes;
+    const summaryNodes = SURVEY_SUMMARIES.flatMap((summary) => {
+      const movement = movements.find((candidate) => candidate.id === summary.id);
+      if (!movement) return [];
+      return [
+        {
+          key: `origin-${summary.id}`,
+          movementId: movement.id,
+          href: `/movements/${movement.id}/`,
+          nameJa: summary.label,
+          nameEn: movement.nameEn,
+          shortLabel: movement.shortLabel,
+          dateLabel: `${fmtYear(movement.dates.start)}〜${
+            movement.dates.end === null ? '現在' : fmtYear(movement.dates.end)
+          }`,
+          regionLabel: movement.regionIds
+            .map((region) => REGION_LABELS[region])
+            .join('・'),
+          classificationLabel: CLASSIFICATION_LABELS[movement.classification],
+          relationCount: relationshipCounts.get(movement.id) ?? 0,
+          summary: movement.summary,
+          barStart: yearToTimelineX(
+            summary.start,
+            displayMode,
+            timelineWidth,
+          ),
+          barEnd: yearToTimelineX(summary.end, displayMode, timelineWidth),
+          centerY: headerHeight + SURVEY_SUMMARY_H / 2,
+          priority: true,
+          selected: activeMovementId === movement.id,
+        },
+      ];
+    });
+    return [...summaryNodes, ...nodes];
+  }, [
+    activeMovementId,
+    barGap,
+    barHeight,
+    displayMode,
+    headerHeight,
+    laneOffsets,
+    lanePaddingY,
+    mode.id,
+    movements,
+    relationshipCounts,
+    timelineWidth,
+  ]);
+  const viewerRegions = useMemo<TimelineViewerRegion[]>(
+    () => [
+      ...(mode.id === 'survey'
+        ? [
+            {
+              id: 'origin',
+              label: '起点',
+              top: headerHeight,
+              height: SURVEY_SUMMARY_H,
+            },
+          ]
+        : []),
+      ...laneOffsets.map((lane) => ({
+        id: lane.region,
+        label: REGION_LABELS[lane.region],
+        top: lane.top,
+        height: lane.height,
+      })),
+    ],
+    [headerHeight, laneOffsets, mode.id],
+  );
+  const viewerMovementIds = useMemo(
+    () => new Set(viewerNodes.map((node) => node.movementId)),
+    [viewerNodes],
+  );
+  const viewerRelations = useMemo(
+    () =>
+      relationships.filter(
+        (relationship) =>
+          viewerMovementIds.has(relationship.from) &&
+          viewerMovementIds.has(relationship.to),
+      ),
+    [relationships, viewerMovementIds],
+  );
 
   const scheduleTimelineLabelUpdate = () => {
     if (isViewerMode) return;
@@ -521,6 +698,7 @@ export function HorizontalTimeline({ movements, activeRegions }: Props) {
 
   const openViewer = () => {
     viewerScrollLeft.current = scrollRef.current?.scrollLeft ?? 0;
+    setViewerSemanticLevel('standard');
     setIsViewerMode(true);
   };
 
@@ -654,10 +832,18 @@ export function HorizontalTimeline({ movements, activeRegions }: Props) {
 
       <TimelineViewerFrame
         active={isViewerMode}
-        contentWidth={regionColumnWidth + timelineWidth}
         contentHeight={chartHeight}
+        contentOriginX={regionColumnWidth}
+        contentOriginY={headerHeight}
         initialScrollLeft={viewerScrollLeft.current}
+        timelineMode={displayMode}
+        timelineWidth={timelineWidth}
+        nodes={viewerNodes}
+        relations={viewerRelations}
+        regions={viewerRegions}
         onClose={() => setIsViewerMode(false)}
+        onSelectNode={setActiveMovementId}
+        onSemanticLevelChange={setViewerSemanticLevel}
       >
       <div className="timeline-shell timeline-chart mt-3 flex overflow-hidden">
         <div
@@ -779,22 +965,7 @@ export function HorizontalTimeline({ movements, activeRegions }: Props) {
                 className="timeline-origin-lane absolute inset-x-0"
                 style={{ top: headerHeight, height: SURVEY_SUMMARY_H }}
               >
-                {[
-                  {
-                    id: 'prehistoric-ritual',
-                    label: '先史の造形',
-                    note: '像・洞窟画・祭祀',
-                    start: -40000,
-                    end: -3000,
-                  },
-                  {
-                    id: 'ancient-greek-classical',
-                    label: '古代の規範',
-                    note: '比例・理想美・公共性',
-                    start: -3000,
-                    end: 500,
-                  },
-                ].map((summary) => {
+                {SURVEY_SUMMARIES.map((summary) => {
                   const left = yearToTimelineX(
                     summary.start,
                     displayMode,

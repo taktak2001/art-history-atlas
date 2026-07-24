@@ -1,31 +1,94 @@
 'use client';
 
+import Link from 'next/link';
 import {
   useCallback,
   useEffect,
+  useLayoutEffect,
   useRef,
+  useState,
   type KeyboardEvent,
   type MouseEvent,
   type PointerEvent,
   type ReactNode,
   type WheelEvent,
 } from 'react';
-import { calculateFollowLabelX } from '@/lib/timeline-presentation';
+import { ArrowMarkerDefs, RelationLine } from '@/components/RelationLine';
 import {
-  fitTimelineViewer,
+  getRectangleBoundaryPoint,
+  insetPointToward,
+} from '@/lib/network-geometry';
+import { IMPORTANT_RELATION_KINDS } from '@/lib/network-presentation';
+import { RELATION_COLOR } from '@/lib/relationship-definitions';
+import {
+  RELATION_LABELS,
+  type RelationKind,
+} from '@/lib/schema';
+import {
+  yearToTimelineX,
+  type TimelineMode,
+} from '@/lib/timeline-presentation';
+import {
+  fitTimelineViewerRect,
   panTimelineViewer,
-  viewerLabelVariant,
+  semanticTimelineTicks,
+  timelineViewerMaxScale,
+  timelineViewerSemanticLevel,
+  TIMELINE_VIEWER_DOUBLE_TAP_SCALE,
+  worldToTimelineViewerScreen,
   zoomTimelineAtPoint,
   type TimelineViewerPoint,
+  type TimelineViewerSemanticLevel,
   type TimelineViewerTransform,
 } from '@/lib/timeline-viewer';
 
+export type TimelineViewerNode = {
+  key: string;
+  movementId: string;
+  href: string;
+  nameJa: string;
+  nameEn: string;
+  shortLabel?: string;
+  dateLabel: string;
+  regionLabel: string;
+  classificationLabel: string;
+  relationCount: number;
+  summary: string;
+  barStart: number;
+  barEnd: number;
+  centerY: number;
+  priority: boolean;
+  selected: boolean;
+};
+
+export type TimelineViewerRelation = {
+  id: string;
+  from: string;
+  to: string;
+  kind: RelationKind;
+};
+
+export type TimelineViewerRegion = {
+  id: string;
+  label: string;
+  top: number;
+  height: number;
+};
+
 type Props = {
   active: boolean;
-  contentWidth: number;
   contentHeight: number;
+  contentOriginX: number;
+  contentOriginY: number;
   initialScrollLeft: number;
+  timelineMode: TimelineMode;
+  timelineWidth: number;
+  nodes: TimelineViewerNode[];
+  relations: TimelineViewerRelation[];
+  regions: TimelineViewerRegion[];
   onClose: () => void;
+  onSelectNode: (movementId: string) => void;
+  onSemanticLevelChange: (level: TimelineViewerSemanticLevel) => void;
   children: ReactNode;
 };
 
@@ -35,14 +98,21 @@ type Gesture = {
   distance: number;
 };
 
+type AxisMetrics = {
+  regionWidth: number;
+  timeHeight: number;
+  controlBottom: number;
+};
+
 const IDENTITY_TRANSFORM: TimelineViewerTransform = {
   x: 0,
   y: 0,
   scale: 1,
 };
-const VIEWER_LABEL_PADDING = 8;
 const DOUBLE_TAP_DELAY = 320;
 const DRAG_THRESHOLD = 5;
+const AXIS_EDGE_PADDING = 10;
+const RELATION_MARKER_PREFIX = 'timeline-viewer';
 
 const pointerCenter = (points: TimelineViewerPoint[]) => ({
   x: points.reduce((sum, point) => sum + point.x, 0) / points.length,
@@ -54,17 +124,100 @@ const pointerDistance = (points: TimelineViewerPoint[]) =>
     ? 0
     : Math.hypot(points[0].x - points[1].x, points[0].y - points[1].y);
 
+const viewerAxisMetrics = (viewportWidth: number): AxisMetrics => {
+  if (viewportWidth <= 639) {
+    return { regionWidth: 112, timeHeight: 52, controlBottom: 68 };
+  }
+  if (viewportWidth <= 1023) {
+    return { regionWidth: 144, timeHeight: 54, controlBottom: 0 };
+  }
+  return { regionWidth: 176, timeHeight: 56, controlBottom: 0 };
+};
+
+const formatViewerYear = (year: number) => {
+  if (year === 0) return '紀元境界';
+  return year < 0 ? `前${Math.abs(year).toLocaleString('ja-JP')}` : `${year}`;
+};
+
+const relationCurve = (
+  fromRect: DOMRect,
+  toRect: DOMRect,
+  directed: boolean,
+) => {
+  const fromCenter = {
+    x: fromRect.left + fromRect.width / 2,
+    y: fromRect.top + fromRect.height / 2,
+  };
+  const toCenter = {
+    x: toRect.left + toRect.width / 2,
+    y: toRect.top + toRect.height / 2,
+  };
+  const fromBoundary = getRectangleBoundaryPoint(
+    fromCenter,
+    toCenter,
+    fromRect.width,
+    fromRect.height,
+  );
+  const toBoundary = getRectangleBoundaryPoint(
+    toCenter,
+    fromCenter,
+    toRect.width,
+    toRect.height,
+  );
+  const start = insetPointToward(fromBoundary, toCenter, 2);
+  const end = insetPointToward(toBoundary, fromCenter, directed ? 5 : 2);
+  const distance = Math.max(1, Math.hypot(end.x - start.x, end.y - start.y));
+  const handle = Math.min(72, Math.max(24, distance * 0.22));
+  const direction = Math.sign(end.x - start.x || 1);
+  const firstControl = {
+    x: start.x + direction * handle,
+    y: start.y,
+  };
+  const secondControl = {
+    x: end.x - direction * handle,
+    y: end.y,
+  };
+
+  return {
+    d: `M ${start.x} ${start.y} C ${firstControl.x} ${firstControl.y}, ${secondControl.x} ${secondControl.y}, ${end.x} ${end.y}`,
+    midpoint: {
+      x:
+        start.x * 0.125 +
+        firstControl.x * 0.375 +
+        secondControl.x * 0.375 +
+        end.x * 0.125,
+      y:
+        start.y * 0.125 +
+        firstControl.y * 0.375 +
+        secondControl.y * 0.375 +
+        end.y * 0.125,
+    },
+  };
+};
+
 export function TimelineViewerFrame({
   active,
-  contentWidth,
   contentHeight,
+  contentOriginX,
+  contentOriginY,
   initialScrollLeft,
+  timelineMode,
+  timelineWidth,
+  nodes,
+  relations,
+  regions,
   onClose,
+  onSelectNode,
+  onSemanticLevelChange,
   children,
 }: Props) {
   const rootRef = useRef<HTMLDivElement>(null);
   const stageRef = useRef<HTMLDivElement>(null);
   const canvasRef = useRef<HTMLDivElement>(null);
+  const nodeLayerRef = useRef<HTMLDivElement>(null);
+  const relationLayerRef = useRef<SVGSVGElement>(null);
+  const timeAxisRef = useRef<HTMLDivElement>(null);
+  const regionAxisRef = useRef<HTMLDivElement>(null);
   const scaleOutputRef = useRef<HTMLOutputElement>(null);
   const transformRef = useRef<TimelineViewerTransform>(IDENTITY_TRANSFORM);
   const pointersRef = useRef(new Map<number, TimelineViewerPoint>());
@@ -76,57 +229,157 @@ export function TimelineViewerFrame({
   );
   const fitModeRef = useRef(false);
   const clickResetTimerRef = useRef<number | null>(null);
+  const semanticLevelRef = useRef<TimelineViewerSemanticLevel>('standard');
+  const tickSignatureRef = useRef('');
+  const [semanticLevel, setSemanticLevel] =
+    useState<TimelineViewerSemanticLevel>('standard');
+  const [axisTicks, setAxisTicks] = useState(() =>
+    semanticTimelineTicks(timelineMode, timelineWidth, 1),
+  );
 
-  const updateLabels = useCallback((transform: TimelineViewerTransform) => {
-    const canvas = canvasRef.current;
-    const stage = stageRef.current;
-    if (!canvas || !stage) return;
-    const track = canvas.querySelector<HTMLElement>('[data-timeline-track]');
-    if (!track) return;
+  const selectedNode = nodes.find((node) => node.selected) ?? null;
+  const relationKinds = Array.from(new Set(relations.map((relation) => relation.kind)));
 
-    const viewportLeft =
-      (-transform.x / transform.scale) - track.offsetLeft;
-    const viewportRight =
-      (stage.clientWidth - transform.x) / transform.scale - track.offsetLeft;
-    const innerPadding = VIEWER_LABEL_PADDING / transform.scale;
+  const updateFixedLayers = useCallback(
+    (transform: TimelineViewerTransform) => {
+      const stage = stageRef.current;
+      const root = rootRef.current;
+      const nodeLayer = nodeLayerRef.current;
+      if (!stage || !root || !nodeLayer) return;
 
-    for (const label of canvas.querySelectorAll<HTMLElement>(
-      '[data-follow-label]',
-    )) {
-      const bar = label.closest<HTMLElement>('[data-timeline-bar]');
-      const text = label.querySelector<HTMLElement>('[data-label-text]');
-      if (!bar || !text) continue;
-
-      const fullLabel = label.dataset.fullLabel ?? '';
-      const shortLabel = label.dataset.shortLabel;
-      const selected = bar.dataset.active === 'true';
-      const variant = selected
-        ? 'full'
-        : viewerLabelVariant(transform.scale, Boolean(shortLabel));
-      text.textContent =
-        variant === 'short' && shortLabel ? shortLabel : fullLabel;
-      label.dataset.labelVariant = variant;
-
-      const barStart = Number(bar.dataset.barStart);
-      const barEnd = Number(bar.dataset.barEnd);
-      const labelWidth = Math.min(
-        Math.max(text.scrollWidth + innerPadding, 1),
-        Math.max(1, barEnd - barStart - innerPadding * 2),
+      const metrics = viewerAxisMetrics(stage.clientWidth);
+      root.style.setProperty(
+        '--timeline-viewer-region-axis-width',
+        `${metrics.regionWidth}px`,
       );
-      const position = calculateFollowLabelX({
-        barStart,
-        barEnd,
-        labelWidth,
-        viewportLeft,
-        viewportRight,
-        innerPadding,
-      });
-      label.style.width = `${labelWidth}px`;
-      label.style.maxWidth = `${Math.max(1, barEnd - barStart)}px`;
-      label.style.transform = `translate3d(${position.x - barStart}px, 0, 0)`;
-      label.dataset.labelFollowing = position.followsViewport ? 'true' : 'false';
-    }
-  }, []);
+      root.style.setProperty(
+        '--timeline-viewer-time-axis-height',
+        `${metrics.timeHeight}px`,
+      );
+
+      const nextTicks = semanticTimelineTicks(
+        timelineMode,
+        timelineWidth,
+        transform.scale,
+      );
+      const tickSignature = nextTicks.join(',');
+      if (tickSignature !== tickSignatureRef.current) {
+        tickSignatureRef.current = tickSignature;
+        setAxisTicks(nextTicks);
+      }
+
+      for (const tick of timeAxisRef.current?.querySelectorAll<HTMLElement>(
+        '[data-viewer-tick]',
+      ) ?? []) {
+        const year = Number(tick.dataset.viewerTick);
+        const worldX =
+          contentOriginX + yearToTimelineX(year, timelineMode, timelineWidth);
+        const screen = worldToTimelineViewerScreen(
+          { x: worldX, y: 0 },
+          transform,
+        );
+        const visible =
+          screen.x >= metrics.regionWidth + AXIS_EDGE_PADDING &&
+          screen.x <= stage.clientWidth - AXIS_EDGE_PADDING;
+        tick.style.transform = `translate3d(${screen.x}px, 0, 0)`;
+        tick.style.visibility = visible ? 'visible' : 'hidden';
+      }
+
+      for (const label of regionAxisRef.current?.querySelectorAll<HTMLElement>(
+        '[data-viewer-region-top]',
+      ) ?? []) {
+        const top = Number(label.dataset.viewerRegionTop);
+        const height = Number(label.dataset.viewerRegionHeight);
+        const screen = worldToTimelineViewerScreen(
+          { x: 0, y: top + height / 2 },
+          transform,
+        );
+        const visible =
+          screen.y >= metrics.timeHeight + 18 &&
+          screen.y <= stage.clientHeight - metrics.controlBottom - 18;
+        label.style.transform = `translate3d(0, ${screen.y}px, 0) translateY(-50%)`;
+        label.style.visibility = visible ? 'visible' : 'hidden';
+      }
+
+      const visibleNodeRects = new Map<string, DOMRect>();
+      for (const node of nodeLayer.querySelectorAll<HTMLElement>(
+        '[data-viewer-node]',
+      )) {
+        const barStart = Number(node.dataset.barStart) + contentOriginX;
+        const barEnd = Number(node.dataset.barEnd) + contentOriginX;
+        const centerY = Number(node.dataset.centerY);
+        const startScreen = worldToTimelineViewerScreen(
+          { x: barStart, y: centerY },
+          transform,
+        );
+        const endScreen = worldToTimelineViewerScreen(
+          { x: barEnd, y: centerY },
+          transform,
+        );
+        const nodeWidth = node.offsetWidth;
+        const nodeHeight = node.offsetHeight;
+        const contentLeft = metrics.regionWidth + AXIS_EDGE_PADDING;
+        const contentRight = stage.clientWidth - AXIS_EDGE_PADDING;
+        const longBar = endScreen.x - startScreen.x >= nodeWidth + 32;
+        const desiredX = longBar
+          ? Math.min(
+              Math.max(contentLeft, startScreen.x + 4),
+              endScreen.x - nodeWidth - 4,
+            )
+          : Math.min(
+              Math.max(
+                contentLeft,
+                (startScreen.x + endScreen.x - nodeWidth) / 2,
+              ),
+              contentRight - nodeWidth,
+            );
+        const visible =
+          endScreen.x >= contentLeft &&
+          startScreen.x <= contentRight &&
+          startScreen.y + nodeHeight / 2 >= metrics.timeHeight &&
+          startScreen.y - nodeHeight / 2 <=
+            stage.clientHeight - metrics.controlBottom;
+
+        node.style.transform = `translate3d(${desiredX}px, ${startScreen.y - nodeHeight / 2}px, 0)`;
+        node.style.visibility = visible ? 'visible' : 'hidden';
+        if (visible && !visibleNodeRects.has(node.dataset.movementId ?? '')) {
+          visibleNodeRects.set(
+            node.dataset.movementId ?? '',
+            node.getBoundingClientRect(),
+          );
+        }
+      }
+
+      for (const path of relationLayerRef.current?.querySelectorAll<SVGPathElement>(
+        '[data-viewer-relation]',
+      ) ?? []) {
+        const fromRect = visibleNodeRects.get(path.dataset.from ?? '');
+        const toRect = visibleNodeRects.get(path.dataset.to ?? '');
+        const label = relationLayerRef.current?.querySelector<SVGTextElement>(
+          `[data-viewer-relation-label="${path.dataset.relationId}"]`,
+        );
+        if (!fromRect || !toRect) {
+          path.style.visibility = 'hidden';
+          if (label) label.style.visibility = 'hidden';
+          continue;
+        }
+        const kind = path.dataset.relationKind as RelationKind;
+        const geometry = relationCurve(
+          fromRect,
+          toRect,
+          !['contemporary', 'shared-idea'].includes(kind),
+        );
+        path.setAttribute('d', geometry.d);
+        path.style.visibility = 'visible';
+        if (label) {
+          label.setAttribute('x', String(geometry.midpoint.x));
+          label.setAttribute('y', String(geometry.midpoint.y - 5));
+          label.style.visibility = 'visible';
+        }
+      }
+    },
+    [contentOriginX, timelineMode, timelineWidth],
+  );
 
   const applyTransform = useCallback(
     (next: TimelineViewerTransform) => {
@@ -146,31 +399,59 @@ export function TimelineViewerFrame({
         scaleOutputRef.current.value = `${Math.round(next.scale * 100)}%`;
         scaleOutputRef.current.textContent = `${Math.round(next.scale * 100)}%`;
       }
-      updateLabels(next);
+
+      const nextSemanticLevel = timelineViewerSemanticLevel(next.scale);
+      if (nextSemanticLevel !== semanticLevelRef.current) {
+        semanticLevelRef.current = nextSemanticLevel;
+        setSemanticLevel(nextSemanticLevel);
+        onSemanticLevelChange(nextSemanticLevel);
+      }
+      updateFixedLayers(next);
     },
-    [updateLabels],
+    [onSemanticLevelChange, updateFixedLayers],
   );
 
   const fitContent = useCallback(() => {
     const stage = stageRef.current;
     if (!stage) return;
+    const metrics = viewerAxisMetrics(stage.clientWidth);
     fitModeRef.current = true;
     applyTransform(
-      fitTimelineViewer(
-        { width: contentWidth, height: contentHeight },
+      fitTimelineViewerRect(
+        {
+          x: contentOriginX,
+          y: contentOriginY,
+          width: timelineWidth,
+          height: Math.max(1, contentHeight - contentOriginY),
+        },
         { width: stage.clientWidth, height: stage.clientHeight },
+        {
+          top: metrics.timeHeight,
+          right: 0,
+          bottom: metrics.controlBottom,
+          left: metrics.regionWidth,
+        },
       ),
     );
-  }, [applyTransform, contentHeight, contentWidth]);
+  }, [
+    applyTransform,
+    contentHeight,
+    contentOriginX,
+    contentOriginY,
+    timelineWidth,
+  ]);
 
   const zoomAt = useCallback(
     (point: TimelineViewerPoint, factor: number) => {
+      const stage = stageRef.current;
+      if (!stage) return;
       fitModeRef.current = false;
       applyTransform(
         zoomTimelineAtPoint(
           transformRef.current,
           transformRef.current.scale * factor,
           point,
+          timelineViewerMaxScale(stage.clientWidth),
         ),
       );
     },
@@ -181,18 +462,51 @@ export function TimelineViewerFrame({
     (factor: number) => {
       const stage = stageRef.current;
       if (!stage) return;
+      const metrics = viewerAxisMetrics(stage.clientWidth);
       zoomAt(
-        { x: stage.clientWidth / 2, y: stage.clientHeight / 2 },
+        {
+          x:
+            metrics.regionWidth +
+            (stage.clientWidth - metrics.regionWidth) / 2,
+          y:
+            metrics.timeHeight +
+            (stage.clientHeight -
+              metrics.timeHeight -
+              metrics.controlBottom) /
+              2,
+        },
         factor,
       );
     },
     [zoomAt],
   );
 
+  const activeRuntimeRef = useRef({
+    applyTransform,
+    contentOriginX,
+    contentOriginY,
+    fitContent,
+    initialScrollLeft,
+  });
+  useLayoutEffect(() => {
+    activeRuntimeRef.current = {
+      applyTransform,
+      contentOriginX,
+      contentOriginY,
+      fitContent,
+      initialScrollLeft,
+    };
+  }, [
+    applyTransform,
+    contentOriginX,
+    contentOriginY,
+    fitContent,
+    initialScrollLeft,
+  ]);
+
   useEffect(() => {
     if (!active) {
-      const canvas = canvasRef.current;
-      canvas?.style.removeProperty('transform');
+      canvasRef.current?.style.removeProperty('transform');
       rootRef.current?.style.removeProperty('--timeline-viewer-scale');
       return;
     }
@@ -211,17 +525,58 @@ export function TimelineViewerFrame({
       element.setAttribute('aria-hidden', 'true');
     }
 
+    const originalLinks = Array.from(
+      canvasRef.current?.querySelectorAll<HTMLElement>(
+        '[data-timeline-bar], .timeline-origin-rail',
+      ) ?? [],
+    );
+    for (const link of originalLinks) {
+      link.inert = true;
+      link.setAttribute('aria-hidden', 'true');
+    }
+
     const frame = window.requestAnimationFrame(() => {
+      const stage = stageRef.current;
+      if (!stage) return;
+      const metrics = viewerAxisMetrics(stage.clientWidth);
+      const runtime = activeRuntimeRef.current;
       fitModeRef.current = false;
-      applyTransform({
-        x: -initialScrollLeft,
-        y: 88,
+      runtime.applyTransform({
+        x:
+          metrics.regionWidth -
+          runtime.contentOriginX -
+          runtime.initialScrollLeft,
+        y: metrics.timeHeight - runtime.contentOriginY,
         scale: 1,
       });
-      stageRef.current?.focus({ preventScroll: true });
+      stage.focus({ preventScroll: true });
     });
+
     const observer = new ResizeObserver(() => {
-      if (fitModeRef.current) fitContent();
+      const stage = stageRef.current;
+      if (!stage) return;
+      const runtime = activeRuntimeRef.current;
+      if (fitModeRef.current) {
+        runtime.fitContent();
+        return;
+      }
+      const maximumScale = timelineViewerMaxScale(stage.clientWidth);
+      const current = transformRef.current;
+      if (current.scale > maximumScale) {
+        runtime.applyTransform(
+          zoomTimelineAtPoint(
+            current,
+            maximumScale,
+            {
+              x: stage.clientWidth / 2,
+              y: stage.clientHeight / 2,
+            },
+            maximumScale,
+          ),
+        );
+      } else {
+        runtime.applyTransform(current);
+      }
     });
     if (stageRef.current) observer.observe(stageRef.current);
 
@@ -235,6 +590,10 @@ export function TimelineViewerFrame({
         element.inert = false;
         element.removeAttribute('aria-hidden');
       }
+      for (const link of originalLinks) {
+        link.inert = false;
+        link.removeAttribute('aria-hidden');
+      }
       activePointers.clear();
       gestureRef.current = null;
       fitModeRef.current = false;
@@ -243,12 +602,22 @@ export function TimelineViewerFrame({
         clickResetTimerRef.current = null;
       }
     };
-  }, [active, applyTransform, fitContent, initialScrollLeft]);
+  }, [active]);
 
-  useEffect(() => {
+  useLayoutEffect(() => {
     if (!active) return;
-    updateLabels(transformRef.current);
-  }, [active, contentHeight, contentWidth, updateLabels]);
+    if (fitModeRef.current) fitContent();
+    else updateFixedLayers(transformRef.current);
+  }, [
+    active,
+    axisTicks,
+    fitContent,
+    nodes,
+    regions,
+    relations,
+    semanticLevel,
+    updateFixedLayers,
+  ]);
 
   const resetGesture = () => {
     const points = [...pointersRef.current.values()];
@@ -265,12 +634,17 @@ export function TimelineViewerFrame({
 
   const handlePointerDown = (event: PointerEvent<HTMLDivElement>) => {
     if (!active) return;
-    if ((event.target as HTMLElement).closest('[data-viewer-controls]')) return;
+    if (
+      (event.target as HTMLElement).closest(
+        '[data-viewer-controls],[data-viewer-node-layer]',
+      )
+    ) {
+      return;
+    }
     try {
       event.currentTarget.setPointerCapture(event.pointerId);
     } catch {
-      // Synthetic pointer events used by automation are not active browser
-      // pointers; physical mouse and touch events still receive capture.
+      // Synthetic pointer events are not active browser pointers.
     }
     const point = { x: event.clientX, y: event.clientY };
     pointersRef.current.set(event.pointerId, point);
@@ -310,6 +684,7 @@ export function TimelineViewerFrame({
           translated,
           gesture.transform.scale * (distance / gesture.distance),
           center,
+          timelineViewerMaxScale(stageRef.current?.clientWidth ?? 1024),
         ),
       );
       return;
@@ -347,9 +722,17 @@ export function TimelineViewerFrame({
         ) <= 28
       ) {
         event.preventDefault();
-        const targetScale = transformRef.current.scale > 1.05 ? 1 : 2;
+        const targetScale =
+          transformRef.current.scale > 1.05
+            ? 1
+            : TIMELINE_VIEWER_DOUBLE_TAP_SCALE;
         applyTransform(
-          zoomTimelineAtPoint(transformRef.current, targetScale, point),
+          zoomTimelineAtPoint(
+            transformRef.current,
+            targetScale,
+            point,
+            timelineViewerMaxScale(stageRef.current?.clientWidth ?? 1024),
+          ),
         );
         lastTapRef.current = null;
       } else {
@@ -367,14 +750,23 @@ export function TimelineViewerFrame({
   };
 
   const handleDoubleClick = (event: MouseEvent<HTMLDivElement>) => {
-    if (!active || (event.target as HTMLElement).closest('a,button')) return;
+    if (
+      !active ||
+      (event.target as HTMLElement).closest('a,button,[data-viewer-node-layer]')
+    ) {
+      return;
+    }
     event.preventDefault();
-    const targetScale = transformRef.current.scale > 1.05 ? 1 : 2;
+    const targetScale =
+      transformRef.current.scale > 1.05
+        ? 1
+        : TIMELINE_VIEWER_DOUBLE_TAP_SCALE;
     applyTransform(
       zoomTimelineAtPoint(
         transformRef.current,
         targetScale,
         { x: event.clientX, y: event.clientY },
+        timelineViewerMaxScale(stageRef.current?.clientWidth ?? 1024),
       ),
     );
   };
@@ -450,7 +842,12 @@ export function TimelineViewerFrame({
       rootRef.current?.querySelectorAll<HTMLElement>(
         'button:not([disabled]), a[href], [tabindex]:not([tabindex="-1"])',
       ) ?? [],
-    ).filter((element) => element.getClientRects().length > 0);
+    ).filter(
+      (element) =>
+        element.getClientRects().length > 0 &&
+        !element.closest('[inert]') &&
+        element.getAttribute('aria-hidden') !== 'true',
+    );
     if (focusable.length === 0) return;
     const first = focusable[0];
     const last = focusable[focusable.length - 1];
@@ -471,30 +868,204 @@ export function TimelineViewerFrame({
       aria-modal={active ? 'true' : undefined}
       aria-label={active ? '横型タイムライン閲覧モード' : undefined}
       data-timeline-viewer={active ? 'active' : 'inactive'}
+      data-semantic-level={active ? semanticLevel : undefined}
       onKeyDown={handleKeyDown}
     >
       {active && (
-        <div
-          className="timeline-viewer-controls"
-          aria-label="閲覧モード操作"
-          data-viewer-controls
-        >
-          <button type="button" onClick={onClose} aria-label="閲覧モードを閉じる">
-            <span aria-hidden="true">×</span>
-          </button>
-          <button type="button" onClick={() => zoomFromCenter(0.8)} aria-label="縮小">
-            <span aria-hidden="true">−</span>
-          </button>
-          <output ref={scaleOutputRef} aria-live="polite" aria-label="現在倍率">
-            100%
-          </output>
-          <button type="button" onClick={() => zoomFromCenter(1.25)} aria-label="拡大">
-            <span aria-hidden="true">＋</span>
-          </button>
-          <button type="button" onClick={fitContent} aria-label="全体表示へ戻す">
-            全体表示
-          </button>
-        </div>
+        <>
+          <div
+            className="timeline-viewer-controls"
+            aria-label="閲覧モード操作"
+            data-viewer-controls
+          >
+            <button
+              type="button"
+              onClick={onClose}
+              aria-label="閲覧モードを閉じる"
+            >
+              <span aria-hidden="true">×</span>
+            </button>
+            <button
+              type="button"
+              onClick={() => zoomFromCenter(0.8)}
+              aria-label="縮小"
+            >
+              <span aria-hidden="true">−</span>
+            </button>
+            <output ref={scaleOutputRef} aria-live="polite" aria-label="現在倍率">
+              100%
+            </output>
+            <button
+              type="button"
+              onClick={() => zoomFromCenter(1.25)}
+              aria-label="拡大"
+            >
+              <span aria-hidden="true">＋</span>
+            </button>
+            <button
+              type="button"
+              onClick={fitContent}
+              aria-label="全体表示へ戻す"
+            >
+              全体表示
+            </button>
+          </div>
+
+          <div
+            className="timeline-viewer-time-axis"
+            ref={timeAxisRef}
+            aria-hidden="true"
+          >
+            {axisTicks.map((tick) => (
+              <span
+                key={tick}
+                className="timeline-viewer-time-tick"
+                data-viewer-tick={tick}
+                data-era-boundary={
+                  tick === 0 ||
+                  tick === timelineMode.start ||
+                  tick === timelineMode.end ||
+                  undefined
+                }
+              >
+                {formatViewerYear(tick)}
+              </span>
+            ))}
+          </div>
+          <div
+            className="timeline-viewer-region-axis"
+            ref={regionAxisRef}
+            aria-hidden="true"
+          >
+            {regions.map((region) => (
+              <span
+                key={region.id}
+                className="timeline-viewer-region-label"
+                data-viewer-region-top={region.top}
+                data-viewer-region-height={region.height}
+              >
+                {region.label}
+              </span>
+            ))}
+          </div>
+          <div className="timeline-viewer-axis-origin" aria-hidden="true">
+            <strong>地域</strong>
+            <span>年代 →</span>
+          </div>
+
+          <svg
+            ref={relationLayerRef}
+            className="timeline-viewer-relationship-layer"
+            aria-hidden="true"
+          >
+            <ArrowMarkerDefs
+              idPrefix={RELATION_MARKER_PREFIX}
+              kinds={relationKinds}
+            />
+            {relations.map((relation) => {
+              const selectedMovementId = selectedNode?.movementId;
+              const related =
+                selectedMovementId === relation.from ||
+                selectedMovementId === relation.to;
+              return (
+                <g
+                  key={relation.id}
+                  data-viewer-relation-group
+                  data-important={
+                    IMPORTANT_RELATION_KINDS.includes(relation.kind) ||
+                    undefined
+                  }
+                  data-related={related || undefined}
+                >
+                  <RelationLine
+                    kind={relation.kind}
+                    d="M 0 0 L 0 0"
+                    markerPrefix={RELATION_MARKER_PREFIX}
+                    state={
+                      selectedMovementId
+                        ? related
+                          ? 'highlighted'
+                          : 'dimmed'
+                        : 'normal'
+                    }
+                    data-viewer-relation
+                    data-relation-id={relation.id}
+                    data-from={relation.from}
+                    data-to={relation.to}
+                    data-relation-kind={relation.kind}
+                  />
+                  <text
+                    className="timeline-viewer-relationship-label"
+                    data-viewer-relation-label={relation.id}
+                    fill={RELATION_COLOR[relation.kind]}
+                  >
+                    {RELATION_LABELS[relation.kind]}
+                  </text>
+                </g>
+              );
+            })}
+          </svg>
+
+          <div
+            ref={nodeLayerRef}
+            className="timeline-viewer-node-layer"
+            data-viewer-node-layer
+          >
+            {nodes.map((node) => (
+              <Link
+                key={node.key}
+                href={node.href}
+                prefetch={false}
+                className="timeline-viewer-node"
+                data-viewer-node
+                data-movement-id={node.movementId}
+                data-bar-start={node.barStart}
+                data-bar-end={node.barEnd}
+                data-center-y={node.centerY}
+                data-priority={node.priority || undefined}
+                data-selected={node.selected || undefined}
+                aria-label={`${node.nameJa}。${node.dateLabel}。${node.regionLabel}。${node.classificationLabel}`}
+                title={`${node.nameJa} (${node.nameEn})`}
+                onMouseEnter={() => onSelectNode(node.movementId)}
+                onFocus={() => onSelectNode(node.movementId)}
+                onPointerDown={() => onSelectNode(node.movementId)}
+              >
+                <span className="timeline-viewer-node__short">
+                  {node.shortLabel ?? node.nameJa}
+                </span>
+                <span className="timeline-viewer-node__name">
+                  {node.nameJa}
+                  <span className="timeline-viewer-node__english-inline">
+                    （{node.nameEn}）
+                  </span>
+                </span>
+                <span className="timeline-viewer-node__date">
+                  {node.dateLabel}
+                </span>
+                <span className="timeline-viewer-node__context">
+                  {node.regionLabel} / {node.classificationLabel}
+                </span>
+                <span className="timeline-viewer-node__relations">
+                  関係 {node.relationCount}
+                </span>
+              </Link>
+            ))}
+          </div>
+
+          {selectedNode && (
+            <aside
+              className="timeline-viewer-selection"
+              aria-live="polite"
+              aria-label="選択中のムーブメント"
+            >
+              <p>{selectedNode.nameJa}</p>
+              <span>
+                {selectedNode.dateLabel} / 関係 {selectedNode.relationCount}
+              </span>
+              <small>{selectedNode.summary}</small>
+            </aside>
+          )}
+        </>
       )}
 
       <div
@@ -504,7 +1075,7 @@ export function TimelineViewerFrame({
         role={active ? 'application' : undefined}
         aria-label={
           active
-            ? '1本指またはマウスで移動、2本指またはコントロールキーとホイールで拡大縮小できます'
+            ? '1本指またはマウスで移動、2本指またはコントロールキーとホイールで拡大縮小できます。上部に年代軸、左側に地域軸を固定表示します'
             : undefined
         }
         onPointerDown={handlePointerDown}
@@ -525,7 +1096,10 @@ export function TimelineViewerFrame({
           className="timeline-viewer-canvas"
           style={
             active
-              ? { width: contentWidth, height: contentHeight }
+              ? {
+                  width: contentOriginX + timelineWidth,
+                  height: contentHeight,
+                }
               : undefined
           }
           data-timeline-viewer-canvas
