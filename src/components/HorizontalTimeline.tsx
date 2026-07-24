@@ -37,15 +37,15 @@ type Props = {
 const DESKTOP_HEADER_H = 60;
 const MOBILE_HEADER_H = 56;
 const SURVEY_SUMMARY_H = 54;
-const SURVEY_BAR_H = 26;
+const SURVEY_BAR_H = 44;
 const DESKTOP_DETAIL_BAR_H = 44;
-const MOBILE_DETAIL_BAR_H = 26;
+const MOBILE_DETAIL_BAR_H = 44;
 const DESKTOP_BAR_GAP = 8;
-const MOBILE_BAR_GAP = 3;
-const DESKTOP_LANE_PAD_Y = 8;
-const MOBILE_LANE_PAD_Y = 4;
-const DESKTOP_MIN_LANE_H = 46;
-const MOBILE_MIN_LANE_H = 54;
+const MOBILE_BAR_GAP = 6;
+const DESKTOP_LANE_PAD_Y = 9;
+const MOBILE_LANE_PAD_Y = 8;
+const DESKTOP_MIN_LANE_H = 62;
+const MOBILE_MIN_LANE_H = 60;
 const LABEL_INNER_PADDING = 8;
 const LABEL_TEXT_PADDING = 4;
 
@@ -248,6 +248,8 @@ export function HorizontalTimeline({ movements, activeRegions }: Props) {
     (era) => era.start < mode.end && era.end > mode.start,
   );
   const ticks = timelineTicks(mode);
+  const majorTickStride =
+    mode.id === 'survey' ? 1 : Math.max(1, Math.ceil((ticks.length - 1) / 4));
   const activeMovement =
     modeMovements.find((movement) => movement.id === activeMovementId) ?? null;
   const activeExpansionMembers = useMemo(() => {
@@ -340,14 +342,16 @@ export function HorizontalTimeline({ movements, activeRegions }: Props) {
           : choice.variant === 'short'
             ? shortLabelWidth ?? nameWidth
             : Math.min(shortLabelWidth ?? nameWidth, availableWidth);
+      const resolvedLabelWidth = Math.max(
+        1,
+        Math.min(chosenWidth + LABEL_TEXT_PADDING, availableWidth),
+      );
+      element.style.width = `${resolvedLabelWidth}px`;
       nextGeometries.push({
         element,
         barStart,
         barEnd,
-        labelWidth: Math.max(
-          1,
-          Math.min(chosenWidth + LABEL_TEXT_PADDING, availableWidth),
-        ),
+        labelWidth: resolvedLabelWidth,
       });
     }
 
@@ -553,20 +557,20 @@ export function HorizontalTimeline({ movements, activeRegions }: Props) {
         </div>
       )}
 
-      <div className="timeline-chart mt-3 flex overflow-hidden border hairline bg-raised">
+      <div className="timeline-shell timeline-chart mt-3 flex overflow-hidden">
         <div
-          className="sticky left-0 z-20 w-20 shrink-0 border-r hairline bg-raised sm:w-36"
+          className="timeline-region-column sticky left-0 z-20 w-20 shrink-0 sm:w-36"
           data-region-column
         >
           <div
-            className="flex items-end px-2 pb-2 text-[10px] text-faint"
+            className="timeline-region-heading flex items-end px-2 pb-2 text-[10px]"
             style={{ height: headerHeight }}
           >
             地域
           </div>
           {mode.id === 'survey' && (
             <div
-              className="flex items-center border-t hairline px-2 text-xs text-muted"
+              className="timeline-region-label flex items-center px-2 text-xs"
               style={{ height: SURVEY_SUMMARY_H }}
             >
               起点
@@ -576,7 +580,7 @@ export function HorizontalTimeline({ movements, activeRegions }: Props) {
             <div
               key={lane.region}
               data-region-lane-label={lane.region}
-              className="flex items-center border-t hairline px-2 text-[11px] leading-snug text-muted sm:text-xs"
+              className="timeline-region-label flex items-center px-2 text-[11px] leading-snug sm:text-xs"
               style={{ height: lane.height }}
             >
               {REGION_LABELS[lane.region]}
@@ -598,7 +602,7 @@ export function HorizontalTimeline({ movements, activeRegions }: Props) {
         >
           <div
             ref={trackRef}
-            className="relative"
+            className="timeline-track relative"
             data-timeline-track
             data-timeline-mode={mode.id}
             data-timeline-lod={lod}
@@ -606,10 +610,10 @@ export function HorizontalTimeline({ movements, activeRegions }: Props) {
             style={{ width: timelineWidth, height: chartHeight }}
           >
             <div
-              className="absolute inset-x-0 top-0 border-b hairline"
+              className="timeline-axis absolute inset-x-0 top-0"
               style={{ height: headerHeight }}
             >
-              {visibleEraBands.map((era, index) => {
+              {visibleEraBands.map((era) => {
                 const left = yearToTimelineX(
                   Math.max(era.start, mode.start),
                   mode,
@@ -623,9 +627,7 @@ export function HorizontalTimeline({ movements, activeRegions }: Props) {
                 return (
                   <div
                     key={era.label}
-                    className={`absolute top-0 overflow-hidden border-r hairline px-2 pt-1 text-[10px] font-medium text-muted ${
-                      index % 2 === 1 ? 'bg-surface/70' : 'bg-raised'
-                    }`}
+                    className="timeline-era-band absolute top-0 overflow-hidden px-2 pt-1 text-[10px] font-medium"
                     style={{ left, width: Math.max(1, right - left), height: 28 }}
                   >
                     <span className="whitespace-nowrap">{era.label}</span>
@@ -634,31 +636,40 @@ export function HorizontalTimeline({ movements, activeRegions }: Props) {
               })}
             </div>
 
-            {ticks.map((tick) => (
-              <div
-                key={tick}
-                data-timeline-tick={tick}
-                className="absolute bottom-0 top-7 border-l hairline"
-                style={{ left: yearToTimelineX(tick, mode, timelineWidth) }}
-                aria-hidden="true"
-              >
-                <span
-                  className={`absolute top-0 whitespace-nowrap bg-raised px-1 text-[10px] tabular-nums text-faint ${
-                    tick === mode.start
-                      ? ''
-                      : tick === mode.end
-                        ? '-translate-x-full'
-                        : '-translate-x-1/2'
+            {ticks.map((tick, index) => {
+              const isMajorTick =
+                index === 0 ||
+                index === ticks.length - 1 ||
+                index % majorTickStride === 0;
+              return (
+                <div
+                  key={tick}
+                  data-timeline-tick={tick}
+                  data-major-tick={isMajorTick || undefined}
+                  className={`timeline-gridline absolute bottom-0 top-7 ${
+                    isMajorTick ? 'timeline-gridline--major' : 'timeline-gridline--minor'
                   }`}
+                  style={{ left: yearToTimelineX(tick, mode, timelineWidth) }}
+                  aria-hidden="true"
                 >
-                  {fmtYear(tick)}
-                </span>
-              </div>
-            ))}
+                  <span
+                    className={`timeline-tick-label absolute top-0 whitespace-nowrap px-1 text-[10px] tabular-nums ${
+                      tick === mode.start
+                        ? ''
+                        : tick === mode.end
+                          ? '-translate-x-full'
+                          : '-translate-x-1/2'
+                    }`}
+                  >
+                    {fmtYear(tick)}
+                  </span>
+                </div>
+              );
+            })}
 
             {mode.id === 'survey' && (
               <div
-                className="absolute inset-x-0 border-b hairline bg-surface/30"
+                className="timeline-origin-lane absolute inset-x-0"
                 style={{ top: headerHeight, height: SURVEY_SUMMARY_H }}
               >
                 {[
@@ -684,8 +695,8 @@ export function HorizontalTimeline({ movements, activeRegions }: Props) {
                       key={summary.id}
                       href={`/movements/${summary.id}/`}
                       prefetch={false}
-                      className="absolute top-1.5 overflow-hidden rounded-sm border border-accent/40 bg-accent/20 px-2 py-1 leading-tight text-ink transition-colors hover:bg-accent/25 active:translate-y-px"
-                      style={{ left: left + 4, width: Math.max(72, right - left - 8), height: 42 }}
+                      className="timeline-origin-rail absolute top-[5px] flex min-h-11 items-center overflow-hidden px-2 leading-tight text-ink active:translate-y-px"
+                      style={{ left: left + 4, width: Math.max(72, right - left - 8) }}
                     >
                       <span className="block truncate text-[11px] font-medium">{summary.label}</span>
                       <span className="block truncate text-[9px] text-muted">{summary.note}</span>
@@ -695,13 +706,11 @@ export function HorizontalTimeline({ movements, activeRegions }: Props) {
               </div>
             )}
 
-            {laneOffsets.map((lane, index) => (
+            {laneOffsets.map((lane) => (
               <div
                 key={lane.region}
                 data-timeline-lane={lane.region}
-                className={`absolute inset-x-0 border-b hairline ${
-                  index % 2 === 1 ? 'bg-surface/35' : ''
-                }`}
+                className="timeline-lane absolute inset-x-0"
                 style={{ top: lane.top, height: lane.height }}
               >
                 {lane.items.map(
@@ -747,12 +756,12 @@ export function HorizontalTimeline({ movements, activeRegions }: Props) {
                           setActiveMovementId(movement.id);
                         }
                       }}
-                      className="group absolute text-left text-[11px] leading-tight focus-visible:z-20 active:translate-y-px"
+                      className="timeline-bar group absolute text-left text-[11px] leading-tight focus-visible:z-20 active:translate-y-px"
                       style={{
                         left,
                         top: lanePaddingY + row * (barHeight + barGap),
                         width,
-                        height: isExpandedDetail ? barHeight - 6 : barHeight,
+                        height: barHeight,
                       }}
                     >
                       <span
@@ -761,7 +770,7 @@ export function HorizontalTimeline({ movements, activeRegions }: Props) {
                         data-timeline-hit-area
                       />
                       <span
-                        className={`timeline-bar-visual ${
+                        className={`timeline-bar-visual pointer-events-none absolute inset-x-0 top-1/2 overflow-hidden ${
                           isPriority
                             ? 'timeline-bar-visual--priority'
                             : 'timeline-bar-visual--secondary'
