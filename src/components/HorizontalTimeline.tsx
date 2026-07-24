@@ -69,6 +69,7 @@ export function HorizontalTimeline({ movements, activeRegions }: Props) {
   const scrollRef = useRef<HTMLDivElement>(null);
   const pendingJump = useRef<number | null>(null);
   const lastPointerType = useRef<string>('mouse');
+  const touchNavigationTarget = useRef<string | null>(null);
   const drag = useRef<{ startX: number; scrollLeft: number; active: boolean }>({
     startX: 0,
     scrollLeft: 0,
@@ -581,16 +582,37 @@ export function HorizontalTimeline({ movements, activeRegions }: Props) {
                       data-clipped-start={clippedStart || undefined}
                       data-clipped-end={clippedEnd || undefined}
                       data-hierarchy-level={isExpandedDetail ? 'child' : 'root'}
-                      onMouseEnter={() => setActiveMovementId(movement.id)}
+                      onMouseEnter={(event) => {
+                        // Touch browsers may synthesize mouseenter after a tap. Also keep a
+                        // keyboard-focused bar authoritative so the inspector does not jump
+                        // to whichever overlapping bar happens to sit under the pointer.
+                        const focusedBar =
+                          event.currentTarget.ownerDocument.querySelector(
+                            '[data-timeline-bar]:focus',
+                          );
+                        if (
+                          lastPointerType.current !== 'touch' &&
+                          focusedBar === null
+                        ) {
+                          setActiveMovementId(movement.id);
+                        }
+                      }}
                       onFocus={() => setActiveMovementId(movement.id)}
                       onPointerDown={(event) => {
                         lastPointerType.current = event.pointerType;
-                        if (event.pointerType !== 'touch') setActiveMovementId(movement.id);
+                        if (event.pointerType === 'touch') {
+                          // Capture the selection state before the tap focuses the link.
+                          // The first tap opens the inspector; only a later tap navigates.
+                          touchNavigationTarget.current =
+                            activeMovementId === movement.id ? movement.id : null;
+                        } else {
+                          setActiveMovementId(movement.id);
+                        }
                       }}
                       onClick={(event) => {
                         if (
                           lastPointerType.current === 'touch' &&
-                          activeMovementId !== movement.id
+                          touchNavigationTarget.current !== movement.id
                         ) {
                           event.preventDefault();
                           setActiveMovementId(movement.id);

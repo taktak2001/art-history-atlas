@@ -36,7 +36,7 @@ export function LodControl({ value, onChange, counts, compact = false }: Props) 
           >
             {VISIBILITY_LEVEL_LABELS[level]}
             {counts?.[level] !== undefined && (
-              <span className="ml-1 text-[10px] tabular-nums opacity-75">
+              <span className="ml-1 text-[10px] tabular-nums">
                 {counts[level]}
               </span>
             )}

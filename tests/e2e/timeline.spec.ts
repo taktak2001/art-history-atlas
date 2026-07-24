@@ -103,7 +103,7 @@ test('iPhone幅では表示状態と地域列が固定され、タップで詳�
 
   const impressionism = page.locator('[data-timeline-bar="impressionism"]').first();
   await impressionism.tap();
-  await expect(page).toHaveURL(/\/timeline\/?$/);
+  await expect(page).toHaveURL(/\/timeline\/\?lod=standard$/);
   await expect(page.locator('[data-movement-inspector]')).toContainText('印象派');
 
   const minimumTarget = await modeButton(page, '近代').evaluate(

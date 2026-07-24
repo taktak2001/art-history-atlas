@@ -3,6 +3,7 @@ import { movements } from '@/data/movements';
 import type { Movement } from '@/lib/schema';
 import {
   MOVEMENT_GROUPS,
+  aggregateRelationshipsForVisibleMovements,
   buildMovementTree,
   filterMovementsByLod,
   flattenMovementTree,
@@ -13,6 +14,7 @@ import {
   hasMovementHierarchyCycle,
   parseMovementLod,
 } from '@/lib/movement-hierarchy';
+import { relationships } from '@/data/relationships';
 
 const fixture = (
   id: string,
@@ -87,5 +89,30 @@ describe('Movement グループ', () => {
       'italian-renaissance',
     );
     expect(MOVEMENT_GROUPS).toHaveLength(6);
+  });
+
+  it('非表示端点の関係を表示中の代表ムーブメントへ集約する', () => {
+    const visible = filterMovementsByLod(movements, 'core');
+    const aggregated = aggregateRelationshipsForVisibleMovements(
+      relationships,
+      movements,
+      new Set(visible.map((movement) => movement.id)),
+    );
+
+    expect(
+      aggregated.every(
+        (relationship) =>
+          visible.some((movement) => movement.id === relationship.from) &&
+          visible.some((movement) => movement.id === relationship.to),
+      ),
+    ).toBe(true);
+    expect(
+      aggregated.some(
+        (relationship) =>
+          relationship.originalRelationshipIds.includes('rel-futurism-to-dada') &&
+          relationship.from === 'cubism' &&
+          relationship.to === 'dada',
+      ),
+    ).toBe(true);
   });
 });
