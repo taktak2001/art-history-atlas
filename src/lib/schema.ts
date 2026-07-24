@@ -1,7 +1,7 @@
 import { z } from 'zod';
 
 /**
- * 美術史アトラスのデータスキーマ。
+ * Art History Atlasのデータスキーマ。
  *
  * すべてのシードデータはこのスキーマで検証される（scripts/validate-data.ts）。
  * - 年代は西暦の整数。紀元前は負値（例: 前2000年 = -2000）。

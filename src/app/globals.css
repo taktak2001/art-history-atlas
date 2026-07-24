@@ -3,7 +3,7 @@
 @tailwind utilities;
 
 /*
- * 美術史アトラス デザインシステム
+ * Art History Atlas デザインシステム
  * オフホワイト（紙）／チャコール（墨）／グレー（石）を基調。
  * 彩色は時代・関係タイプの識別に限定して用いる。
  * システムフォントを用いて日本語可読性と軽量性を両立（ビルド時ネットワーク不要）。
@@ -299,6 +299,29 @@ html.dark .relation-badge {
     width: 4.625rem;
     font-size: 0.6875rem;
     line-height: 0.75rem;
+  }
+}
+
+@media print {
+  header {
+    position: static !important;
+    background: #fff !important;
+    backdrop-filter: none !important;
+  }
+
+  .site-header__actions,
+  footer nav {
+    display: none !important;
+  }
+
+  .site-wordmark,
+  footer a[aria-label='Art History Atlas'] {
+    color: #111 !important;
+  }
+
+  footer {
+    break-inside: avoid;
+    background: #fff !important;
   }
 }
 
