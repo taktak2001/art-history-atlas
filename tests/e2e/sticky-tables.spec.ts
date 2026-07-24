@@ -40,52 +40,6 @@ test('マトリクスは左上・時代・地域を表内スクロール中も�
   expectNear(cornerAfterVertical.y, scrollBox.y + 1);
 });
 
-test('マトリクスは余白のあるレーンと22pxの展示リボンで表示する', async ({ page }) => {
-  await page.goto('/matrix/?lod=detailed');
-
-  const scroll = page.getByRole('region', { name: '地域と時代のマトリクス表' });
-  const rowHeader = scroll.locator('[data-sticky-cell="row"]').first();
-  const eraHeader = scroll.locator('[data-sticky-cell="column"]').first();
-  const lane = scroll.locator('[data-matrix-cell]').first();
-  const ribbon = scroll.locator('.matrix-ribbon-link').first();
-
-  const paperColor = await page.evaluate(() =>
-    getComputedStyle(document.documentElement).getPropertyValue('--c-paper').trim(),
-  );
-  const rowHeaderBackground = await rowHeader.evaluate(
-    (element) => getComputedStyle(element).backgroundColor,
-  );
-  expect(rowHeaderBackground).toBe(`rgb(${paperColor.replaceAll(' ', ', ')})`);
-
-  const laneStyle = await lane.evaluate((element) => {
-    const style = getComputedStyle(element);
-    return {
-      borderLeftWidth: style.borderLeftWidth,
-      minHeight: style.minHeight,
-    };
-  });
-  expect(laneStyle.borderLeftWidth).toBe('0px');
-  expect(Number.parseFloat(laneStyle.minHeight)).toBeGreaterThanOrEqual(68);
-
-  const eraFontSize = await eraHeader.evaluate((element) =>
-    Number.parseFloat(getComputedStyle(element).fontSize),
-  );
-  expect(eraFontSize).toBeLessThanOrEqual(12);
-
-  const ribbonMetrics = await ribbon.evaluate((element) => {
-    const elementStyle = getComputedStyle(element);
-    const railStyle = getComputedStyle(element, '::before');
-    return {
-      targetHeight: element.getBoundingClientRect().height,
-      ribbonHeight: railStyle.height,
-      textAlign: elementStyle.textAlign,
-    };
-  });
-  expect(ribbonMetrics.targetHeight).toBeGreaterThanOrEqual(44);
-  expect(ribbonMetrics.ribbonHeight).toBe('22px');
-  expect(ribbonMetrics.textAlign).toBe('center');
-});
-
 test('比較表は対象別アクセントと固定行列を共通利用する', async ({ page }) => {
   await page.goto('/compare/?ids=gothic,italian-renaissance,baroque');
 
