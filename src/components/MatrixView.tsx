@@ -51,7 +51,7 @@ export function MatrixView({
       />
 
       <div
-        className="data-table-scroll mt-8 rounded-sm border hairline"
+        className="data-table-scroll matrix-scroll mt-8"
         data-matrix-lod={lod}
         role="region"
         aria-label="地域と時代のマトリクス表"
@@ -65,16 +65,18 @@ export function MatrixView({
             <tr>
               <th
                 scope="col"
-                className="data-table-corner matrix-corner border-b border-r hairline p-3 text-left text-xs text-muted"
+                className="data-table-corner matrix-corner p-3 text-left"
                 data-sticky-cell="corner"
               >
-                地域 ＼ 時代
+                <span className="matrix-corner__region">地域</span>
+                <span aria-hidden="true" className="matrix-corner__divider"> ＼ </span>
+                <span className="matrix-corner__era">時代</span>
               </th>
               {ERA_ORDER.map((era) => (
                 <th
                   key={era}
                   scope="col"
-                  className="data-table-column-header min-w-[160px] border-b border-l hairline p-3 text-left font-serif text-sm"
+                  className="data-table-column-header matrix-era-header min-w-[160px] p-3 text-center"
                   data-sticky-cell="column"
                 >
                   {ERA_LABELS[era]}
@@ -87,7 +89,7 @@ export function MatrixView({
               <tr key={region}>
                 <th
                   scope="row"
-                  className="data-table-row-header matrix-row-header border-r border-t hairline p-3 text-left text-xs text-muted"
+                  className="data-table-row-header matrix-row-header p-3 text-left"
                   data-sticky-cell="row"
                 >
                   {REGION_LABELS[region]}
@@ -111,21 +113,29 @@ export function MatrixView({
                   return (
                     <td
                       key={era}
-                      className="border-l border-t hairline align-top p-2"
+                      className="matrix-lane-cell align-middle"
                       data-matrix-cell={key}
                     >
                       {cell.length === 0 ? (
-                        <span aria-hidden="true" className="text-faint">−</span>
+                        <span aria-hidden="true" className="matrix-empty">·</span>
                       ) : (
                         <>
-                          <ul className="space-y-1">
+                          <ul className="matrix-ribbon-list">
                             {shown.map((movement) => (
                               <li key={movement.id}>
                                 <Link
                                   href={`/movements/${movement.id}/`}
-                                  className="block border-l-2 border-accent/45 bg-accent/10 px-2 py-1 text-xs text-ink hover:bg-accent/20"
+                                  className="matrix-ribbon-link"
+                                  aria-label={
+                                    movement.shortLabel
+                                      ? `${movement.shortLabel}（正式名称：${movement.nameJa}）`
+                                      : movement.nameJa
+                                  }
+                                  title={movement.nameJa}
                                 >
-                                  {movement.shortLabel ?? movement.nameJa}
+                                  <span className="matrix-ribbon-label">
+                                    {movement.shortLabel ?? movement.nameJa}
+                                  </span>
                                 </Link>
                               </li>
                             ))}
@@ -135,9 +145,9 @@ export function MatrixView({
                               type="button"
                               onClick={() => toggleCell(key)}
                               aria-expanded={expanded}
-                              className="mt-2 min-h-11 w-full border-t hairline text-left text-xs font-bold text-muted hover:text-ink"
+                              className="matrix-cell-toggle"
                             >
-                              {expanded ? '折りたたむ' : `+${hiddenCount}`}
+                              {expanded ? '折りたたむ' : `+${hiddenCount}件を表示`}
                               <span className="sr-only">
                                 {REGION_LABELS[region]}、{ERA_LABELS[era]}のセル
                               </span>
