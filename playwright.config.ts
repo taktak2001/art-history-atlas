@@ -34,10 +34,12 @@ export default defineConfig({
       },
     },
   ],
+  // out/ をルート配信して検証する（NEXT_PUBLIC_DISABLE_BASEPATH=1 でビルドすること）。
+  // Python の http.server を用いる（環境非依存で安定）。
   webServer: {
-    command: 'npx --yes serve out -l 3100',
-    url: 'http://127.0.0.1:3100',
-    reuseExistingServer: !process.env.CI,
+    command: 'python3 -m http.server 3100 --bind 127.0.0.1 --directory out',
+    url: 'http://127.0.0.1:3100/',
+    reuseExistingServer: false,
     timeout: 120000,
   },
 });
