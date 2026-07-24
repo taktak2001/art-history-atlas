@@ -81,8 +81,9 @@ art-history-atlas/
 
 - 作業は指定ブランチで（Phase 2 は `claude/phase2-content-images`）。`main` へ force push しない。
 - 機能に変更があった場合は、コミット後その都度、作業ブランチを `origin` へ push する（ユーザー常設指示、2026-07-24）。
+- 必要な検証が成功した機能変更は、PR を作成して `main` へ自動マージしてよい（ユーザー常設指示、2026-07-24）。チェック未成功・競合・意図しない差分がある場合はマージせず報告する。
 - 機能単位でコミット。認証情報・APIキー・`node_modules`・`out/`・テスト生成物をコミットしない。
-- 完了時に PR を作成（自動マージしない）。PR 本文に変更点・データ件数・画像権利方針・テスト結果。
+- 完了時に PR を作成し、必要なチェックが成功したら自動マージする。PR 本文に変更点・データ件数・画像権利方針・テスト結果を記載する。`main` へ force push しない。
 - データ追加後は必ず `npm run validate:data`。品質ゲート: `npm run check`（typecheck+lint+validate+test）と `npm run build`。
 - 画像・出典は「推測 URL 禁止」。詳細 `Image_Policy.md` / `Editorial_Policy.md`。
 
