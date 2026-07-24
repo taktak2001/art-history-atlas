@@ -9,6 +9,7 @@ const pages = [
   { path: '/movements/italian-renaissance/', name: 'ルネサンス詳細' },
   { path: '/movements/mono-ha/', name: 'もの派詳細' },
   { path: '/chronology/', name: '縦型年表' },
+  { path: '/timeline/', name: '横型タイムライン' },
   { path: '/matrix/', name: 'マトリクス' },
   { path: '/network/', name: '関係ネットワーク' },
   { path: '/compare/?ids=gothic,baroque', name: '比較' },

@@ -129,6 +129,20 @@ h1, h2, h3, h4 {
   scrollbar-width: thin;
 }
 
+.timeline-label-survey {
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+
+.timeline-label-detail {
+  display: -webkit-box;
+  overflow: hidden;
+  white-space: normal;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+}
+
 /* 本文リンク */
 .prose-link {
   color: rgb(var(--c-accent));
