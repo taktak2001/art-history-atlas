@@ -1,4 +1,5 @@
 import { test, expect, type Page } from '@playwright/test';
+import AxeBuilder from '@axe-core/playwright';
 
 const modeButton = (page: Page, name: string) =>
   page.getByRole('group', { name: '表示モード' }).getByRole('button', { name, exact: true });
@@ -372,4 +373,164 @@ test('ダークモードとPWA standalone設定を維持する', async ({ page, 
   const manifest = await request.get('/manifest.webmanifest');
   expect(manifest.ok()).toBeTruthy();
   expect((await manifest.json()).display).toBe('standalone');
+});
+
+test('閲覧モードは全画面へ入り、倍率操作・全体表示・終了後の復帰に対応する', async ({
+  page,
+}) => {
+  await page.goto('/timeline/');
+  await modeButton(page, '近代').click();
+
+  const trigger = page.getByRole('button', {
+    name: 'タイムラインを全画面で表示',
+  });
+  const normalStage = page.locator('[data-timeline-viewer-stage]');
+  await expect(trigger).toBeVisible();
+  expect(
+    await trigger.evaluate((element) => element.getBoundingClientRect().height),
+  ).toBeGreaterThanOrEqual(44);
+  expect(await normalStage.evaluate((element) => getComputedStyle(element).touchAction)).not.toBe(
+    'none',
+  );
+
+  await trigger.click();
+  const viewer = page.locator('[data-timeline-viewer="active"]');
+  const stage = viewer.locator('[data-timeline-viewer-stage]');
+  await expect(viewer).toHaveAttribute('role', 'dialog');
+  await expect(viewer).toHaveAttribute('aria-modal', 'true');
+  await expect(stage).toBeFocused();
+  await expect
+    .poll(() =>
+      viewer.evaluate((element) => {
+        const rect = element.getBoundingClientRect();
+        return {
+          width: Math.round(rect.width),
+          height: Math.round(rect.height),
+        };
+      }),
+    )
+    .toEqual({
+      width: await page.evaluate(() => window.innerWidth),
+      height: await page.evaluate(() => window.innerHeight),
+    });
+  expect(await stage.evaluate((element) => getComputedStyle(element).touchAction)).toBe('none');
+
+  await viewer.getByRole('button', { name: '拡大' }).click();
+  await expect
+    .poll(async () => Number((await viewer.getAttribute('data-viewer-scale')) ?? 0))
+    .toBeGreaterThan(1);
+  await viewer.getByRole('button', { name: '全体表示へ戻す' }).click();
+  await expect
+    .poll(async () => Number((await viewer.getAttribute('data-viewer-scale')) ?? 0))
+    .toBeGreaterThan(0);
+
+  await stage.press('Escape');
+  await expect(page.locator('[data-timeline-viewer="active"]')).toHaveCount(0);
+  await expect(trigger).toBeFocused();
+  await expect(modeButton(page, '近代')).toHaveAttribute('aria-current', 'true');
+});
+
+test('閲覧モードはマウスパン・ダブルクリック・キーボード操作を共有する', async ({
+  page,
+}, testInfo) => {
+  test.skip(testInfo.project.name !== 'desktop', 'desktop project only');
+  await page.goto('/timeline/');
+  await page.getByRole('button', { name: 'タイムラインを全画面で表示' }).click();
+
+  const viewer = page.locator('[data-timeline-viewer="active"]');
+  const stage = viewer.locator('[data-timeline-viewer-stage]');
+  const beforeX = Number(await viewer.getAttribute('data-viewer-x'));
+  await stage.hover({ position: { x: 620, y: 420 } });
+  await page.mouse.down();
+  await page.mouse.move(500, 350, { steps: 4 });
+  await page.mouse.up();
+  await expect
+    .poll(async () => Number((await viewer.getAttribute('data-viewer-x')) ?? 0))
+    .not.toBe(beforeX);
+
+  await stage.dispatchEvent('dblclick', { clientX: 720, clientY: 520 });
+  await expect(viewer).toHaveAttribute('data-viewer-scale', '2');
+  await stage.press('0');
+  await expect
+    .poll(async () => Number((await viewer.getAttribute('data-viewer-scale')) ?? 0))
+    .toBeLessThanOrEqual(1);
+  await stage.press('+');
+  await expect
+    .poll(async () => Number((await viewer.getAttribute('data-viewer-scale')) ?? 0))
+    .toBeGreaterThan(0);
+});
+
+test('iPhone幅の閲覧モードは2本指の中点を保ってピンチズームする', async ({
+  page,
+}, testInfo) => {
+  test.skip(testInfo.project.name !== 'mobile', 'mobile project only');
+  await page.goto('/timeline/');
+  await page.getByRole('button', { name: 'タイムラインを全画面で表示' }).tap();
+
+  const viewer = page.locator('[data-timeline-viewer="active"]');
+  const stage = viewer.locator('[data-timeline-viewer-stage]');
+  await stage.evaluate((element) => {
+    const emit = (
+      type: string,
+      pointerId: number,
+      clientX: number,
+      isPrimary = false,
+    ) => {
+      element.dispatchEvent(
+        new PointerEvent(type, {
+          bubbles: true,
+          cancelable: true,
+          pointerId,
+          pointerType: 'touch',
+          clientX,
+          clientY: 380,
+          isPrimary,
+        }),
+      );
+    };
+    emit('pointerdown', 11, 130, true);
+    emit('pointerdown', 12, 250);
+    emit('pointermove', 11, 90, true);
+    emit('pointermove', 12, 290);
+  });
+  await expect
+    .poll(async () => Number((await viewer.getAttribute('data-viewer-scale')) ?? 0))
+    .toBeGreaterThan(1);
+  await stage.evaluate((element) => {
+    for (const [pointerId, clientX] of [
+      [11, 90],
+      [12, 290],
+    ]) {
+      element.dispatchEvent(
+        new PointerEvent('pointerup', {
+          bubbles: true,
+          cancelable: true,
+          pointerId,
+          pointerType: 'touch',
+          clientX,
+          clientY: 380,
+        }),
+      );
+    }
+  });
+
+  await page.setViewportSize({ width: 844, height: 390 });
+  await expect(viewer).toBeVisible();
+  await viewer.getByRole('button', { name: '全体表示へ戻す' }).tap();
+  await expect
+    .poll(async () => Number((await viewer.getAttribute('data-viewer-scale')) ?? 0))
+    .toBeGreaterThan(0);
+});
+
+test('閲覧モードにaxeの重大なアクセシビリティ違反がない', async ({ page }) => {
+  await page.goto('/timeline/');
+  await page.getByRole('button', { name: 'タイムラインを全画面で表示' }).click();
+  const results = await new AxeBuilder({ page })
+    .include('[data-timeline-viewer="active"]')
+    .analyze();
+  expect(
+    results.violations.filter((violation) =>
+      ['critical', 'serious'].includes(violation.impact ?? ''),
+    ),
+  ).toEqual([]);
 });

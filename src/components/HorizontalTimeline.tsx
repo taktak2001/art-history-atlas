@@ -5,6 +5,7 @@ import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import type { Movement, RegionId } from '@/lib/schema';
 import { CLASSIFICATION_LABELS, REGION_LABELS } from '@/lib/schema';
 import { LodControl } from '@/components/LodControl';
+import { TimelineViewerFrame } from '@/components/TimelineViewerFrame';
 import {
   filterMovementsByLod,
   getGroupMovements,
@@ -90,6 +91,9 @@ export function HorizontalTimeline({ movements, activeRegions }: Props) {
   const pendingJump = useRef<number | null>(null);
   const labelAnimationFrame = useRef<number | null>(null);
   const labelGeometries = useRef<LabelGeometry[]>([]);
+  const viewerTriggerRef = useRef<HTMLButtonElement>(null);
+  const viewerScrollLeft = useRef(0);
+  const wasViewerMode = useRef(false);
   const drag = useRef<{ startX: number; scrollLeft: number; active: boolean }>({
     startX: 0,
     scrollLeft: 0,
@@ -101,6 +105,7 @@ export function HorizontalTimeline({ movements, activeRegions }: Props) {
     new Set(),
   );
   const [isCompactTimeline, setIsCompactTimeline] = useState(false);
+  const [isViewerMode, setIsViewerMode] = useState(false);
   const { lod, setLod, applyPurposeDefault } = useLodState('core');
 
   const mode = timelineModeById(modeId);
@@ -150,6 +155,7 @@ export function HorizontalTimeline({ movements, activeRegions }: Props) {
   const minimumLaneHeight = isCompactTimeline
     ? MOBILE_MIN_LANE_H
     : DESKTOP_MIN_LANE_H;
+  const regionColumnWidth = isCompactTimeline ? 80 : 144;
 
   useEffect(() => {
     const coarsePointer = window.matchMedia(
@@ -296,6 +302,7 @@ export function HorizontalTimeline({ movements, activeRegions }: Props) {
   }, [activeMovement, lod, movements]);
 
   const scheduleTimelineLabelUpdate = () => {
+    if (isViewerMode) return;
     if (labelAnimationFrame.current !== null) return;
     labelAnimationFrame.current = requestAnimationFrame(() => {
       labelAnimationFrame.current = null;
@@ -323,6 +330,10 @@ export function HorizontalTimeline({ movements, activeRegions }: Props) {
   };
 
   useLayoutEffect(() => {
+    if (isViewerMode) {
+      labelGeometries.current = [];
+      return;
+    }
     const track = trackRef.current;
     const viewport = scrollRef.current;
     if (!track || !viewport) return;
@@ -413,10 +424,30 @@ export function HorizontalTimeline({ movements, activeRegions }: Props) {
     displayMode.end,
     displayMode.start,
     isCompactTimeline,
+    isViewerMode,
     laneOffsets,
     mode.id,
     timelineWidth,
   ]);
+
+  useLayoutEffect(() => {
+    const viewport = scrollRef.current;
+    if (isViewerMode) {
+      viewport?.scrollTo({ left: 0, behavior: 'auto' });
+    } else if (wasViewerMode.current) {
+      viewport?.scrollTo({
+        left: viewerScrollLeft.current,
+        behavior: 'auto',
+      });
+      window.requestAnimationFrame(() => {
+        viewerTriggerRef.current?.focus({ preventScroll: true });
+        scheduleTimelineLabelUpdate();
+      });
+    }
+    wasViewerMode.current = isViewerMode;
+    // Viewer mode temporarily replaces native scrolling with a transformed canvas.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isViewerMode]);
 
   const scrollToYear = (year: number, behavior: ScrollBehavior = 'smooth') => {
     const element = scrollRef.current;
@@ -465,6 +496,7 @@ export function HorizontalTimeline({ movements, activeRegions }: Props) {
   };
 
   const onPointerDown = (event: React.PointerEvent) => {
+    if (isViewerMode) return;
     const element = scrollRef.current;
     if (!element || event.pointerType !== 'mouse') return;
     if ((event.target as HTMLElement).closest('a,button')) return;
@@ -477,6 +509,7 @@ export function HorizontalTimeline({ movements, activeRegions }: Props) {
   };
 
   const onPointerMove = (event: React.PointerEvent) => {
+    if (isViewerMode) return;
     if (!drag.current.active || !scrollRef.current) return;
     scrollRef.current.scrollLeft =
       drag.current.scrollLeft - (event.clientX - drag.current.startX);
@@ -484,6 +517,11 @@ export function HorizontalTimeline({ movements, activeRegions }: Props) {
 
   const onPointerUp = () => {
     drag.current.active = false;
+  };
+
+  const openViewer = () => {
+    viewerScrollLeft.current = scrollRef.current?.scrollLeft ?? 0;
+    setIsViewerMode(true);
   };
 
   return (
@@ -540,15 +578,27 @@ export function HorizontalTimeline({ movements, activeRegions }: Props) {
               </span>
             </p>
           </div>
-          {mode.id !== 'survey' && (
+          <div className="timeline-status__actions">
+            {mode.id !== 'survey' && (
+              <button
+                type="button"
+                onClick={() => selectMode('survey')}
+                className="timeline-back-link"
+              >
+                <span aria-hidden="true">←</span> 通史
+              </button>
+            )}
             <button
+              ref={viewerTriggerRef}
               type="button"
-              onClick={() => selectMode('survey')}
-              className="timeline-back-link"
+              onClick={openViewer}
+              className="timeline-viewer-toggle"
+              aria-label="タイムラインを全画面で表示"
+              aria-haspopup="dialog"
             >
-              <span aria-hidden="true">←</span> 通史
+              <span aria-hidden="true">⛶</span>
             </button>
-          )}
+          </div>
         </div>
       </section>
 
@@ -602,6 +652,13 @@ export function HorizontalTimeline({ movements, activeRegions }: Props) {
         </div>
       )}
 
+      <TimelineViewerFrame
+        active={isViewerMode}
+        contentWidth={regionColumnWidth + timelineWidth}
+        contentHeight={chartHeight}
+        initialScrollLeft={viewerScrollLeft.current}
+        onClose={() => setIsViewerMode(false)}
+      >
       <div className="timeline-shell timeline-chart mt-3 flex overflow-hidden">
         <div
           className="timeline-region-column sticky left-0 z-20 w-20 shrink-0 sm:w-36"
@@ -872,6 +929,7 @@ export function HorizontalTimeline({ movements, activeRegions }: Props) {
           </div>
         </div>
       </div>
+      </TimelineViewerFrame>
 
       <p className="mt-2 text-xs text-faint">
         <span className="sm:hidden">横にスワイプして移動。タップで詳細</span>
