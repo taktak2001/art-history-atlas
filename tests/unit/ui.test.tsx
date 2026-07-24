@@ -130,16 +130,21 @@ describe('ClassificationAccordion', () => {
 });
 
 describe('LOD UI', () => {
-  it('表示密度をテキストとaria-pressedで切り替える', () => {
+  it('表示する範囲を説明とaria-pressedで切り替える', () => {
     const onChange = vi.fn();
-    render(<LodControl value="core" onChange={onChange} />);
+    const { rerender } = render(<LodControl value="core" onChange={onChange} />);
 
-    expect(screen.getByRole('button', { name: '主要' })).toHaveAttribute(
+    expect(screen.getByRole('group', { name: '表示する範囲' })).toBeVisible();
+    expect(screen.getByRole('button', { name: '基本' })).toHaveAttribute(
       'aria-pressed',
       'true',
     );
-    fireEvent.click(screen.getByRole('button', { name: '標準' }));
+    expect(screen.getByText('美術史の骨格となる主要項目を表示')).toBeVisible();
+
+    fireEvent.click(screen.getByRole('button', { name: '充実' }));
     expect(onChange).toHaveBeenCalledWith('standard');
+    rerender(<LodControl value="standard" onChange={onChange} />);
+    expect(screen.getByText('重要な細分・派生ムーブメントも表示')).toBeVisible();
   });
 
   it('マトリクスのセルを+Nで個別展開する', async () => {
@@ -176,13 +181,13 @@ describe('LOD UI', () => {
     render(<MovementsExplorer />);
 
     fireEvent.change(screen.getByRole('searchbox'), { target: { value: '未来派' } });
-    expect(screen.getByText('現在の表示密度では非表示')).toBeVisible();
+    expect(screen.getByText('現在の表示範囲では非表示')).toBeVisible();
 
-    fireEvent.click(screen.getByRole('button', { name: '標準で表示' }));
+    fireEvent.click(screen.getByRole('button', { name: '充実で表示' }));
     await waitFor(() =>
       expect(window.location.search).toContain('lod=standard'),
     );
-    expect(screen.queryByText('現在の表示密度では非表示')).not.toBeInTheDocument();
+    expect(screen.queryByText('現在の表示範囲では非表示')).not.toBeInTheDocument();
   });
 
   it('一覧をフラット表示から階層表示へ切り替える', () => {

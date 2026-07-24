@@ -103,14 +103,20 @@ export const ERA_ORDER: EraId[] = [
   'contemporary',
 ];
 
-/** 表示密度。値は「その項目が初めて現れるレベル」を表す */
+/** 表示する範囲。値は「その項目が初めて現れるレベル」を表す */
 export const VisibilityLevel = z.enum(['core', 'standard', 'detailed']);
 export type VisibilityLevel = z.infer<typeof VisibilityLevel>;
 
 export const VISIBILITY_LEVEL_LABELS: Record<VisibilityLevel, string> = {
-  core: '主要',
-  standard: '標準',
-  detailed: '詳細',
+  core: '基本',
+  standard: '充実',
+  detailed: 'すべて',
+};
+
+export const VISIBILITY_LEVEL_DESCRIPTIONS: Record<VisibilityLevel, string> = {
+  core: '美術史の骨格となる主要項目を表示',
+  standard: '重要な細分・派生ムーブメントも表示',
+  detailed: '収録済みの全項目を表示',
 };
 
 /** 情報の確認状態：事実の確からしさを利用者に明示する */

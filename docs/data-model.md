@@ -66,7 +66,7 @@
 
 **情報確認状態（verification）** — 確認済み / 単一資料 / 諸説あり / 要確認。
 
-**表示密度（visibilityLevel）** — 主要 `core` / 標準 `standard` / 詳細 `detailed`。現在の30件は `24 / 30 / 30`。`detailed` は「詳細専用項目が必ず存在する」という意味ではなく、収録済み全件を表示する上限レベル。
+**表示する範囲（visibilityLevel）** — 基本 `core` / 充実 `standard` / すべて `detailed`。現在の30件は `24 / 30 / 30`。`detailed` は「専用項目が必ず存在する」という意味ではなく、収録済み全件を表示する上限レベル。
 
 ## 年代（DateRange）の表現
 

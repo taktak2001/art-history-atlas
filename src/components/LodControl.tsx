@@ -1,7 +1,10 @@
 'use client';
 
 import type { VisibilityLevel } from '@/lib/schema';
-import { VISIBILITY_LEVEL_LABELS } from '@/lib/schema';
+import {
+  VISIBILITY_LEVEL_DESCRIPTIONS,
+  VISIBILITY_LEVEL_LABELS,
+} from '@/lib/schema';
 import { LOD_LEVELS } from '@/lib/movement-hierarchy';
 
 type Props = {
@@ -14,11 +17,11 @@ type Props = {
 export function LodControl({ value, onChange, counts, compact = false }: Props) {
   return (
     <div className={compact ? '' : 'border-y hairline py-4'} data-lod-control>
-      <p className="mb-2 text-xs font-bold text-ink">表示密度</p>
+      <p className="mb-2 text-xs font-bold text-ink">表示する範囲</p>
       <div
         className="inline-grid min-w-[264px] grid-cols-3 overflow-hidden rounded-sm border hairline bg-raised"
         role="group"
-        aria-label="表示密度"
+        aria-label="表示する範囲"
       >
         {LOD_LEVELS.map((level, index) => (
           <button
@@ -43,11 +46,9 @@ export function LodControl({ value, onChange, counts, compact = false }: Props) 
           </button>
         ))}
       </div>
-      {!compact && (
-        <p className="mt-2 text-xs leading-relaxed text-muted">
-          主要は全体像、標準は重要な細分、詳細は収録済みの全項目を表示
-        </p>
-      )}
+      <p className="mt-2 text-xs leading-relaxed text-muted" aria-live="polite">
+        {VISIBILITY_LEVEL_DESCRIPTIONS[value]}
+      </p>
     </div>
   );
 }
