@@ -8,29 +8,73 @@ export type CompareRow = {
   get: (m: Movement) => string;
 };
 
-export const compareRows: CompareRow[] = [
+export type CompareSection = {
+  key: 'overview' | 'background' | 'works' | 'institution' | 'influence';
+  label: string;
+  rows: CompareRow[];
+  includesRepresentativeWorks?: boolean;
+};
+
+const overviewRows: CompareRow[] = [
   { key: 'dates', label: '年代', get: (m) => formatDateRange(m) },
   {
     key: 'region',
     label: '地域',
     get: (m) => m.regionIds.map((r) => REGION_LABELS[r]).join('・'),
   },
-  { key: 'coreIdea', label: '中心思想', get: (m) => m.coreIdea },
+];
+
+const backgroundRows: CompareRow[] = [
+  { key: 'coreIdea', label: '思想', get: (m) => m.coreIdea },
   { key: 'social', label: '社会背景', get: (m) => m.socialContext },
   { key: 'reaction', label: '前時代への反応', get: (m) => m.reactionAgainst },
+];
+
+const workRows: CompareRow[] = [
   { key: 'visual', label: '視覚的特徴', get: (m) => m.visualTraits },
   {
     key: 'materials',
     label: '技法・素材',
     get: (m) => `${m.technique}／${m.materials}`,
   },
+];
+
+const institutionRows: CompareRow[] = [
   {
     key: 'market',
     label: 'パトロン・市場',
     get: (m) => `${m.patronage}／${m.marketExhibition}`,
   },
+];
+
+const influenceRows: CompareRow[] = [
   { key: 'legacy', label: '後世への影響', get: (m) => m.legacy },
 ];
+
+export const compareSections: CompareSection[] = [
+  { key: 'overview', label: '基本情報', rows: overviewRows },
+  { key: 'background', label: '背景', rows: backgroundRows },
+  {
+    key: 'works',
+    label: '作品',
+    rows: workRows,
+    includesRepresentativeWorks: true,
+  },
+  { key: 'institution', label: '制度', rows: institutionRows },
+  { key: 'influence', label: '影響', rows: influenceRows },
+];
+
+export const compareRows: CompareRow[] = compareSections.flatMap(
+  (section) => section.rows,
+);
+
+/** 比較対象の順序に割り当てる、紙面になじむ識別色。RGB値はCSS変数で共用する。 */
+export const COMPARE_ACCENTS = [
+  '155 81 57',
+  '62 112 108',
+  '103 91 143',
+  '151 112 52',
+] as const;
 
 /** 比較対象IDの検証（存在する2〜4件のみ許可） */
 export const MIN_COMPARE = 2;

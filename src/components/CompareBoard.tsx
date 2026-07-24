@@ -1,16 +1,17 @@
 'use client';
 
-import { useCallback, useMemo, useState } from 'react';
+import { useCallback, useMemo, useState, type CSSProperties } from 'react';
 import Link from 'next/link';
 import { useSearchParams, useRouter } from 'next/navigation';
 import { movements, worksOf } from '@/lib/dataset';
 import { WorkImage } from './WorkImage';
 import {
-  compareRows,
+  compareSections,
   parseCompareIds,
   MIN_COMPARE,
   MAX_COMPARE,
   compareMovements,
+  COMPARE_ACCENTS,
 } from '@/lib/compare';
 import { getMovementChildren } from '@/lib/movement-hierarchy';
 
@@ -55,75 +56,155 @@ export function CompareBoard() {
   };
 
   const candidates = movements.filter((m) => !ids.includes(m.id));
+  const missingCount = Math.max(0, MIN_COMPARE - ids.length);
+  const accentStyle = (index: number) =>
+    ({
+      '--compare-accent': COMPARE_ACCENTS[index % COMPARE_ACCENTS.length],
+    }) as CSSProperties;
 
   return (
     <div>
       {/* 追加コントロール */}
-      <div className="flex flex-wrap items-center gap-3 border hairline bg-surface p-4">
-        <label htmlFor="add-movement" className="text-sm text-muted">
-          比較に追加（{MIN_COMPARE}〜{MAX_COMPARE}件）
-        </label>
-        <select
-          id="add-movement"
-          value=""
-          onChange={(e) => add(e.target.value)}
-          disabled={ids.length >= MAX_COMPARE}
-          className="rounded-sm border hairline bg-raised px-2 py-2 text-sm text-ink disabled:opacity-50"
-        >
-          <option value="">ムーブメントを選択…</option>
-          {candidates.map((m) => (
-            <option key={m.id} value={m.id}>{m.nameJa}</option>
-          ))}
-        </select>
-        <span className="text-sm text-faint">{ids.length}/{MAX_COMPARE}件</span>
-        {ids.length >= MIN_COMPARE && (
-          <button type="button" onClick={share} className="ml-auto rounded-sm border hairline px-3 py-2 text-xs text-muted hover:text-ink">
-            {copied ? 'URLをコピーしました' : '比較URLを共有'}
-          </button>
-        )}
+      <div className="compare-controls border hairline bg-surface p-4">
+        <div className="flex flex-wrap items-center gap-3">
+          <label htmlFor="add-movement" className="text-sm text-muted">
+            比較に追加（{MIN_COMPARE}〜{MAX_COMPARE}件）
+          </label>
+          <select
+            id="add-movement"
+            value=""
+            onChange={(e) => add(e.target.value)}
+            disabled={ids.length >= MAX_COMPARE}
+            className="min-h-11 rounded-sm border hairline bg-raised px-2 py-2 text-sm text-ink disabled:opacity-50"
+          >
+            <option value="">ムーブメントを選択…</option>
+            {candidates.map((m) => (
+              <option key={m.id} value={m.id}>{m.nameJa}</option>
+            ))}
+          </select>
+          <span className="text-sm tabular-nums text-faint">{ids.length}/{MAX_COMPARE}件</span>
+          {ids.length >= MIN_COMPARE && (
+            <button
+              type="button"
+              onClick={share}
+              className="min-h-11 rounded-sm border hairline px-3 py-2 text-xs text-muted hover:text-ink sm:ml-auto"
+            >
+              {copied ? 'URLをコピーしました' : '比較URLを共有'}
+            </button>
+          )}
+        </div>
+
+        <div className="compare-selection mt-4 border-t hairline pt-3">
+          <div className="flex items-baseline justify-between gap-3">
+            <p className="text-xs font-bold text-muted">現在比較中</p>
+            <p className="text-xs text-faint" aria-live="polite">
+              {missingCount > 0
+                ? `あと${missingCount}件選択してください`
+                : `${ids.length}件を比較できます`}
+            </p>
+          </div>
+          <ul
+            className="compare-chip-list mt-2"
+            aria-label="現在比較中のムーブメント"
+          >
+            {selected.length === 0 ? (
+              <li className="compare-chip-empty">まだ選択されていません</li>
+            ) : (
+              selected.map((movement, index) => (
+                <li
+                  key={movement.id}
+                  className="compare-chip"
+                  style={accentStyle(index)}
+                  data-compare-chip={movement.id}
+                >
+                  <span className="compare-chip__bar" aria-hidden="true" />
+                  <Link
+                    href={`/movements/${movement.id}/`}
+                    className="compare-chip__link"
+                  >
+                    {movement.shortLabel ?? movement.nameJa}
+                  </Link>
+                  <button
+                    type="button"
+                    onClick={() => remove(movement.id)}
+                    aria-label={`${movement.nameJa}を比較から外す`}
+                    className="compare-chip__remove"
+                  >
+                    ×
+                  </button>
+                </li>
+              ))
+            )}
+          </ul>
+        </div>
       </div>
 
       {ids.length < MIN_COMPARE ? (
         <div className="mt-8 rounded-sm border hairline bg-raised p-8 text-center text-sm text-muted">
-          <p>比較するムーブメントを{MIN_COMPARE}件以上選んでください。</p>
+          <p>比較表を開くには、あと{missingCount}件選択してください。</p>
           <div className="mt-4 flex flex-wrap justify-center gap-2">
-            {['gothic', 'italian-renaissance', 'baroque'].map((id) => {
-              const m = movements.find((x) => x.id === id)!;
-              return (
-                <button key={id} type="button" onClick={() => add(id)} className="rounded-sm border hairline px-3 py-1.5 text-xs hover:text-ink">
-                  + {m.nameJa}
-                </button>
-              );
-            })}
+            {['gothic', 'italian-renaissance', 'baroque']
+              .filter((id) => !ids.includes(id))
+              .map((id) => {
+                const m = movements.find((x) => x.id === id)!;
+                return (
+                  <button
+                    key={id}
+                    type="button"
+                    onClick={() => add(id)}
+                    className="min-h-11 rounded-sm border hairline px-3 py-1.5 text-xs hover:text-ink"
+                  >
+                    + {m.nameJa}
+                  </button>
+                );
+              })}
           </div>
         </div>
       ) : (
-        <div className="scroll-x mt-8 rounded-sm border hairline">
-          <table className="w-full border-collapse text-sm">
+        <div
+          className="data-table-scroll mt-8 rounded-sm border hairline"
+          role="region"
+          aria-label="選択したムーブメントの比較表"
+          tabIndex={0}
+          data-compare-table-scroll
+        >
+          <table className="data-table compare-table w-full text-sm">
             <caption className="sr-only">選択したムーブメントの比較表</caption>
             <thead>
               <tr>
-                <th scope="col" className="sticky left-0 z-10 w-32 border-b border-r hairline bg-surface p-3 text-left text-xs text-muted">
-                  項目
+                <th
+                  scope="col"
+                  className="data-table-corner compare-corner border-b border-r hairline p-3 text-left text-xs text-muted"
+                  data-sticky-cell="corner"
+                >
+                  比較項目
                 </th>
-                {selected.map((m) => (
-                  <th key={m.id} scope="col" className="min-w-[220px] border-b border-l hairline bg-surface p-3 text-left align-top">
+                {selected.map((m, index) => (
+                  <th
+                    key={m.id}
+                    scope="col"
+                    className="data-table-column-header compare-column-header min-w-[220px] border-b border-l hairline p-3 text-left align-top"
+                    style={accentStyle(index)}
+                    data-sticky-cell="column"
+                    data-compare-column={m.id}
+                  >
+                    <span className="compare-column-accent" aria-hidden="true" />
                     <div className="flex items-start justify-between gap-2">
-                      <Link href={`/movements/${m.id}/`} className="font-serif text-base text-ink hover:text-accent">
+                      <Link href={`/movements/${m.id}/`} className="font-serif text-base text-ink underline decoration-transparent underline-offset-4 hover:decoration-current">
                         {m.nameJa}
                       </Link>
                       <button
                         type="button"
                         onClick={() => remove(m.id)}
                         aria-label={`${m.nameJa}を比較から外す`}
-                        className="shrink-0 rounded-sm px-1.5 text-faint hover:text-ink"
+                        className="min-h-11 min-w-11 shrink-0 rounded-sm text-faint hover:text-ink"
                       >
-                        ✕
+                        ×
                       </button>
                     </div>
                     <span className="mt-1 block text-[11px] uppercase tracking-wider text-faint">{m.nameEn}</span>
                     {getMovementChildren(m.id, movements).length > 0 && (
-                      <span className="mt-2 block border-l-2 border-accent/50 pl-2 text-[11px] font-normal leading-relaxed text-muted">
+                      <span className="compare-column-note mt-2 block border-l-2 pl-2 text-[11px] font-normal leading-relaxed text-muted">
                         この項目は複数のサブムーブメントを含む上位分類です
                       </span>
                     )}
@@ -131,43 +212,82 @@ export function CompareBoard() {
                 ))}
               </tr>
             </thead>
-            <tbody>
-              {/* 代表作品（各ムーブメント1〜2点、画像優先）で視覚的に比較 */}
-              <tr>
-                <th scope="row" className="sticky left-0 z-10 border-r border-t hairline bg-raised p-3 text-left align-top text-xs text-muted">
-                  代表作品
-                </th>
-                {selected.map((m) => {
-                  const reps = worksOf(m).slice(0, 2);
-                  return (
-                    <td key={m.id} className="border-l border-t hairline p-3 align-top">
-                      <div className="grid grid-cols-2 gap-2">
-                        {reps.map((w) => (
-                          <Link key={w.id} href={`/works/${w.id}/`} className="group block">
-                            <WorkImage work={w} sizes="140px" />
-                            <span className="mt-1 line-clamp-1 block text-[11px] text-muted group-hover:text-ink">
-                              {w.titleJa}
-                            </span>
-                          </Link>
-                        ))}
-                      </div>
-                    </td>
-                  );
-                })}
-              </tr>
-              {compareRows.map((row) => (
-                <tr key={row.key}>
-                  <th scope="row" className="sticky left-0 z-10 border-r border-t hairline bg-raised p-3 text-left align-top text-xs text-muted">
-                    {row.label}
+            {compareSections.map((section) => (
+              <tbody
+                key={section.key}
+                aria-labelledby={`compare-category-${section.key}`}
+              >
+                <tr className="compare-category-row">
+                  <th
+                    id={`compare-category-${section.key}`}
+                    scope="row"
+                    className="data-table-row-header compare-category-cell border-r border-t hairline px-3 py-2 text-left text-xs font-bold text-ink"
+                    data-sticky-cell="category"
+                  >
+                    {section.label}
                   </th>
-                  {selected.map((m) => (
-                    <td key={m.id} className="border-l border-t hairline p-3 align-top leading-relaxed text-ink">
-                      {row.get(m)}
-                    </td>
-                  ))}
+                  <td
+                    colSpan={selected.length}
+                    className="compare-category-fill border-t hairline"
+                    aria-hidden="true"
+                  />
                 </tr>
-              ))}
-            </tbody>
+
+                {section.includesRepresentativeWorks && (
+                  <tr>
+                    <th
+                      scope="row"
+                      className="data-table-row-header compare-row-header border-r border-t hairline p-3 text-left align-top text-xs text-muted"
+                      data-sticky-cell="row"
+                    >
+                      代表作品
+                    </th>
+                    {selected.map((m, index) => {
+                      const reps = worksOf(m).slice(0, 2);
+                      return (
+                        <td
+                          key={m.id}
+                          className="compare-value-cell border-l border-t hairline p-3 align-top"
+                          style={accentStyle(index)}
+                        >
+                          <div className="grid grid-cols-2 gap-2">
+                            {reps.map((w) => (
+                              <Link key={w.id} href={`/works/${w.id}/`} className="group block">
+                                <WorkImage work={w} sizes="140px" />
+                                <span className="mt-1 line-clamp-1 block text-[11px] text-muted group-hover:text-ink">
+                                  {w.titleJa}
+                                </span>
+                              </Link>
+                            ))}
+                          </div>
+                        </td>
+                      );
+                    })}
+                  </tr>
+                )}
+
+                {section.rows.map((row) => (
+                  <tr key={row.key}>
+                    <th
+                      scope="row"
+                      className="data-table-row-header compare-row-header border-r border-t hairline p-3 text-left align-top text-xs text-muted"
+                      data-sticky-cell="row"
+                    >
+                      {row.label}
+                    </th>
+                    {selected.map((m, index) => (
+                      <td
+                        key={m.id}
+                        className="compare-value-cell border-l border-t hairline p-3 align-top leading-relaxed text-ink"
+                        style={accentStyle(index)}
+                      >
+                        {row.get(m)}
+                      </td>
+                    ))}
+                  </tr>
+                ))}
+              </tbody>
+            ))}
           </table>
         </div>
       )}

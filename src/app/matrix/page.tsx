@@ -23,7 +23,7 @@ export default function MatrixPage() {
         <MatrixView movements={movements} regions={regions} />
       </div>
       <p className="mt-4 text-xs text-faint">
-        セルを選ぶと該当ムーブメントの詳細へ移動します。横スクロールで全時代を確認できます。
+        セルを選ぶと該当ムーブメントの詳細へ移動します。表内を縦横にスクロールして、全地域・全時代を確認できます。
       </p>
     </div>
   );

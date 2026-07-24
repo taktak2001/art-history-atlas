@@ -156,6 +156,21 @@ describe('LOD UI', () => {
     expect(within(cell).getByText('ポスト印象派')).toBeVisible();
   });
 
+  it('マトリクスに固定コーナー・時代ヘッダー・地域ヘッダーを持つ', () => {
+    window.history.replaceState({}, '', '/matrix/?lod=core');
+    render(<MatrixView movements={movements} regions={activeRegions()} />);
+
+    const region = screen.getByRole('region', {
+      name: '地域と時代のマトリクス表',
+    });
+    expect(region).toHaveAttribute('tabindex', '0');
+    expect(region.querySelector('[data-sticky-cell="corner"]')).toHaveTextContent(
+      '地域 ＼ 時代',
+    );
+    expect(region.querySelectorAll('[data-sticky-cell="column"]').length).toBeGreaterThan(0);
+    expect(region.querySelectorAll('[data-sticky-cell="row"]').length).toBeGreaterThan(0);
+  });
+
   it('LOD外の検索結果を表示し、必要な密度へ切り替える', async () => {
     window.history.replaceState({}, '', '/movements/?lod=core');
     render(<MovementsExplorer />);

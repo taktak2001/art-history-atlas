@@ -12,6 +12,8 @@ import {
   canCompare,
   compareMovements,
   compareRows,
+  compareSections,
+  COMPARE_ACCENTS,
   MAX_COMPARE,
 } from '@/lib/compare';
 import { buildHeroSummary } from '@/lib/movement-detail';
@@ -87,6 +89,29 @@ describe('比較ロジック', () => {
   });
   it('null入力は空配列', () => {
     expect(parseCompareIds(null)).toEqual([]);
+  });
+
+  it('比較項目を基本情報・背景・作品・制度・影響へ整理する', () => {
+    expect(compareSections.map((section) => section.label)).toEqual([
+      '基本情報',
+      '背景',
+      '作品',
+      '制度',
+      '影響',
+    ]);
+    expect(
+      compareSections.find((section) => section.key === 'background')?.rows
+        .map((row) => row.label),
+    ).toEqual(['思想', '社会背景', '前時代への反応']);
+    expect(
+      compareSections.find((section) => section.key === 'works')?.rows
+        .map((row) => row.label),
+    ).toEqual(['視覚的特徴', '技法・素材']);
+  });
+
+  it('最大4件へ重複しないアクセントカラーを割り当てる', () => {
+    expect(COMPARE_ACCENTS).toHaveLength(MAX_COMPARE);
+    expect(new Set(COMPARE_ACCENTS).size).toBe(MAX_COMPARE);
   });
 });
 

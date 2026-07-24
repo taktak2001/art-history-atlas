@@ -51,10 +51,13 @@ export function MatrixView({
       />
 
       <div
-        className="scroll-x mt-8 rounded-sm border hairline"
+        className="data-table-scroll mt-8 rounded-sm border hairline"
         data-matrix-lod={lod}
+        role="region"
+        aria-label="地域と時代のマトリクス表"
+        tabIndex={0}
       >
-        <table className="w-full border-collapse text-sm">
+        <table className="data-table matrix-table w-full text-sm">
           <caption className="sr-only">
             時代を列、地域を行とし、該当するムーブメントを各セルに示した表
           </caption>
@@ -62,7 +65,8 @@ export function MatrixView({
             <tr>
               <th
                 scope="col"
-                className="sticky left-0 top-0 z-20 border-b border-r hairline bg-surface p-3 text-left text-xs text-muted"
+                className="data-table-corner matrix-corner border-b border-r hairline p-3 text-left text-xs text-muted"
+                data-sticky-cell="corner"
               >
                 地域 ＼ 時代
               </th>
@@ -70,7 +74,8 @@ export function MatrixView({
                 <th
                   key={era}
                   scope="col"
-                  className="sticky top-0 z-10 min-w-[160px] border-b border-l hairline bg-surface p-3 text-left font-serif text-sm"
+                  className="data-table-column-header min-w-[160px] border-b border-l hairline p-3 text-left font-serif text-sm"
+                  data-sticky-cell="column"
                 >
                   {ERA_LABELS[era]}
                 </th>
@@ -82,7 +87,8 @@ export function MatrixView({
               <tr key={region}>
                 <th
                   scope="row"
-                  className="sticky left-0 z-10 border-r border-t hairline bg-raised p-3 text-left text-xs text-muted"
+                  className="data-table-row-header matrix-row-header border-r border-t hairline p-3 text-left text-xs text-muted"
+                  data-sticky-cell="row"
                 >
                   {REGION_LABELS[region]}
                 </th>

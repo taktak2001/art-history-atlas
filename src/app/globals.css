@@ -129,6 +129,271 @@ h1, h2, h3, h4 {
   scrollbar-width: thin;
 }
 
+/*
+ * データ表のスクロール平面。
+ * layer 1: body cells / layer 2: row headers / layer 3: column headers /
+ * layer 4: top-left corner. Safariのsticky table崩れを避けるため
+ * border-collapseは使わず、各固定セルに不透明な背景を持たせる。
+ */
+.data-table-scroll {
+  position: relative;
+  isolation: isolate;
+  max-height: min(68dvh, 44rem);
+  overflow: auto;
+  overscroll-behavior: contain;
+  scroll-padding: 4.5rem 8rem;
+  -webkit-overflow-scrolling: touch;
+  scrollbar-width: thin;
+  touch-action: pan-x pan-y;
+  background: rgb(var(--c-raised));
+}
+
+.data-table-scroll:focus-visible {
+  outline-offset: 3px;
+}
+
+.data-table {
+  border-collapse: separate;
+  border-spacing: 0;
+}
+
+.data-table-column-header,
+.data-table-row-header,
+.data-table-corner {
+  background: rgb(var(--c-surface));
+  background-clip: padding-box;
+}
+
+.data-table-column-header {
+  position: sticky;
+  top: 0;
+  z-index: 3;
+  box-shadow: 0 1px 0 rgb(var(--c-line));
+}
+
+.data-table-row-header {
+  position: sticky;
+  left: 0;
+  z-index: 2;
+  box-shadow: 1px 0 0 rgb(var(--c-line));
+}
+
+.data-table-corner {
+  position: sticky;
+  top: 0;
+  left: 0;
+  z-index: 4;
+  box-shadow:
+    1px 0 0 rgb(var(--c-line)),
+    0 1px 0 rgb(var(--c-line));
+}
+
+.matrix-table {
+  min-width: 88rem;
+}
+
+.matrix-corner,
+.matrix-row-header {
+  width: 8.5rem;
+  min-width: 8.5rem;
+  max-width: 8.5rem;
+}
+
+.matrix-row-header {
+  background: rgb(var(--c-raised));
+}
+
+.compare-controls {
+  background: rgb(var(--c-surface));
+}
+
+.compare-chip-list {
+  display: flex;
+  gap: 0.5rem;
+  overflow-x: auto;
+  overscroll-behavior-x: contain;
+  padding-bottom: 0.25rem;
+  scroll-snap-type: x proximity;
+  scrollbar-width: thin;
+  -webkit-overflow-scrolling: touch;
+}
+
+.compare-chip {
+  display: inline-flex;
+  min-height: 2.75rem;
+  flex: 0 0 auto;
+  align-items: center;
+  overflow: hidden;
+  border: 1px solid rgb(var(--c-line));
+  border-radius: 0.25rem;
+  background: rgb(var(--c-raised));
+  scroll-snap-align: start;
+  animation: compare-chip-in 160ms cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.compare-chip__bar {
+  width: 0.25rem;
+  align-self: stretch;
+  background: rgb(var(--compare-accent));
+}
+
+.compare-chip__link {
+  max-width: 13rem;
+  overflow: hidden;
+  padding: 0.55rem 0.7rem;
+  color: rgb(var(--c-ink));
+  font-size: 0.75rem;
+  font-weight: 700;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.compare-chip__link:hover {
+  text-decoration: underline;
+  text-underline-offset: 0.25em;
+}
+
+.compare-chip__remove {
+  display: grid;
+  width: 2.75rem;
+  min-width: 2.75rem;
+  height: 2.75rem;
+  place-items: center;
+  border-left: 1px solid rgb(var(--c-line));
+  color: rgb(var(--c-muted));
+  font-size: 1rem;
+}
+
+.compare-chip__remove:hover,
+.compare-chip__remove:active {
+  background: rgb(var(--compare-accent) / 0.1);
+  color: rgb(var(--c-ink));
+}
+
+.compare-chip-empty {
+  min-height: 2.75rem;
+  padding: 0.55rem 0;
+  color: rgb(var(--c-faint));
+  font-size: 0.75rem;
+}
+
+.compare-table {
+  min-width: 38rem;
+}
+
+.compare-corner,
+.compare-row-header,
+.compare-category-cell {
+  width: 9.5rem;
+  min-width: 9.5rem;
+  max-width: 9.5rem;
+}
+
+.compare-column-header {
+  background:
+    linear-gradient(
+      90deg,
+      rgb(var(--compare-accent) / 0.08),
+      transparent 56%
+    ),
+    rgb(var(--c-surface));
+}
+
+.compare-column-accent {
+  display: block;
+  width: 2.5rem;
+  height: 0.2rem;
+  margin-bottom: 0.7rem;
+  background: rgb(var(--compare-accent));
+}
+
+.compare-column-note {
+  border-color: rgb(var(--compare-accent) / 0.65);
+}
+
+.compare-row-header {
+  background: rgb(var(--c-raised));
+}
+
+.compare-category-cell,
+.compare-category-fill {
+  background: rgb(var(--c-surface));
+}
+
+.compare-category-cell {
+  z-index: 2;
+  letter-spacing: 0.08em;
+}
+
+.compare-value-cell {
+  background:
+    linear-gradient(
+      180deg,
+      rgb(var(--compare-accent) / 0.035),
+      transparent 5rem
+    ),
+    rgb(var(--c-raised));
+}
+
+@keyframes compare-chip-in {
+  from {
+    opacity: 0;
+    transform: translateX(-0.35rem);
+  }
+  to {
+    opacity: 1;
+    transform: translateX(0);
+  }
+}
+
+@media (max-width: 639px) {
+  .data-table-scroll {
+    max-height: min(
+      68dvh,
+      calc(100dvh - 8rem - env(safe-area-inset-bottom))
+    );
+    scroll-padding-left: 7.25rem;
+  }
+
+  .matrix-table {
+    min-width: 70rem;
+  }
+
+  .matrix-corner,
+  .matrix-row-header {
+    width: 7.25rem;
+    min-width: 7.25rem;
+    max-width: 7.25rem;
+  }
+
+  .matrix-table .data-table-column-header {
+    min-width: 8.75rem;
+  }
+
+  .compare-corner,
+  .compare-row-header,
+  .compare-category-cell {
+    width: 7.25rem;
+    min-width: 7.25rem;
+    max-width: 7.25rem;
+  }
+
+  .compare-column-header {
+    min-width: 12rem;
+  }
+
+  .compare-chip-list {
+    margin-inline: -1rem;
+    padding-inline: 1rem;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .compare-chip {
+    animation: none;
+  }
+}
+
 .timeline-label-survey {
   overflow: hidden;
   white-space: nowrap;

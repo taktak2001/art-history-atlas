@@ -30,7 +30,7 @@ test('2件のムーブメントを比較できる', async ({ page }) => {
   await expect(page.getByRole('columnheader', { name: /ゴシック美術/ })).toBeVisible();
   await expect(page.getByRole('columnheader', { name: /イタリア・ルネサンス/ })).toBeVisible();
   // 比較項目の行が存在する
-  await expect(page.getByRole('rowheader', { name: '中心思想' })).toBeVisible();
+  await expect(page.getByRole('rowheader', { name: '思想' })).toBeVisible();
   await expect(page.getByRole('rowheader', { name: '後世への影響' })).toBeVisible();
 });
 
