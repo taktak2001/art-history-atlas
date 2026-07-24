@@ -1,16 +1,48 @@
-import type { Work } from '@/lib/schema';
+import type { Work, ImageMeta } from '@/lib/schema';
 
 /**
  * 作品データ。
  *
- * 画像方針: 権利・ライセンスを確認できたパブリックドメイン画像のみを収録する。
- * 現行MVPでは検証済み画像を同梱せず、image=null としてプレースホルダーを表示する
- * （出典不明・ライセンス未確認の画像を絶対に使用しないため）。画像追加の手順は
- * docs/image-rights.md、検証は scripts/validate-data.ts を参照。
- * ImageMeta を付与する際は全フィールド（提供元・原典URL・ライセンス・クレジット・
- * PD可否・最終確認日）が必須。
+ * 画像方針（Phase 2）:
+ *  - 権利を確認できた画像のみ収録する。2次元作品（絵画・写本）の忠実な複製はパブリックドメイン。
+ *  - 画像は Wikimedia Commons の公式・安定エンドポイント Special:FilePath を width 付きで参照する。
+ *    各ファイル名は WebSearch で Commons のファイルページ URL を確認した（推測 URL ではない）。
+ *  - 本サンドボックスの egress ポリシーが画像ホスト（upload.wikimedia.org 等）への接続を拒否するため、
+ *    画像バイナリのダウンロード・WebP 変換・バイト単位の検証は行っていない（docs/editorial-audit-phase2.md 参照）。
+ *  - 画像が無い作品は架空画像を使わず image=null とし、UI はプレースホルダーを表示する
+ *    （20 世紀の著作権保護作品、および 3次元/建築で CC 帰属を確定できないものはプレースホルダー）。
+ *  - ImageMeta は全フィールド必須（提供元・原典 URL・ライセンス・PD 判定・クレジット・alt・確認日）。
  */
+
+const COMMONS_FILE = 'https://commons.wikimedia.org/wiki/File:';
+const COMMONS_PATH = 'https://commons.wikimedia.org/wiki/Special:FilePath/';
+const VERIFIED = '2026-07-24';
+
+/** Wikimedia Commons のパブリックドメイン画像（2次元作品の忠実な複製）用ヘルパー */
+function pd(
+  file: string,
+  o: { title: string; creator: string; date: string; alt: string },
+): ImageMeta {
+  const enc = encodeURIComponent(file);
+  return {
+    title: o.title,
+    creator: o.creator,
+    date: o.date,
+    provider: 'Wikimedia Commons',
+    sourceUrl: COMMONS_FILE + enc,
+    fileUrl: COMMONS_PATH + enc, // 表示時に width パラメータを付与する
+    license: 'public-domain',
+    credit: `${o.creator}（パブリックドメイン, via Wikimedia Commons）`,
+    isPublicDomain: true,
+    alt: o.alt,
+    verifiedOn: VERIFIED,
+    verificationNote:
+      'WebSearchでCommonsのファイルページURLを確認。画像バイナリの取得・最適化はegress制限のため未実施。',
+  };
+}
+
 export const works: Work[] = [
+  /* ── 先史 ───────────────────────────── */
   {
     id: 'work-lascaux-hall-of-bulls',
     titleJa: 'ラスコー洞窟「牡牛の広間」',
@@ -41,6 +73,8 @@ export const works: Work[] = [
     sourceIds: ['smarthistory-venus-willendorf'],
     verification: 'verified',
   },
+
+  /* ── 古代ギリシア ───────────────────── */
   {
     id: 'work-doryphoros',
     titleJa: 'ドリュフォロス（槍を持つ人）',
@@ -49,7 +83,7 @@ export const works: Work[] = [
     creatorName: 'ポリュクレイトス（原作）',
     year: '紀元前440年頃（ローマ期の大理石模刻で伝わる）',
     medium: 'ブロンズ（原作）／大理石（模刻）',
-    collection: '各地の美術館（模刻。例：ナポリ国立考古学博物館）',
+    collection: 'ナポリ国立考古学博物館ほか（模刻）',
     movementIds: ['ancient-greek-classical'],
     description:
       '理想的比例（カノン）を体現した立像で、コントラポストによる自然な重心移動を示す。原作はブロンズで、現存するのはローマ期の大理石模刻。',
@@ -57,6 +91,97 @@ export const works: Work[] = [
     sourceIds: ['met-classical-greece'],
     verification: 'verified',
   },
+  {
+    id: 'work-exekias-amphora',
+    titleJa: 'アキレウスとアイアスの遊戯（エクセキアスのアンフォラ）',
+    titleOriginal: 'Achilles and Ajax playing dice (amphora by Exekias)',
+    creatorName: 'エクセキアス',
+    year: '紀元前540〜530年頃',
+    medium: '黒絵式アンフォラ（陶器）',
+    collection: 'ヴァティカン美術館（グレゴリアーノ・エトルスコ美術館, inv. 16757）',
+    movementIds: ['ancient-greek-classical'],
+    description:
+      '陶工にして画家エクセキアスが署名した黒絵式アンフォラ。盤上遊戯に集中する二人の英雄を精緻な線で描き、古代ギリシアの器物絵画の頂点を示す。',
+    image: null,
+    sourceIds: ['met-classical-greece'],
+    verification: 'single-source',
+  },
+
+  /* ── 初期キリスト教・ビザンティン ───── */
+  {
+    id: 'work-justinian-mosaic',
+    titleJa: 'ユスティニアヌス帝と随臣（サン・ヴィターレ聖堂）',
+    titleOriginal: 'Emperor Justinian and his retinue',
+    creatorName: '作者不詳（ビザンティン）',
+    year: '547年頃',
+    medium: '壁面モザイク（ガラス・金のテッセラ）',
+    collection: 'サン・ヴィターレ聖堂（ラヴェンナ）',
+    movementIds: ['early-christian-byzantine'],
+    description:
+      '皇帝を中心に聖俗の権威を金地の中に正面性をもって並べたモザイク。写実的空間ではなく、神的秩序と帝権を象徴する平面的な聖なる空間を示す。',
+    image: null,
+    sourceIds: ['met-byzantium'],
+    verification: 'single-source',
+  },
+  {
+    id: 'work-hagia-sophia',
+    titleJa: 'ハギア・ソフィア大聖堂 内部',
+    titleOriginal: 'Interior of Hagia Sophia',
+    creatorName: 'イシドロス／アンテミオス（建築）',
+    year: '537年',
+    medium: '建築（石・煉瓦・モザイク）',
+    collection: 'イスタンブール（旧コンスタンティノープル）',
+    movementIds: ['early-christian-byzantine'],
+    description:
+      '巨大なドームが光に浮かぶ内部空間。窓からの光と金地モザイクが非物質的な天上の空間を演出し、ビザンティン建築の到達点を示す。',
+    image: null,
+    sourceIds: ['met-byzantium'],
+    verification: 'single-source',
+  },
+
+  /* ── ゴシック ───────────────────────── */
+  {
+    id: 'work-duccio-maesta',
+    titleJa: 'マエスタ（荘厳の聖母）',
+    titleOriginal: 'Maestà',
+    creatorName: 'ドゥッチョ・ディ・ブオニンセーニャ',
+    year: '1308〜1311年',
+    medium: '板・テンペラ・金地',
+    collection: 'ドゥオモ付属美術館（シエナ）',
+    movementIds: ['gothic'],
+    description:
+      'シエナ大聖堂の主祭壇を飾った両面祭壇画。金地とビザンティン的荘厳さを残しつつ、人物に柔らかな情感を与え、ゴシックからルネサンスへの移行を示す。',
+    image: pd('Duccio Maestà.jpg', {
+      title: 'Maestà',
+      creator: 'ドゥッチョ・ディ・ブオニンセーニャ',
+      date: '1308–1311',
+      alt: '金地を背景に、荘厳に座す聖母子を多数の聖人と天使が半円状に取り囲むゴシックの大祭壇画。',
+    }),
+    sourceIds: ['smarthistory-late-gothic'],
+    verification: 'verified',
+  },
+  {
+    id: 'work-tres-riches-heures',
+    titleJa: 'ベリー公のいとも豪華なる時祷書「2月」',
+    titleOriginal: 'Les Très Riches Heures du duc de Berry — Février',
+    creatorName: 'ランブール兄弟',
+    year: '1412〜1416年頃',
+    medium: '羊皮紙・彩色写本（イルミネーション）',
+    collection: 'コンデ美術館（シャンティイ）',
+    movementIds: ['gothic'],
+    description:
+      '国際ゴシックの精緻な彩飾写本の月暦図。雪の農村と城を写実的細部と装飾性で描き、季節と労働、宮廷文化を伝える。写本イルミネーションはパブリックドメイン。',
+    image: pd('Les Très Riches Heures du duc de Berry février.jpg', {
+      title: 'Les Très Riches Heures du duc de Berry — Février',
+      creator: 'ランブール兄弟',
+      date: 'c. 1412–1416',
+      alt: '雪に覆われた冬の農村を上から俯瞰し、暖を取る農民・薪を割る人・城などを細密に描いたゴシックの彩飾写本。',
+    }),
+    sourceIds: ['smarthistory-late-gothic'],
+    verification: 'verified',
+  },
+
+  /* ── イタリア・ルネサンス ───────────── */
   {
     id: 'work-mona-lisa',
     titleJa: 'モナ・リザ',
@@ -69,7 +194,12 @@ export const works: Work[] = [
     movementIds: ['italian-renaissance'],
     description:
       'スフマートによる大気と微妙な陰影、心理的な曖昧さで知られる肖像。盛期ルネサンスの空間と人間表現の到達点の一つ。',
-    image: null,
+    image: pd('Mona Lisa, by Leonardo da Vinci, from C2RMF retouched.jpg', {
+      title: 'Mona Lisa',
+      creator: 'レオナルド・ダ・ヴィンチ',
+      date: 'c. 1503–1519',
+      alt: '山岳の風景を背に、椅子に座り穏やかに微笑む女性の半身肖像。スフマートで輪郭が柔らかく溶ける。',
+    }),
     sourceIds: ['tate-renaissance'],
     verification: 'verified',
   },
@@ -85,10 +215,59 @@ export const works: Work[] = [
     movementIds: ['italian-renaissance'],
     description:
       '古代の哲学者たちを一点透視の壮大な空間に配し、遠近法と古典的統一の理想を示した盛期ルネサンスの記念碑的作品。',
-    image: null,
+    image: pd('Raffael 058.jpg', {
+      title: 'The School of Athens',
+      creator: 'ラファエロ・サンティ',
+      date: '1509–1511',
+      alt: '壮大なアーチの建築空間に、プラトンとアリストテレスを中心に古代の哲学者たちが左右対称に集うフレスコ。',
+    }),
     sourceIds: ['tate-renaissance'],
     verification: 'verified',
   },
+  {
+    id: 'work-birth-of-venus',
+    titleJa: 'ヴィーナスの誕生',
+    titleOriginal: 'La nascita di Venere',
+    creatorId: 'artist-botticelli',
+    creatorName: 'サンドロ・ボッティチェッリ',
+    year: '1485年頃',
+    medium: 'カンヴァス・テンペラ',
+    collection: 'ウフィツィ美術館（フィレンツェ）',
+    movementIds: ['italian-renaissance'],
+    description:
+      '貝の上に立つヴィーナスを優美な線描で描く。新プラトン主義的な美の理念と古代神話の復興を体現するフィレンツェ・ルネサンスの代表作。',
+    image: pd('Sandro Botticelli - La nascita di Venere - Google Art Project - edited.jpg', {
+      title: 'La nascita di Venere',
+      creator: 'サンドロ・ボッティチェッリ',
+      date: 'c. 1485',
+      alt: '大きな帆立貝の上に裸で立つヴィーナスへ、左から風の神が花を吹き寄せ、右から侍女が衣を差し出す情景。',
+    }),
+    sourceIds: ['tate-renaissance'],
+    verification: 'verified',
+  },
+  {
+    id: 'work-creation-of-adam',
+    titleJa: 'アダムの創造（システィーナ礼拝堂天井画）',
+    titleOriginal: 'The Creation of Adam',
+    creatorId: 'artist-michelangelo',
+    creatorName: 'ミケランジェロ・ブオナローティ',
+    year: '1511年頃',
+    medium: 'フレスコ',
+    collection: 'システィーナ礼拝堂（ヴァチカン）',
+    movementIds: ['italian-renaissance'],
+    description:
+      '神とアダムの指が触れ合わんとする一瞬を力強い人体で描く。天井画全体の中心をなし、盛期ルネサンスの人体表現と精神性の頂点を示す。',
+    image: pd('Creation of Adam Michelangelo.jpg', {
+      title: 'The Creation of Adam',
+      creator: 'ミケランジェロ・ブオナローティ',
+      date: 'c. 1511',
+      alt: '横たわる裸体のアダムへ、天から雲に乗る神が身を乗り出し、両者の人差し指が触れ合う直前を描くフレスコ。',
+    }),
+    sourceIds: ['tate-renaissance'],
+    verification: 'verified',
+  },
+
+  /* ── 北方ルネサンス ─────────────────── */
   {
     id: 'work-arnolfini-portrait',
     titleJa: 'アルノルフィーニ夫妻の肖像',
@@ -101,10 +280,124 @@ export const works: Work[] = [
     movementIds: ['northern-renaissance'],
     description:
       '油彩の緻密なグレーズで室内の光と質感を再現し、鏡や犬など事物に象徴を込めた初期ネーデルラント絵画の傑作。',
-    image: null,
+    image: pd('Van Eyck - Arnolfini Portrait.jpg', {
+      title: 'The Arnolfini Portrait',
+      creator: 'ヤン・ファン・エイク',
+      date: '1434',
+      alt: '室内に立つ男女一組の全身肖像。奥の凸面鏡に室内と人物が映り込み、シャンデリアや犬など細部が緻密に描かれる。',
+    }),
     sourceIds: ['smarthistory-van-eyck', 'smarthistory-northern-renaissance'],
     verification: 'verified',
   },
+  {
+    id: 'work-ghent-altarpiece',
+    titleJa: 'ヘントの祭壇画（神秘の子羊の礼拝）',
+    titleOriginal: 'The Ghent Altarpiece (Adoration of the Mystic Lamb)',
+    creatorId: 'artist-van-eyck',
+    creatorName: 'フーベルト／ヤン・ファン・エイク',
+    year: '1432年',
+    medium: '板・油彩（多翼祭壇画）',
+    collection: '聖バーフ大聖堂（ヘント）',
+    movementIds: ['northern-renaissance'],
+    description:
+      '油彩技法の精緻さで光・織物・宝石を再現した多翼祭壇画。神学的プログラムと自然観察を統合し、初期ネーデルラント絵画の記念碑となった。',
+    image: pd('Lamgods open.jpg', {
+      title: 'The Ghent Altarpiece (open)',
+      creator: 'ファン・エイク兄弟',
+      date: '1432',
+      alt: '開いた状態の多翼祭壇画。上段に神・聖母・洗礼者ヨハネら、下段中央に草原の祭壇上の子羊を諸聖人が礼拝する。',
+    }),
+    sourceIds: ['smarthistory-van-eyck', 'smarthistory-northern-renaissance'],
+    verification: 'verified',
+  },
+  {
+    id: 'work-durer-self-portrait',
+    titleJa: '自画像（1500年）',
+    titleOriginal: 'Self-Portrait (1500)',
+    creatorId: 'artist-durer',
+    creatorName: 'アルブレヒト・デューラー',
+    year: '1500年',
+    medium: '板・油彩',
+    collection: 'アルテ・ピナコテーク（ミュンヘン）',
+    movementIds: ['northern-renaissance'],
+    description:
+      'キリスト像を思わせる厳格な正面性で自己を描いた自画像。芸術家の自意識の高まりを示し、北方ルネサンスにおける個の表現を象徴する。',
+    image: pd('Dürer self portrait 28.jpg', {
+      title: 'Self-Portrait (1500)',
+      creator: 'アルブレヒト・デューラー',
+      date: '1500',
+      alt: '毛皮の襟の衣をまとい、正面をまっすぐ見据える若い男性（画家自身）の胸像。左右対称の厳格な構図。',
+    }),
+    sourceIds: ['smarthistory-northern-renaissance'],
+    verification: 'verified',
+  },
+  {
+    id: 'work-garden-earthly-delights',
+    titleJa: '快楽の園',
+    titleOriginal: 'The Garden of Earthly Delights',
+    creatorId: 'artist-bosch',
+    creatorName: 'ヒエロニムス・ボス',
+    year: '1490〜1510年頃',
+    medium: '板・油彩（三連祭壇画）',
+    collection: 'プラド美術館（マドリード）',
+    movementIds: ['northern-renaissance'],
+    description:
+      '楽園・現世の快楽・地獄を三連で描く幻想的な寓意画。膨大な細部と奇怪な生物により、罪と救済をめぐる想像世界を可視化する。',
+    image: pd('The Garden of earthly delights.jpg', {
+      title: 'The Garden of Earthly Delights',
+      creator: 'ヒエロニムス・ボス',
+      date: 'c. 1490–1510',
+      alt: '三枚組の祭壇画。左に楽園、中央に裸の群像と巨大な果実や鳥が満ちる快楽の園、右に暗い地獄が描かれる。',
+    }),
+    sourceIds: ['smarthistory-northern-renaissance'],
+    verification: 'verified',
+  },
+
+  /* ── マニエリスム ───────────────────── */
+  {
+    id: 'work-madonna-long-neck',
+    titleJa: '長い首の聖母',
+    titleOriginal: 'Madonna dal collo lungo',
+    creatorId: 'artist-parmigianino',
+    creatorName: 'パルミジャニーノ',
+    year: '1534〜1540年頃',
+    medium: '板・油彩',
+    collection: 'ウフィツィ美術館（フィレンツェ）',
+    movementIds: ['mannerism'],
+    description:
+      '引き伸ばされた聖母と幼子、不安定な空間と背景の柱により、盛期ルネサンスの調和をあえて逸脱した洗練を示すマニエリスムの典型。',
+    image: pd('Parmigianino - Madonna dal collo lungo - Google Art Project.jpg', {
+      title: 'Madonna dal collo lungo',
+      creator: 'パルミジャニーノ',
+      date: 'c. 1534–1540',
+      alt: '不自然に長い首と身体の聖母が細長い幼子を膝に抱き、左に天使たちが密集、右奥に一本の柱が立つ縦長の画面。',
+    }),
+    sourceIds: ['tate-mannerist'],
+    verification: 'verified',
+  },
+  {
+    id: 'work-burial-count-orgaz',
+    titleJa: 'オルガス伯の埋葬',
+    titleOriginal: 'The Burial of the Count of Orgaz',
+    creatorId: 'artist-el-greco',
+    creatorName: 'エル・グレコ',
+    year: '1586〜1588年',
+    medium: 'カンヴァス・油彩',
+    collection: 'サント・トメ教会（トレド）',
+    movementIds: ['mannerism'],
+    description:
+      '下部の地上の埋葬と上部の天界を一画面に重ね、引き伸ばされた人体と非現実的な光で霊的高揚を描く。マニエリスムとビザンティン的伝統の融合。',
+    image: pd('The Burial of Count Orgaz by El Greco.jpg', {
+      title: 'The Burial of the Count of Orgaz',
+      creator: 'エル・グレコ',
+      date: '1586–1588',
+      alt: '下段で聖人が甲冑の伯爵を埋葬し、上段で細長く引き伸ばされた天界の人物たちが魂を迎える、二層構成の縦長の絵。',
+    }),
+    sourceIds: ['tate-mannerist'],
+    verification: 'verified',
+  },
+
+  /* ── バロック ───────────────────────── */
   {
     id: 'work-las-meninas',
     titleJa: 'ラス・メニーナス（女官たち）',
@@ -117,10 +410,59 @@ export const works: Work[] = [
     movementIds: ['baroque'],
     description:
       '画家自身・王女・鏡に映る国王夫妻を組み込み、描く者と見る者の関係を複雑に反転させたバロック絵画の傑作。',
-    image: null,
+    image: pd('Las Meninas 01.jpg', {
+      title: 'Las Meninas',
+      creator: 'ディエゴ・ベラスケス',
+      date: '1656',
+      alt: '薄暗い工房で、中央の幼い王女を女官が囲み、左に大きなカンヴァスに向かう画家自身、奥の鏡に国王夫妻が映る。',
+    }),
     sourceIds: ['tate-baroque'],
     verification: 'verified',
   },
+  {
+    id: 'work-calling-st-matthew',
+    titleJa: '聖マタイの召命',
+    titleOriginal: 'The Calling of Saint Matthew',
+    creatorId: 'artist-caravaggio',
+    creatorName: 'カラヴァッジョ',
+    year: '1599〜1600年',
+    medium: 'カンヴァス・油彩',
+    collection: 'サン・ルイジ・デイ・フランチェージ聖堂（ローマ）',
+    movementIds: ['baroque'],
+    description:
+      '斜めに差す一条の光がキリストの指と徴税人マタイを結ぶ。劇的な明暗法（テネブリズム）が回心の一瞬を演出するバロックの記念碑。',
+    image: pd('The Calling of Saint Matthew-Caravaggo (1599-1600).jpg', {
+      title: 'The Calling of Saint Matthew',
+      creator: 'カラヴァッジョ',
+      date: '1599–1600',
+      alt: '薄暗い室内で机を囲む男たちに、右から差す強い光の中でキリストが手を差し伸べ、一人が驚いて自分を指さす。',
+    }),
+    sourceIds: ['tate-baroque'],
+    verification: 'verified',
+  },
+  {
+    id: 'work-judith-holofernes',
+    titleJa: 'ホロフェルネスの首を斬るユディト',
+    titleOriginal: 'Judith Slaying Holofernes',
+    creatorId: 'artist-gentileschi',
+    creatorName: 'アルテミジア・ジェンティレスキ',
+    year: '1614〜1620年頃',
+    medium: 'カンヴァス・油彩',
+    collection: 'ウフィツィ美術館（フィレンツェ）',
+    movementIds: ['baroque'],
+    description:
+      '劇的な明暗と力強い動勢で、旧約の女性ユディトが敵将を討つ瞬間を描く。カラヴァッジョの手法を継ぎ、女性の主体性を前景化したバロックの傑作。',
+    image: pd('GENTILESCHI Judith.jpg', {
+      title: 'Judith Slaying Holofernes',
+      creator: 'アルテミジア・ジェンティレスキ',
+      date: 'c. 1614–1620',
+      alt: '暗い背景の中、二人の女性が力を込めて横たわる将軍の首に剣を当て斬首する、緊張に満ちた明暗の強い場面。',
+    }),
+    sourceIds: ['tate-baroque'],
+    verification: 'verified',
+  },
+
+  /* ── オランダ黄金時代 ───────────────── */
   {
     id: 'work-milkmaid',
     titleJa: '牛乳を注ぐ女',
@@ -133,10 +475,124 @@ export const works: Work[] = [
     movementIds: ['dutch-golden-age'],
     description:
       '窓から差す光の中で家事に集中する女性を精緻に描き、市民の日常に静かな尊厳を与えたオランダ黄金時代の代表作。',
-    image: null,
+    image: pd('Vermeer - The Milkmaid.jpg', {
+      title: 'The Milkmaid',
+      creator: 'ヨハネス・フェルメール',
+      date: 'c. 1658–1660',
+      alt: '左の窓から柔らかな光が差す簡素な台所で、頑健な女性が壺から鉢へ牛乳を細く注ぐ姿を捉えた室内画。',
+    }),
     sourceIds: ['met-dutch-golden-age'],
     verification: 'verified',
   },
+  {
+    id: 'work-night-watch',
+    titleJa: '夜警',
+    titleOriginal: 'The Night Watch (De Nachtwacht)',
+    creatorId: 'artist-rembrandt',
+    creatorName: 'レンブラント・ファン・レイン',
+    year: '1642年',
+    medium: 'カンヴァス・油彩',
+    collection: 'アムステルダム国立美術館',
+    movementIds: ['dutch-golden-age'],
+    description:
+      '市民自警団の集団肖像を、静的な整列ではなく動きと劇的な光で描いた革新作。市民社会の自負とバロック的演出を結びつける。',
+    image: pd('The Nightwatch by Rembrandt - Rijksmuseum.jpg', {
+      title: 'The Night Watch',
+      creator: 'レンブラント・ファン・レイン',
+      date: '1642',
+      alt: '隊長に率いられた市民自警団が、光と影の中を前へ踏み出そうとする躍動的な大画面の集団肖像画。',
+    }),
+    sourceIds: ['met-dutch-golden-age'],
+    verification: 'verified',
+  },
+  {
+    id: 'work-girl-pearl-earring',
+    titleJa: '真珠の耳飾りの少女',
+    titleOriginal: 'Girl with a Pearl Earring',
+    creatorId: 'artist-vermeer',
+    creatorName: 'ヨハネス・フェルメール',
+    year: '1665年頃',
+    medium: 'カンヴァス・油彩',
+    collection: 'マウリッツハイス美術館（ハーグ）',
+    movementIds: ['dutch-golden-age'],
+    description:
+      '暗い背景から振り向く少女を、青と黄のターバンと光る真珠で捉えた「トロニー」。匿名の一人物に静かな親密さを与えたフェルメールの代表作。',
+    image: pd('1665 Girl with a Pearl Earring.jpg', {
+      title: 'Girl with a Pearl Earring',
+      creator: 'ヨハネス・フェルメール',
+      date: 'c. 1665',
+      alt: '暗い背景の中、青と黄のターバンを巻いた少女が肩越しに振り返り、耳に大きな真珠が光る半身像。',
+    }),
+    sourceIds: ['met-dutch-golden-age'],
+    verification: 'verified',
+  },
+  {
+    id: 'work-rembrandt-self-portrait',
+    titleJa: '自画像（1659年）',
+    titleOriginal: 'Self-Portrait (1659)',
+    creatorId: 'artist-rembrandt',
+    creatorName: 'レンブラント・ファン・レイン',
+    year: '1659年',
+    medium: 'カンヴァス・油彩',
+    collection: 'ナショナル・ギャラリー（ワシントンD.C.）',
+    movementIds: ['dutch-golden-age'],
+    description:
+      '晩年の自己を陰影の中に率直に見つめた自画像。市場の需要に応えつつ、内面を探る近代的な自己表象の先駆を示す。',
+    image: pd('Rembrandt van Rijn - Self-Portrait (1659).jpg', {
+      title: 'Self-Portrait',
+      creator: 'レンブラント・ファン・レイン',
+      date: '1659',
+      alt: '暗い背景から光に浮かぶ、老いた画家自身の顔と組んだ手。柔らかな明暗で内省的な表情を捉える。',
+    }),
+    sourceIds: ['met-dutch-golden-age'],
+    verification: 'verified',
+  },
+
+  /* ── ロココ ─────────────────────────── */
+  {
+    id: 'work-embarkation-cythera',
+    titleJa: 'シテール島への巡礼',
+    titleOriginal: "Pèlerinage à l'île de Cythère",
+    creatorId: 'artist-watteau',
+    creatorName: 'アントワーヌ・ヴァトー',
+    year: '1717年',
+    medium: 'カンヴァス・油彩',
+    collection: 'ルーヴル美術館（パリ）',
+    movementIds: ['rococo'],
+    description:
+      '愛の島を離れる貴族たちの雅宴（フェット・ギャラント）。淡い色調と優美で憂いを帯びた叙情が、ロココの私的享楽の文化を映す。',
+    image: pd('Antoine Watteau - Embarkation for Cythera.jpg', {
+      title: 'Pilgrimage to Cythera',
+      creator: 'アントワーヌ・ヴァトー',
+      date: '1717',
+      alt: '木立と彫像のある庭園で、優雅に着飾った男女の一団が船へ向かう、淡い色調の情景。',
+    }),
+    sourceIds: ['tate-rococo'],
+    verification: 'verified',
+  },
+  {
+    id: 'work-the-swing',
+    titleJa: 'ぶらんこ（幸運なる偶然）',
+    titleOriginal: "Les Hasards heureux de l'escarpolette",
+    creatorId: 'artist-fragonard',
+    creatorName: 'ジャン＝オノレ・フラゴナール',
+    year: '1767年頃',
+    medium: 'カンヴァス・油彩',
+    collection: 'ウォレス・コレクション（ロンドン）',
+    movementIds: ['rococo'],
+    description:
+      '茂みの中でぶらんこに乗る女性と、それを見上げる男性を軽やかで官能的な筆致で描く。私的享楽と機知に富むロココ後期の象徴的作品。',
+    image: pd('Fragonard, The Swing.jpg', {
+      title: 'The Swing',
+      creator: 'ジャン＝オノレ・フラゴナール',
+      date: 'c. 1767',
+      alt: '生い茂る庭園でピンクの衣の女性がぶらんこをこぎ、片方の靴が宙に飛び、茂みの下から男性が見上げる官能的な情景。',
+    }),
+    sourceIds: ['tate-rococo'],
+    verification: 'verified',
+  },
+
+  /* ── 新古典主義 ─────────────────────── */
   {
     id: 'work-oath-of-horatii',
     titleJa: 'ホラティウス兄弟の誓い',
@@ -149,10 +605,59 @@ export const works: Work[] = [
     movementIds: ['neoclassicism'],
     description:
       '古代ローマの主題を明晰な構図と彫刻的人体で描き、市民的徳と犠牲を説いた新古典主義の宣言的作品。',
-    image: null,
+    image: pd('Jacques-Louis David, Le Serment des Horaces.jpg', {
+      title: 'Oath of the Horatii',
+      creator: 'ジャック＝ルイ・ダヴィッド',
+      date: '1784',
+      alt: '三つのアーチを背に、剣を掲げる父へ三兄弟が腕を伸ばして誓い、右で女性たちが嘆く、左右対称の劇的な構図。',
+    }),
     sourceIds: ['tate-neoclassicism'],
     verification: 'verified',
   },
+  {
+    id: 'work-death-of-marat',
+    titleJa: 'マラーの死',
+    titleOriginal: 'La Mort de Marat',
+    creatorId: 'artist-david',
+    creatorName: 'ジャック＝ルイ・ダヴィッド',
+    year: '1793年',
+    medium: 'カンヴァス・油彩',
+    collection: 'ベルギー王立美術館（ブリュッセル）',
+    movementIds: ['neoclassicism'],
+    description:
+      '革命家マラーの暗殺直後を、簡潔な構図と静謐な光で殉教図のように描く。新古典主義の様式を同時代の政治的出来事へ転用した作品。',
+    image: pd('Death of Marat by David.jpg', {
+      title: 'The Death of Marat',
+      creator: 'ジャック＝ルイ・ダヴィッド',
+      date: '1793',
+      alt: '浴槽の中で息絶えた男が、羽根ペンと手紙を手にぐったりと横たわる。暗い上部と光る人物の対比が静かで劇的。',
+    }),
+    sourceIds: ['tate-neoclassicism'],
+    verification: 'verified',
+  },
+  {
+    id: 'work-grande-odalisque',
+    titleJa: 'グランド・オダリスク',
+    titleOriginal: 'La Grande Odalisque',
+    creatorId: 'artist-ingres',
+    creatorName: 'ドミニク・アングル',
+    year: '1814年',
+    medium: 'カンヴァス・油彩',
+    collection: 'ルーヴル美術館（パリ）',
+    movementIds: ['neoclassicism'],
+    description:
+      '純化された線描で東方の後宮の女性を描く。解剖学的に引き伸ばされた背中は、古典的形式美と官能・異国趣味を結ぶアングルの様式を示す。',
+    image: pd('Jean Auguste Dominique Ingres, La Grande Odalisque, 1814.jpg', {
+      title: 'La Grande Odalisque',
+      creator: 'ドミニク・アングル',
+      date: '1814',
+      alt: '青い布の寝台に背を向けて横たわり、こちらを振り返る裸婦。背中が長く引き伸ばされ、東方風の調度が添えられる。',
+    }),
+    sourceIds: ['tate-neoclassicism'],
+    verification: 'verified',
+  },
+
+  /* ── ロマン主義 ─────────────────────── */
   {
     id: 'work-wanderer-sea-of-fog',
     titleJa: '雲海の上の旅人',
@@ -165,10 +670,166 @@ export const works: Work[] = [
     movementIds: ['romanticism'],
     description:
       '霧の海を見下ろす孤独な人物を通じ、自然の崇高と個の内面を象徴的に示したドイツ・ロマン主義の代表作。',
-    image: null,
+    image: pd('Caspar David Friedrich - Wanderer above the sea of fog.jpg', {
+      title: 'Wanderer above the Sea of Fog',
+      creator: 'カスパー・ダーヴィト・フリードリヒ',
+      date: 'c. 1818',
+      alt: '岩の頂に後ろ姿で立つ男性が、眼下に広がる霧の海と遠くの山々を見晴らす、崇高な風景画。',
+    }),
     sourceIds: ['smarthistory-romanticism'],
     verification: 'verified',
   },
+  {
+    id: 'work-third-of-may',
+    titleJa: '1808年5月3日',
+    titleOriginal: 'El tres de mayo de 1808 en Madrid',
+    creatorId: 'artist-goya',
+    creatorName: 'フランシスコ・デ・ゴヤ',
+    year: '1814年',
+    medium: 'カンヴァス・油彩',
+    collection: 'プラド美術館（マドリード）',
+    movementIds: ['romanticism'],
+    description:
+      'ナポレオン軍による市民の処刑を、匿名の銃殺隊と光に照らされた犠牲者の対比で描く。英雄化を拒む近代的な戦争の証言。',
+    image: pd('El tres de mayo de 1808 en Madrid.jpg', {
+      title: 'The Third of May 1808',
+      creator: 'フランシスコ・デ・ゴヤ',
+      date: '1814',
+      alt: '夜、ランタンの光に照らされ両手を上げる白いシャツの男へ、顔の見えない銃殺隊が一斉に銃を向ける処刑の場面。',
+    }),
+    sourceIds: ['smarthistory-romanticism'],
+    verification: 'verified',
+  },
+  {
+    id: 'work-liberty-leading',
+    titleJa: '民衆を導く自由の女神',
+    titleOriginal: 'La Liberté guidant le peuple',
+    creatorId: 'artist-delacroix',
+    creatorName: 'ウジェーヌ・ドラクロワ',
+    year: '1830年',
+    medium: 'カンヴァス・油彩',
+    collection: 'ルーヴル美術館（パリ）',
+    movementIds: ['romanticism'],
+    description:
+      '七月革命を、三色旗を掲げる寓意像「自由」を中心に躍動する色彩と動勢で描く。ロマン主義の政治的主題と色彩の力を示す。',
+    image: pd('Eugène Delacroix - La liberté guidant le peuple.jpg', {
+      title: 'Liberty Leading the People',
+      creator: 'ウジェーヌ・ドラクロワ',
+      date: '1830',
+      alt: 'バリケードを越え、三色旗と銃剣を掲げた女性像を先頭に、様々な階層の民衆が硝煙の中を前進する劇的な群像。',
+    }),
+    sourceIds: ['smarthistory-romanticism'],
+    verification: 'verified',
+  },
+  {
+    id: 'work-raft-medusa',
+    titleJa: 'メデューズ号の筏',
+    titleOriginal: 'Le Radeau de la Méduse',
+    creatorId: 'artist-gericault',
+    creatorName: 'テオドール・ジェリコー',
+    year: '1818〜1819年',
+    medium: 'カンヴァス・油彩',
+    collection: 'ルーヴル美術館（パリ）',
+    movementIds: ['romanticism'],
+    description:
+      '難破事故の生存者を実地調査に基づき大画面で描く。同時代の悲劇を歴史画の規模で扱い、絶望と希望の劇性を示したロマン主義の記念碑。',
+    image: pd('The Raft of the Medusa - Louvre.jpg', {
+      title: 'The Raft of the Medusa',
+      creator: 'テオドール・ジェリコー',
+      date: '1818–1819',
+      alt: '荒海を漂う筏の上で、死者と瀕死の人々が積み重なり、頂点で一人が布を振って遠くの船に助けを求める群像。',
+    }),
+    sourceIds: ['smarthistory-romanticism'],
+    verification: 'verified',
+  },
+  {
+    id: 'work-fighting-temeraire',
+    titleJa: '解体されるために最後の停泊地へ曳かれる戦艦テメレール号',
+    titleOriginal: 'The Fighting Temeraire',
+    creatorId: 'artist-turner',
+    creatorName: 'J.M.W.ターナー',
+    year: '1839年',
+    medium: 'カンヴァス・油彩',
+    collection: 'ナショナル・ギャラリー（ロンドン）',
+    movementIds: ['romanticism'],
+    description:
+      '解体場へ曳かれる古い帆船を夕日の光の中に描く。光と大気の効果に時代の移り変わりへの哀感を託した、ターナーの崇高な風景画。',
+    image: pd('The Fighting Temeraire, JMW Turner, National Gallery.jpg', {
+      title: 'The Fighting Temeraire',
+      creator: 'J.M.W.ターナー',
+      date: '1839',
+      alt: '燃えるような夕焼けの空と水面を背に、黒い蒸気曳船が淡い白の古い帆船を最後の停泊地へ曳いていく光景。',
+    }),
+    sourceIds: ['smarthistory-romanticism'],
+    verification: 'verified',
+  },
+
+  /* ── 写実主義 ───────────────────────── */
+  {
+    id: 'work-burial-ornans',
+    titleJa: 'オルナンの埋葬',
+    titleOriginal: 'Un enterrement à Ornans',
+    creatorId: 'artist-courbet',
+    creatorName: 'ギュスターヴ・クールベ',
+    year: '1849〜1850年',
+    medium: 'カンヴァス・油彩',
+    collection: 'オルセー美術館（パリ）',
+    movementIds: ['realism'],
+    description:
+      '地方の庶民の葬列を歴史画の大画面で描き、理想化を排して同時代の現実を主題化した写実主義の宣言的作品。',
+    image: pd('Gustave courbet, un funerale a ornans, 1849-50.JPG', {
+      title: 'A Burial at Ornans',
+      creator: 'ギュスターヴ・クールベ',
+      date: '1849–1850',
+      alt: '曇天の田舎の墓地に、聖職者・遺族・村人が横一列に長く並ぶ、等身大の庶民を描いた大画面の葬列。',
+    }),
+    sourceIds: ['smarthistory-realism'],
+    verification: 'verified',
+  },
+  {
+    id: 'work-gleaners',
+    titleJa: '落穂拾い',
+    titleOriginal: 'Des glaneuses',
+    creatorId: 'artist-millet',
+    creatorName: 'ジャン＝フランソワ・ミレー',
+    year: '1857年',
+    medium: 'カンヴァス・油彩',
+    collection: 'オルセー美術館（パリ）',
+    movementIds: ['realism'],
+    description:
+      '刈り取り後の畑で落穂を拾う三人の農婦を、静かな尊厳をもって描く。農村の貧しい労働を主題に据えた写実主義の代表作。',
+    image: pd('Jean-François Millet - Gleaners - Google Art Project 2.jpg', {
+      title: 'The Gleaners',
+      creator: 'ジャン＝フランソワ・ミレー',
+      date: '1857',
+      alt: '黄金色の収穫後の畑で、腰をかがめて落穂を拾う三人の農婦。奥に収穫の山と作業する人々が小さく見える。',
+    }),
+    sourceIds: ['smarthistory-realism'],
+    verification: 'verified',
+  },
+  {
+    id: 'work-dejeuner-herbe',
+    titleJa: '草上の昼食',
+    titleOriginal: "Le Déjeuner sur l'herbe",
+    creatorId: 'artist-manet',
+    creatorName: 'エドゥアール・マネ',
+    year: '1863年',
+    medium: 'カンヴァス・油彩',
+    collection: 'オルセー美術館（パリ）',
+    movementIds: ['realism'],
+    description:
+      '着衣の男性と裸婦を戸外に並置し、平面的な処理と同時代性でサロンに衝撃を与えた。写実主義から近代絵画への転回を告げる作品。',
+    image: pd('Edouard Manet - Luncheon on the Grass - Google Art Project.jpg', {
+      title: "Le Déjeuner sur l'herbe",
+      creator: 'エドゥアール・マネ',
+      date: '1863',
+      alt: '森の空き地で、正装した二人の男性とこちらを見る裸の女性が座り、奥で女性が水浴する、平面的な明暗の情景。',
+    }),
+    sourceIds: ['smarthistory-realism', 'tate-impressionism'],
+    verification: 'verified',
+  },
+
+  /* ── 印象派 ─────────────────────────── */
   {
     id: 'work-impression-sunrise',
     titleJa: '印象・日の出',
@@ -181,10 +842,37 @@ export const works: Work[] = [
     movementIds: ['impressionism'],
     description:
       'ル・アーヴル港の朝の光を素早い筆致で捉えた作品。批評家がこの題名から「印象派」と呼んだことが運動名の由来となった。',
-    image: null,
+    image: pd('Claude Monet, Impression, soleil levant.jpg', {
+      title: 'Impression, Sunrise',
+      creator: 'クロード・モネ',
+      date: '1872',
+      alt: '朝もやの港に昇るオレンジの太陽と水面の反射、荒い筆触で描かれた小舟と工場の煙のシルエット。',
+    }),
     sourceIds: ['tate-impressionism'],
     verification: 'verified',
   },
+  {
+    id: 'work-moulin-galette',
+    titleJa: 'ムーラン・ド・ラ・ギャレットの舞踏会',
+    titleOriginal: 'Bal du moulin de la Galette',
+    creatorName: 'ピエール＝オーギュスト・ルノワール',
+    year: '1876年',
+    medium: 'カンヴァス・油彩',
+    collection: 'オルセー美術館（パリ）',
+    movementIds: ['impressionism'],
+    description:
+      'モンマルトルの野外舞踏会を、木漏れ日の斑点と軽やかな筆致で描く。都市の余暇と光の効果を主題化した印象派の代表作。',
+    image: pd('Pierre-Auguste Renoir, Le Moulin de la Galette.jpg', {
+      title: 'Bal du moulin de la Galette',
+      creator: 'ピエール＝オーギュスト・ルノワール',
+      date: '1876',
+      alt: '屋外の舞踏会で談笑し踊る大勢の男女に、木々を透かした陽光が斑点となって降りそそぐ、賑やかで明るい情景。',
+    }),
+    sourceIds: ['tate-impressionism'],
+    verification: 'verified',
+  },
+
+  /* ── ポスト印象派 ───────────────────── */
   {
     id: 'work-starry-night',
     titleJa: '星月夜',
@@ -197,10 +885,145 @@ export const works: Work[] = [
     movementIds: ['post-impressionism'],
     description:
       '渦巻く夜空を強い筆致と色で描き、外界の再現を超えた内的表現へ踏み込んだポスト印象派の象徴的作品。',
-    image: null,
+    image: pd('Van Gogh - Starry Night - Google Art Project.jpg', {
+      title: 'The Starry Night',
+      creator: 'フィンセント・ファン・ゴッホ',
+      date: '1889',
+      alt: '渦を巻く夜空に大きな星と月が輝き、手前に糸杉が炎のように立ち上がり、下に静かな村が広がる。',
+    }),
     sourceIds: ['tate-post-impressionism'],
     verification: 'verified',
   },
+  {
+    id: 'work-sunflowers',
+    titleJa: 'ひまわり',
+    titleOriginal: 'Sunflowers',
+    creatorId: 'artist-van-gogh',
+    creatorName: 'フィンセント・ファン・ゴッホ',
+    year: '1888年',
+    medium: 'カンヴァス・油彩',
+    collection: 'ナショナル・ギャラリー（ロンドン）',
+    movementIds: ['post-impressionism'],
+    description:
+      '黄を主調に厚塗りで花瓶のひまわりを描く。色そのものの表現力と物質的な絵具の質感を追求したアルル時代の連作の一つ。',
+    image: pd('Vincent Willem van Gogh 127.jpg', {
+      title: 'Sunflowers',
+      creator: 'フィンセント・ファン・ゴッホ',
+      date: '1888',
+      alt: '黄色い背景と卓上に置かれた花瓶に、盛りと枯れの入り混じったひまわりが厚い絵具で描かれた静物。',
+    }),
+    sourceIds: ['tate-post-impressionism'],
+    verification: 'verified',
+  },
+  {
+    id: 'work-card-players',
+    titleJa: 'カード遊びをする人々',
+    titleOriginal: 'Les Joueurs de cartes',
+    creatorId: 'artist-cezanne',
+    creatorName: 'ポール・セザンヌ',
+    year: '1892〜1895年頃',
+    medium: 'カンヴァス・油彩',
+    collection: 'コートールド美術館（ロンドン）',
+    movementIds: ['post-impressionism'],
+    description:
+      '卓を挟む二人の農夫を堅固な幾何学的構造で描く。瞬間の印象より永続する形を追い、キュビスムの源泉となったセザンヌ晩年の連作。',
+    image: pd('Card Players-Paul Cezanne.jpg', {
+      title: 'The Card Players',
+      creator: 'ポール・セザンヌ',
+      date: 'c. 1892–1895',
+      alt: '一本のワイン瓶を中心に、テーブルを挟んで向かい合いカードを持つ二人の男を、堅固で単純化した形で描く。',
+    }),
+    sourceIds: ['tate-post-impressionism'],
+    verification: 'verified',
+  },
+  {
+    id: 'work-where-do-we-come',
+    titleJa: '我々はどこから来たのか 我々は何者か 我々はどこへ行くのか',
+    titleOriginal: "D'où venons-nous ? Que sommes-nous ? Où allons-nous ?",
+    creatorId: 'artist-gauguin',
+    creatorName: 'ポール・ゴーギャン',
+    year: '1897年',
+    medium: 'カンヴァス・油彩',
+    collection: 'ボストン美術館',
+    movementIds: ['post-impressionism'],
+    description:
+      'タヒチを舞台に生から死へ至る人間の寓意を平面的な色面と輪郭で描く。西洋近代文明への懐疑と「原始」への憧れを込めた大作。',
+    image: pd("Paul Gauguin - D'ou venons-nous.jpg", {
+      title: 'Where Do We Come From?',
+      creator: 'ポール・ゴーギャン',
+      date: '1897',
+      alt: '横長の画面に、タヒチの風景の中で赤子から老人までの人物が点在し、生から死への寓意を平面的な色面で描く。',
+    }),
+    sourceIds: ['tate-post-impressionism'],
+    verification: 'verified',
+  },
+  {
+    id: 'work-grande-jatte',
+    titleJa: 'グランド・ジャット島の日曜日の午後',
+    titleOriginal: "Un dimanche après-midi à l'Île de la Grande Jatte",
+    creatorId: 'artist-seurat',
+    creatorName: 'ジョルジュ・スーラ',
+    year: '1884〜1886年',
+    medium: 'カンヴァス・油彩',
+    collection: 'シカゴ美術館',
+    movementIds: ['post-impressionism'],
+    description:
+      '無数の色点を並置する点描（分割主義）で、休日の川辺を静止した幾何学的秩序として構成する。印象派の直観を科学的方法へ転じた作品。',
+    image: pd('A Sunday on La Grande Jatte, Georges Seurat, 1884.jpg', {
+      title: 'A Sunday on La Grande Jatte',
+      creator: 'ジョルジュ・スーラ',
+      date: '1884–1886',
+      alt: '川辺の公園で、日傘の婦人や散歩する人々が静止したように整然と配置され、全体が細かな色の点で描かれる。',
+    }),
+    sourceIds: ['tate-post-impressionism'],
+    verification: 'verified',
+  },
+
+  /* ── 象徴主義 ───────────────────────── */
+  {
+    id: 'work-apparition',
+    titleJa: '出現',
+    titleOriginal: "L'Apparition",
+    creatorId: 'artist-moreau',
+    creatorName: 'ギュスターヴ・モロー',
+    year: '1876年頃',
+    medium: '紙・水彩／油彩',
+    collection: 'オルセー美術館（パリ）ほか',
+    movementIds: ['symbolism'],
+    description:
+      '踊るサロメの前に洗礼者ヨハネの首が幻視として宙に現れる。装飾的で夢幻的な画面により、内面と神秘を暗示する象徴主義の代表作。',
+    image: pd('The Apparition, Gustave Moreau 1876.jpg', {
+      title: 'The Apparition',
+      creator: 'ギュスターヴ・モロー',
+      date: 'c. 1876',
+      alt: '豪奢な宮殿の広間で、宝飾をまとったサロメが指さす先に、光輪を放つ生首が血を滴らせて宙に浮かぶ幻想的な場面。',
+    }),
+    sourceIds: ['tate-symbolism'],
+    verification: 'verified',
+  },
+  {
+    id: 'work-cyclops',
+    titleJa: 'キュクロプス',
+    titleOriginal: 'Le Cyclope',
+    creatorId: 'artist-redon',
+    creatorName: 'オディロン・ルドン',
+    year: '1914年頃',
+    medium: '厚紙・油彩',
+    collection: 'クレラー＝ミュラー美術館（オッテルロー）',
+    movementIds: ['symbolism'],
+    description:
+      '一つ目の巨人が花咲く風景の中で眠るニンフを見つめる。柔らかな色彩と夢の論理により、神話を内面の情景として描いた象徴主義後期の作品。',
+    image: pd('Redon.cyclops.jpg', {
+      title: 'The Cyclops',
+      creator: 'オディロン・ルドン',
+      date: 'c. 1914',
+      alt: '花に覆われた丘の陰から、一つ目の巨人が優しげに顔を出し、手前に横たわる裸のニンフを見つめる幻想的な色彩画。',
+    }),
+    sourceIds: ['tate-symbolism'],
+    verification: 'verified',
+  },
+
+  /* ── キュビスム ─────────────────────── */
   {
     id: 'work-demoiselles-avignon',
     titleJa: 'アヴィニョンの娘たち',
@@ -218,6 +1041,24 @@ export const works: Work[] = [
     verification: 'verified',
   },
   {
+    id: 'work-portrait-vollard',
+    titleJa: 'アンブロワーズ・ヴォラールの肖像',
+    titleOriginal: 'Portrait of Ambroise Vollard',
+    creatorId: 'artist-picasso',
+    creatorName: 'パブロ・ピカソ',
+    year: '1910年',
+    medium: 'カンヴァス・油彩',
+    collection: 'プーシキン美術館（モスクワ）',
+    movementIds: ['cubism'],
+    description:
+      '画商の肖像を無数の小さな面へ分解した分析的キュビスムの典型。対象は色を抑えた結晶的な平面の連なりとして再構成される。',
+    image: null,
+    sourceIds: ['tate-cubism'],
+    verification: 'single-source',
+  },
+
+  /* ── 未来派 ─────────────────────────── */
+  {
     id: 'work-unique-forms',
     titleJa: '空間における連続性の唯一の形態',
     titleOriginal: 'Forme uniche della continuità nello spazio',
@@ -225,7 +1066,7 @@ export const works: Work[] = [
     creatorName: 'ウンベルト・ボッチョーニ',
     year: '1913年（鋳造は後年）',
     medium: 'ブロンズ（原型は石膏）',
-    collection: '各地の美術館（複数の鋳造。例：MoMA、テート）',
+    collection: 'MoMA、テートほか（複数の鋳造）',
     movementIds: ['futurism'],
     description:
       '歩む人体が空間を切り裂いて進む運動を彫刻化した、未来派のダイナミズムを体現する代表作。',
@@ -234,6 +1075,24 @@ export const works: Work[] = [
     verification: 'verified',
   },
   {
+    id: 'work-dynamism-dog',
+    titleJa: '鎖につながれた犬のダイナミズム',
+    titleOriginal: 'Dinamismo di un cane al guinzaglio',
+    creatorId: 'artist-balla',
+    creatorName: 'ジャコモ・バッラ',
+    year: '1912年',
+    medium: 'カンヴァス・油彩',
+    collection: 'オルブライト＝ノックス美術館（バッファロー）',
+    movementIds: ['futurism'],
+    description:
+      '歩く犬と飼い主の脚を連続する残像として描き、運動の軌跡そのものを画面化した未来派の典型作。',
+    image: null,
+    sourceIds: ['tate-futurism'],
+    verification: 'single-source',
+  },
+
+  /* ── ダダ ───────────────────────────── */
+  {
     id: 'work-fountain',
     titleJa: '泉',
     titleOriginal: 'Fountain',
@@ -241,7 +1100,7 @@ export const works: Work[] = [
     creatorName: 'マルセル・デュシャン（R. Mutt名義）',
     year: '1917年（オリジナルは消失、後年のレプリカが現存）',
     medium: 'レディメイド（既製の男性用小便器）',
-    collection: '各地の美術館（作家公認レプリカ。例：テート、フィラデルフィア美術館）',
+    collection: 'テート、フィラデルフィア美術館ほか（作家公認レプリカ）',
     movementIds: ['dada', 'conceptual-art'],
     description:
       '既製の小便器に署名して展覧会に出品した作品。「作者が選ぶ」行為を芸術とし、作者性・独創性・美術制度を根底から問うた。',
@@ -249,6 +1108,23 @@ export const works: Work[] = [
     sourceIds: ['smarthistory-dada'],
     verification: 'verified',
   },
+  {
+    id: 'work-cut-with-kitchen-knife',
+    titleJa: '台所ナイフで切り裂く（ダダ・フォトモンタージュ）',
+    titleOriginal: 'Schnitt mit dem Küchenmesser Dada …',
+    creatorName: 'ハンナ・ヘーヒ',
+    year: '1919年',
+    medium: 'フォトモンタージュ',
+    collection: 'ベルリン国立美術館（新ナショナルギャラリー）',
+    movementIds: ['dada'],
+    description:
+      '新聞・雑誌の写真を切り貼りしたフォトモンタージュで、ワイマール期ドイツの政治と社会を風刺する。ベルリン・ダダの制度批判を体現。',
+    image: null,
+    sourceIds: ['smarthistory-dada'],
+    verification: 'single-source',
+  },
+
+  /* ── シュルレアリスム ───────────────── */
   {
     id: 'work-persistence-memory',
     titleJa: '記憶の固執',
@@ -266,6 +1142,23 @@ export const works: Work[] = [
     verification: 'verified',
   },
   {
+    id: 'work-son-of-man',
+    titleJa: '人の子',
+    titleOriginal: "Le fils de l'homme",
+    creatorName: 'ルネ・マグリット',
+    year: '1964年',
+    medium: 'カンヴァス・油彩',
+    collection: '個人蔵',
+    movementIds: ['surrealism'],
+    description:
+      '山高帽の男の顔を宙に浮かぶ青リンゴが隠す。見えるものと隠されたものの緊張により、日常の事物を謎へと転じるマグリットの代表作。',
+    image: null,
+    sourceIds: ['tate-surrealism'],
+    verification: 'single-source',
+  },
+
+  /* ── 抽象表現主義 ───────────────────── */
+  {
     id: 'work-autumn-rhythm',
     titleJa: '秋のリズム（No.30）',
     titleOriginal: 'Autumn Rhythm (Number 30)',
@@ -282,6 +1175,24 @@ export const works: Work[] = [
     verification: 'verified',
   },
   {
+    id: 'work-rothko-no61',
+    titleJa: 'No. 61（錆色と青）',
+    titleOriginal: 'No. 61 (Rust and Blue)',
+    creatorId: 'artist-rothko',
+    creatorName: 'マーク・ロスコ',
+    year: '1953年',
+    medium: 'カンヴァス・油彩',
+    collection: 'ブロード美術館（ロサンゼルス）',
+    movementIds: ['abstract-expressionism'],
+    description:
+      '滲む輪郭の大きな色面を積み重ね、鑑賞者を包む発光するような場を作る。崇高と精神性を追求したカラーフィールドの代表作。',
+    image: null,
+    sourceIds: ['tate-abstract-expressionism'],
+    verification: 'single-source',
+  },
+
+  /* ── 具体 ───────────────────────────── */
+  {
     id: 'work-electric-dress',
     titleJa: '電気服',
     titleOriginal: 'Electric Dress',
@@ -289,7 +1200,7 @@ export const works: Work[] = [
     creatorName: '田中敦子',
     year: '1956年',
     medium: '電球・塗装管球・電線・コントローラー',
-    collection: '高松市美術館（再制作を含む複数所蔵）',
+    collection: '高松市美術館ほか（再制作を含む）',
     movementIds: ['gutai'],
     description:
       '点滅する多数の電球とコードを身にまとう作品。光・電気・身体を結び、絵画の枠を超えた具体の実験を象徴する。',
@@ -297,6 +1208,24 @@ export const works: Work[] = [
     sourceIds: ['gugg-gutai'],
     verification: 'verified',
   },
+  {
+    id: 'work-challenging-mud',
+    titleJa: '泥に挑む',
+    titleOriginal: 'Challenging Mud',
+    creatorId: 'artist-shiraga',
+    creatorName: '白髪一雄',
+    year: '1955年',
+    medium: 'パフォーマンス（泥）',
+    collection: '記録として現存（第1回具体美術展）',
+    movementIds: ['gutai'],
+    description:
+      '半裸で泥の塊に格闘し、その痕跡を作品とした行為。物質と身体の直接的な出会いを提示し、絵画を行為・時間へと開いた具体の代表的実践。',
+    image: null,
+    sourceIds: ['gugg-gutai'],
+    verification: 'single-source',
+  },
+
+  /* ── ポップアート ───────────────────── */
   {
     id: 'work-campbells-soup',
     titleJa: 'キャンベルのスープ缶',
@@ -312,5 +1241,259 @@ export const works: Work[] = [
     image: null,
     sourceIds: ['tate-pop-art'],
     verification: 'verified',
+  },
+  {
+    id: 'work-marilyn-diptych',
+    titleJa: 'マリリン・ディプティック',
+    titleOriginal: 'Marilyn Diptych',
+    creatorId: 'artist-warhol',
+    creatorName: 'アンディ・ウォーホル',
+    year: '1962年',
+    medium: 'カンヴァス・シルクスクリーン・アクリル',
+    collection: 'テート（ロンドン）',
+    movementIds: ['pop-art'],
+    description:
+      'マリリン・モンローの同一図像をシルクスクリーンで反復し、左を鮮やかに右を掠れた白黒で刷る。スターの複製とその消尽・死を主題化する。',
+    image: null,
+    sourceIds: ['tate-pop-art'],
+    verification: 'single-source',
+  },
+
+  /* ── ミニマリズム ───────────────────── */
+  {
+    id: 'work-judd-untitled-stack',
+    titleJa: '無題（スタック）',
+    titleOriginal: 'Untitled (Stack)',
+    creatorId: 'artist-judd',
+    creatorName: 'ドナルド・ジャッド',
+    year: '1967年',
+    medium: '亜鉛メッキ鉄・塗装（工業製作）',
+    collection: 'MoMAほか',
+    movementIds: ['minimalism'],
+    description:
+      '同一の箱を等間隔で壁に積み上げた作品。手仕事の痕跡を消した工業素材の反復により、作品を「特定の物体」として空間に提示する。',
+    image: null,
+    sourceIds: ['tate-minimalism'],
+    verification: 'single-source',
+  },
+  {
+    id: 'work-flavin-monument',
+    titleJa: 'V・タトリンのための「記念碑」',
+    titleOriginal: "'monument' for V. Tatlin",
+    creatorId: 'artist-flavin',
+    creatorName: 'ダン・フレイヴィン',
+    year: '1966〜1969年',
+    medium: '市販の蛍光灯',
+    collection: '各所',
+    movementIds: ['minimalism'],
+    description:
+      '既製の白い蛍光灯を左右対称に組んだ作品。光そのものが素材となり、空間と壁を非物質的に変容させるミニマリズムの実践。',
+    image: null,
+    sourceIds: ['tate-minimalism'],
+    verification: 'single-source',
+  },
+
+  /* ── コンセプチュアル・アート ───────── */
+  {
+    id: 'work-one-and-three-chairs',
+    titleJa: '一つと三つの椅子',
+    titleOriginal: 'One and Three Chairs',
+    creatorId: 'artist-kosuth',
+    creatorName: 'ジョセフ・コスース',
+    year: '1965年',
+    medium: '木の椅子・写真・辞書の定義の引き伸ばし',
+    collection: 'ニューヨーク近代美術館（MoMA）',
+    movementIds: ['conceptual-art'],
+    description:
+      '実物の椅子、その写真、「椅子」の辞書定義を並置し、物・像・言語の関係を問う。観念そのものを作品とするコンセプチュアル・アートの典型。',
+    image: null,
+    sourceIds: ['tate-conceptual-art'],
+    verification: 'single-source',
+  },
+  {
+    id: 'work-lewitt-wall-drawing',
+    titleJa: 'ウォール・ドローイング',
+    titleOriginal: 'Wall Drawing',
+    creatorId: 'artist-lewitt',
+    creatorName: 'ソル・ルウィット',
+    year: '1968年以降',
+    medium: '指示書に基づき壁面へ直接描画',
+    collection: '各所（指示書として存在）',
+    movementIds: ['conceptual-art', 'minimalism'],
+    description:
+      '作家の指示書に従って他者が壁に描く作品。物としての固有性より「アイデアが作品を作る機械である」という観念を体現する。',
+    image: null,
+    sourceIds: ['tate-conceptual-art'],
+    verification: 'single-source',
+  },
+
+  /* ── ポストミニマリズム ─────────────── */
+  {
+    id: 'work-hesse-hang-up',
+    titleJa: 'ハング・アップ',
+    titleOriginal: 'Hang Up',
+    creatorId: 'artist-hesse',
+    creatorName: 'エヴァ・ヘス',
+    year: '1966年',
+    medium: '布を巻いた木枠・鋼管・コード',
+    collection: 'シカゴ美術館',
+    movementIds: ['postminimalism'],
+    description:
+      '空の額縁から一本の細い管が部屋へと垂れ出す作品。硬い幾何学と柔らかな不定形、二次元と三次元の境界を揺さぶるポストミニマリズムの起点的作品。',
+    image: null,
+    sourceIds: ['tate-installation-art'],
+    verification: 'single-source',
+  },
+  {
+    id: 'work-serra-splashing',
+    titleJa: '飛散（キャスティング）',
+    titleOriginal: 'Splashing / Casting',
+    creatorId: 'artist-serra',
+    creatorName: 'リチャード・セラ',
+    year: '1968〜1969年',
+    medium: '溶かした鉛を壁の隅へ投げつける',
+    collection: '記録として現存',
+    movementIds: ['postminimalism'],
+    description:
+      '溶けた鉛を床と壁の境へ繰り返し投げつけ、冷えて固まった帯を並べる。素材・重力・過程・行為を作品の内容とするプロセス・アートの実践。',
+    image: null,
+    sourceIds: ['tate-installation-art'],
+    verification: 'single-source',
+  },
+
+  /* ── ライト・アンド・スペース ───────── */
+  {
+    id: 'work-turrell-ganzfeld',
+    titleJa: 'ガンツフェルト（光の空間）',
+    titleOriginal: 'Ganzfeld',
+    creatorId: 'artist-turrell',
+    creatorName: 'ジェームズ・タレル',
+    year: '1970年代以降',
+    medium: '光・空間（インスタレーション）',
+    collection: '各所（恒久設置を含む）',
+    movementIds: ['light-and-space'],
+    description:
+      '均質な光で満たした部屋に入ると、距離や面の感覚が失われ、光そのものが実体のように立ち現れる。知覚の経験を作品化するライト・アンド・スペースの典型。',
+    image: null,
+    sourceIds: ['gugg-turrell'],
+    verification: 'single-source',
+  },
+  {
+    id: 'work-irwin-scrim',
+    titleJa: '無題（スクリム・インスタレーション）',
+    titleOriginal: 'Untitled (scrim installation)',
+    creatorId: 'artist-irwin',
+    creatorName: 'ロバート・アーヴィン',
+    year: '1970年代以降',
+    medium: '半透明布（スクリム）・自然光・空間',
+    collection: '各所',
+    movementIds: ['light-and-space'],
+    description:
+      '半透明の布と既存の光・建築に最小限の介入を加え、部屋の知覚そのものを変容させる。場に条件づけられた知覚を扱うライト・アンド・スペースの実践。',
+    image: null,
+    sourceIds: ['gugg-turrell'],
+    verification: 'single-source',
+  },
+
+  /* ── もの派 ─────────────────────────── */
+  {
+    id: 'work-sekine-phase-earth',
+    titleJa: '位相―大地',
+    titleOriginal: 'Phase—Mother Earth',
+    creatorId: 'artist-sekine',
+    creatorName: '関根伸夫',
+    year: '1968年',
+    medium: '土（掘削した穴と円筒）',
+    collection: '記録として現存（須磨離宮公園）',
+    movementIds: ['mono-ha'],
+    description:
+      '地面を円筒状に掘り、掘り出した土で同じ寸法の円柱を隣に築いた作品。「作る」より「置く・移す」ことで、もの・場・存在の関係を提示。もの派の起点とされる。',
+    image: null,
+    sourceIds: ['smarthistory-showa'],
+    verification: 'single-source',
+  },
+  {
+    id: 'work-lee-relatum',
+    titleJa: '関係項',
+    titleOriginal: 'Relatum',
+    creatorId: 'artist-lee-ufan',
+    creatorName: '李禹煥',
+    year: '1968年以降',
+    medium: '石・鉄板・ガラスなど',
+    collection: '各所',
+    movementIds: ['mono-ha'],
+    description:
+      '自然の石と工業的な鉄板やガラスを最小限の操作で組み合わせ、もの同士・ものと場・鑑賞者の間に生じる「関係」と現前を経験させる、もの派を代表する連作。',
+    image: null,
+    sourceIds: ['gugg-lee-ufan', 'gugg-lee-ufan-teaching'],
+    verification: 'verified',
+  },
+
+  /* ── スーパーフラット ───────────────── */
+  {
+    id: 'work-murakami-727',
+    titleJa: '727',
+    titleOriginal: '727',
+    creatorId: 'artist-murakami',
+    creatorName: '村上隆',
+    year: '1996年',
+    medium: 'カンヴァス・アクリル（3枚組）',
+    collection: 'ニューヨーク近代美術館（MoMA）',
+    movementIds: ['superflat'],
+    description:
+      '波の上を走る自作キャラクターDOB君を、金地・琳派的な波・アニメ的造形で描く。日本美術史とサブカルチャーを「平面性」で接続するスーパーフラットの代表作。',
+    image: null,
+    sourceIds: ['gugg-murakami'],
+    verification: 'single-source',
+  },
+  {
+    id: 'work-murakami-flowers',
+    titleJa: 'お花（スーパーフラットの花）',
+    titleOriginal: 'Flower Ball / Flowers',
+    creatorId: 'artist-murakami',
+    creatorName: '村上隆',
+    year: '2000年代',
+    medium: 'カンヴァス・アクリル、フィギュア等',
+    collection: '各所',
+    movementIds: ['superflat'],
+    description:
+      '微笑む多数の花を隙間なく敷き詰めた平面。均質な色面と反復、キャラクター化により、装飾性と大衆文化・商品を横断するスーパーフラットの視覚言語を示す。',
+    image: null,
+    sourceIds: ['gugg-murakami'],
+    verification: 'single-source',
+  },
+
+  /* ── デジタル／没入型 ───────────────── */
+  {
+    id: 'work-teamlab-borderless',
+    titleJa: 'teamLab Borderless（境界のない世界）',
+    titleOriginal: 'teamLab Borderless',
+    creatorId: 'artist-teamlab',
+    creatorName: 'teamLab',
+    year: '2018年（初開館）／2024年（麻布台）',
+    medium: 'デジタル（リアルタイム演算・投影・センサー）',
+    collection: 'teamLab Borderless（東京・麻布台ヒルズほか）',
+    movementIds: ['immersive-digital'],
+    description:
+      '地図のない、作品同士が展示室を越えて影響し合う没入空間。鑑賞者の動きに反応して映像が変化し、身体と作品・世界の境界を溶かす。',
+    image: null,
+    sourceIds: ['teamlab-tokyo', 'teamlab-body-immersive'],
+    verification: 'verified',
+  },
+  {
+    id: 'work-teamlab-crystal',
+    titleJa: 'クリスタル・ワールド／花と人の森',
+    titleOriginal: 'Crystal Universe / Forest of Flowers and People',
+    creatorId: 'artist-teamlab',
+    creatorName: 'teamLab',
+    year: '2010年代以降',
+    medium: 'デジタル（LED・投影・センサー）',
+    collection: 'teamLab各施設',
+    movementIds: ['immersive-digital'],
+    description:
+      '無数の光点や、生まれては散る花の映像に鑑賞者が包まれ、その動きが空間に作用する。光・時間・身体を素材とする没入型デジタル作品の代表例。',
+    image: null,
+    sourceIds: ['teamlab-tokyo', 'teamlab-body-immersive'],
+    verification: 'single-source',
   },
 ];

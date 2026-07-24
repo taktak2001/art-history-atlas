@@ -920,4 +920,18 @@ export const artists: Artist[] = [
     sourceIds: ['tate-post-impressionism'],
     verification: 'verified',
   },
+  {
+    id: 'artist-gericault',
+    nameJa: 'テオドール・ジェリコー',
+    nameOriginal: 'Théodore Géricault',
+    born: 1791,
+    died: 1824,
+    regionIds: ['france'],
+    country: 'フランス',
+    movementIds: ['romanticism'],
+    bio: '同時代の事件を歴史画の規模で描き、劇的な人体と光でロマン主義を先導した。《メデューズ号の筏》で知られる。',
+    keyWorkIds: ['work-raft-medusa'],
+    sourceIds: ['smarthistory-romanticism'],
+    verification: 'verified',
+  },
 ];
