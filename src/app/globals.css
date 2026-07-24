@@ -993,6 +993,189 @@ html.dark .relation-badge {
   text-decoration-color: rgb(var(--c-line));
 }
 
+.timeline-status__actions {
+  display: flex;
+  flex: none;
+  align-items: center;
+  gap: 0.25rem;
+}
+
+.timeline-viewer-toggle {
+  display: grid;
+  width: 2.75rem;
+  height: 2.75rem;
+  flex: none;
+  place-items: center;
+  border: 1px solid rgb(var(--c-line) / 0.72);
+  color: rgb(var(--c-muted));
+  font-size: 1.15rem;
+  line-height: 1;
+  transition:
+    border-color 140ms ease,
+    background-color 140ms ease,
+    color 140ms ease;
+}
+
+.timeline-viewer-toggle:hover {
+  border-color: rgb(var(--c-ink) / 0.68);
+  background: rgb(var(--c-surface));
+  color: rgb(var(--c-ink));
+}
+
+.timeline-viewer-toggle:focus-visible,
+.timeline-viewer-controls button:focus-visible,
+.timeline-viewer-stage:focus-visible {
+  outline: 2px solid rgb(var(--c-accent));
+  outline-offset: 2px;
+}
+
+.timeline-viewer-frame,
+.timeline-viewer-stage,
+.timeline-viewer-canvas {
+  min-width: 0;
+}
+
+.timeline-viewer-frame--active {
+  position: fixed;
+  z-index: 100;
+  inset: 0;
+  overflow: hidden;
+  padding:
+    env(safe-area-inset-top)
+    env(safe-area-inset-right)
+    env(safe-area-inset-bottom)
+    env(safe-area-inset-left);
+  background: rgb(var(--c-paper));
+  isolation: isolate;
+}
+
+.timeline-viewer-frame--active .timeline-viewer-stage {
+  position: absolute;
+  inset: 0;
+  overflow: hidden;
+  cursor: grab;
+  overscroll-behavior: none;
+  touch-action: none;
+  user-select: none;
+}
+
+.timeline-viewer-frame--active .timeline-viewer-stage:active {
+  cursor: grabbing;
+}
+
+.timeline-viewer-frame--active .timeline-viewer-canvas {
+  position: absolute;
+  top: 0;
+  left: 0;
+  transform-origin: 0 0;
+  will-change: transform;
+}
+
+.timeline-viewer-frame--active .timeline-shell {
+  width: 100%;
+  margin-top: 0;
+  overflow: visible;
+}
+
+.timeline-viewer-frame--active [data-timeline-scroll] {
+  overflow: visible;
+  cursor: inherit;
+  overscroll-behavior: none;
+  touch-action: none;
+}
+
+.timeline-viewer-frame--active .timeline-region-column {
+  position: relative;
+}
+
+.timeline-viewer-frame--active .timeline-label-survey,
+.timeline-viewer-frame--active .timeline-label-detail {
+  font-size: calc(0.6875rem / var(--timeline-viewer-scale, 1));
+  line-height: 1;
+}
+
+.timeline-viewer-frame--active .timeline-follow-label {
+  background: rgb(var(--c-surface) / 0.72);
+  white-space: nowrap;
+}
+
+.timeline-viewer-frame--active
+  .timeline-bar-visual--priority
+  .timeline-follow-label {
+  background: rgb(var(--c-accent) / 0.13);
+}
+
+.timeline-viewer-controls {
+  position: absolute;
+  z-index: 3;
+  top: max(0.75rem, env(safe-area-inset-top));
+  right: max(0.75rem, env(safe-area-inset-right));
+  display: grid;
+  grid-template-columns: 2.75rem 2.75rem 3.5rem 2.75rem auto;
+  align-items: center;
+  border: 1px solid rgb(var(--c-line) / 0.78);
+  background: rgb(var(--c-paper) / 0.94);
+  box-shadow: 0 0.5rem 1.5rem rgb(var(--c-ink) / 0.08);
+  backdrop-filter: blur(12px);
+}
+
+.timeline-viewer-controls button,
+.timeline-viewer-controls output {
+  display: grid;
+  min-width: 2.75rem;
+  min-height: 2.75rem;
+  place-items: center;
+  border-inline-end: 1px solid rgb(var(--c-line) / 0.58);
+  color: rgb(var(--c-muted));
+  font-size: 0.75rem;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+.timeline-viewer-controls button {
+  transition:
+    background-color 140ms ease,
+    color 140ms ease;
+}
+
+.timeline-viewer-controls button:hover {
+  background: rgb(var(--c-surface));
+  color: rgb(var(--c-ink));
+}
+
+.timeline-viewer-controls button:last-child {
+  min-width: 5.25rem;
+  padding-inline: 0.75rem;
+  border-inline-end: 0;
+}
+
+.timeline-viewer-controls button > span {
+  font-size: 1.15rem;
+  line-height: 1;
+}
+
+@media (max-width: 639px) {
+  .timeline-viewer-controls {
+    top: auto;
+    right: max(0.5rem, env(safe-area-inset-right));
+    bottom: max(0.5rem, env(safe-area-inset-bottom));
+    left: max(0.5rem, env(safe-area-inset-left));
+    grid-template-columns: 2.75rem 2.75rem minmax(3rem, 1fr) 2.75rem auto;
+  }
+
+  .timeline-viewer-controls button:last-child {
+    min-width: 4.75rem;
+    padding-inline: 0.5rem;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .timeline-viewer-toggle,
+  .timeline-viewer-controls button {
+    transition: none;
+  }
+}
+
 .timeline-chart .hairline {
   border-color: rgb(var(--c-line) / 0.68);
 }

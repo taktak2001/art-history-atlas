@@ -2,7 +2,11 @@ import { test, expect } from '@playwright/test';
 
 test('ホームからムーブメント詳細へ移動できる', async ({ page }) => {
   await page.goto('/');
-  await expect(page.getByRole('heading', { level: 1 })).toHaveText('Art History Atlas');
+  const title = page.getByRole('heading', {
+    level: 1,
+    name: 'Art History Atlas',
+  });
+  await expect(title).toHaveText('ART HISTORY ATLAS');
   // 主要な転換点のカードから印象派へ
   await page.getByRole('link', { name: /印象派/ }).first().click();
   await expect(page).toHaveURL(/\/movements\/impressionism\/?$/);
