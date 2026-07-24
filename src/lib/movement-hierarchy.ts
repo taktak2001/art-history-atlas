@@ -1,5 +1,9 @@
 import { movements as defaultMovements } from '@/data/movements';
-import type { Movement, VisibilityLevel } from '@/lib/schema';
+import type {
+  Movement,
+  Relationship,
+  VisibilityLevel,
+} from '@/lib/schema';
 
 export const LOD_ORDER: Record<VisibilityLevel, number> = {
   core: 0,
@@ -245,4 +249,61 @@ export function groupMovementsForDisplay(items: Movement[]) {
     grouped.set(movement.groupId, members);
   }
   return { grouped, ungrouped };
+}
+
+export type AggregatedRelationship = Relationship & {
+  aggregateCount: number;
+  originalRelationshipIds: string[];
+};
+
+/**
+ * DOMへ描画するノード集合に合わせてエッジを縮約する。
+ * 非表示端点は表示中の祖先、次に同グループの代表へ寄せる。
+ */
+export function aggregateRelationshipsForVisibleMovements(
+  relationships: Relationship[],
+  items: Movement[],
+  visibleIds: Set<string>,
+): AggregatedRelationship[] {
+  const byId = new Map(items.map((movement) => [movement.id, movement]));
+
+  const resolve = (id: string): string | undefined => {
+    if (visibleIds.has(id)) return id;
+    const visited = new Set<string>();
+    let current = byId.get(id);
+    while (current?.parentMovementId && !visited.has(current.id)) {
+      visited.add(current.id);
+      if (visibleIds.has(current.parentMovementId)) return current.parentMovementId;
+      current = byId.get(current.parentMovementId);
+    }
+    const original = byId.get(id);
+    if (!original?.groupId) return undefined;
+    const representative = getRepresentativeMovement(original.groupId, items);
+    return representative && visibleIds.has(representative.id)
+      ? representative.id
+      : undefined;
+  };
+
+  const buckets = new Map<string, AggregatedRelationship>();
+  for (const relationship of relationships) {
+    const from = resolve(relationship.from);
+    const to = resolve(relationship.to);
+    if (!from || !to || from === to) continue;
+    const key = `${from}:${to}:${relationship.kind}`;
+    const existing = buckets.get(key);
+    if (existing) {
+      existing.aggregateCount += 1;
+      existing.originalRelationshipIds.push(relationship.id);
+      continue;
+    }
+    buckets.set(key, {
+      ...relationship,
+      id: `lod-${relationship.kind}-${from}-${to}`,
+      from,
+      to,
+      aggregateCount: 1,
+      originalRelationshipIds: [relationship.id],
+    });
+  }
+  return [...buckets.values()];
 }

@@ -4,6 +4,15 @@ import Link from 'next/link';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import type { Movement, RegionId } from '@/lib/schema';
 import { CLASSIFICATION_LABELS, REGION_LABELS } from '@/lib/schema';
+import { LodControl } from '@/components/LodControl';
+import {
+  filterMovementsByLod,
+  getGroupMovements,
+  getMovementChildren,
+  getMovementGroup,
+  isMovementVisibleAtLod,
+} from '@/lib/movement-hierarchy';
+import { useLodState } from '@/lib/use-lod-state';
 import {
   TIMELINE_ERA_BANDS,
   TIMELINE_MODES,
@@ -67,11 +76,34 @@ export function HorizontalTimeline({ movements, activeRegions }: Props) {
   });
   const [modeId, setModeId] = useState<TimelineModeId>('survey');
   const [activeMovementId, setActiveMovementId] = useState<string | null>(null);
+  const [expandedMovementIds, setExpandedMovementIds] = useState<Set<string>>(
+    new Set(),
+  );
+  const { lod, setLod, applyPurposeDefault } = useLodState('core');
 
   const mode = timelineModeById(modeId);
+  const lodMovements = useMemo(() => {
+    const visible = filterMovementsByLod(movements, lod);
+    const visibleIds = new Set(visible.map((movement) => movement.id));
+    const expanded = movements.filter((movement) => {
+      if (visibleIds.has(movement.id)) return false;
+      return [...expandedMovementIds].some((expandedId) => {
+        const group = getMovementGroup(expandedId, movements);
+        return (
+          movement.parentMovementId === expandedId ||
+          (group && movement.groupId === group.id)
+        );
+      });
+    });
+    return [...visible, ...expanded];
+  }, [expandedMovementIds, lod, movements]);
+  const baseVisibleIds = useMemo(
+    () => new Set(filterMovementsByLod(movements, lod).map((movement) => movement.id)),
+    [lod, movements],
+  );
   const modeMovements = useMemo(
-    () => movements.filter((movement) => movementOverlapsMode(movement, mode)),
-    [movements, mode],
+    () => lodMovements.filter((movement) => movementOverlapsMode(movement, mode)),
+    [lodMovements, mode],
   );
   const timelineWidth = useMemo(
     () => timelineWidthForMode(mode, modeMovements.length),
@@ -159,6 +191,21 @@ export function HorizontalTimeline({ movements, activeRegions }: Props) {
   const ticks = timelineTicks(mode);
   const activeMovement =
     modeMovements.find((movement) => movement.id === activeMovementId) ?? null;
+  const activeExpansionMembers = useMemo(() => {
+    if (!activeMovement) return [];
+    const children = getMovementChildren(activeMovement.id, movements);
+    const group = getMovementGroup(activeMovement.id, movements);
+    const groupMembers = group
+      ? getGroupMovements(group.id, movements).filter(
+          (movement) => movement.id !== activeMovement.id,
+        )
+      : [];
+    return [...children, ...groupMembers].filter(
+      (movement, index, all) =>
+        all.findIndex((candidate) => candidate.id === movement.id) === index &&
+        !isMovementVisibleAtLod(movement, lod),
+    );
+  }, [activeMovement, lod, movements]);
 
   const scrollToYear = (year: number, behavior: ScrollBehavior = 'smooth') => {
     const element = scrollRef.current;
@@ -191,6 +238,7 @@ export function HorizontalTimeline({ movements, activeRegions }: Props) {
       scrollRef.current?.scrollTo({ left: 0, behavior: 'smooth' });
       return;
     }
+    applyPurposeDefault(nextMode === 'survey' ? 'core' : 'standard');
     setModeId(nextMode);
   };
 
@@ -201,7 +249,17 @@ export function HorizontalTimeline({ movements, activeRegions }: Props) {
       return;
     }
     pendingJump.current = era.jumpYear;
+    applyPurposeDefault(era.mode === 'survey' ? 'core' : 'standard');
     setModeId(era.mode);
+  };
+
+  const toggleExpansion = (id: string) => {
+    setExpandedMovementIds((current) => {
+      const next = new Set(current);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
   };
 
   const onPointerDown = (event: React.PointerEvent) => {
@@ -229,6 +287,19 @@ export function HorizontalTimeline({ movements, activeRegions }: Props) {
   return (
     <div style={{ paddingBottom: 'calc(env(safe-area-inset-bottom) + 16px)' }}>
       <div className="space-y-5 border-y hairline py-4">
+        <LodControl
+          value={lod}
+          onChange={(next) => {
+            setExpandedMovementIds(new Set());
+            setLod(next);
+          }}
+          counts={{
+            core: filterMovementsByLod(movements, 'core').length,
+            standard: filterMovementsByLod(movements, 'standard').length,
+            detailed: filterMovementsByLod(movements, 'detailed').length,
+          }}
+          compact
+        />
         <div>
           <p className="mb-2 text-xs font-bold text-ink">表示モード</p>
           <div className="grid grid-cols-3 gap-1.5 sm:grid-cols-6" role="group" aria-label="表示モード">
@@ -332,6 +403,20 @@ export function HorizontalTimeline({ movements, activeRegions }: Props) {
               </span>
             </p>
           </div>
+          {activeExpansionMembers.length > 0 && (
+            <button
+              type="button"
+              onClick={() => toggleExpansion(activeMovement.id)}
+              aria-expanded={expandedMovementIds.has(activeMovement.id)}
+              className="mt-3 min-h-11 border-l-2 border-accent px-3 text-left text-xs font-medium text-ink hover:bg-surface"
+              data-timeline-expand={activeMovement.id}
+            >
+              {expandedMovementIds.has(activeMovement.id) ? '内訳を閉じる' : '内訳を展開'}
+              <span className="ml-2 text-muted">
+                {activeExpansionMembers.map((movement) => movement.nameJa).join('・')}
+              </span>
+            </button>
+          )}
         </div>
       )}
 
@@ -377,6 +462,7 @@ export function HorizontalTimeline({ movements, activeRegions }: Props) {
             className="relative"
             data-timeline-track
             data-timeline-mode={mode.id}
+            data-timeline-lod={lod}
             data-lane-count={laneLayouts.length}
             style={{ width: timelineWidth, height: chartHeight }}
           >
@@ -478,6 +564,7 @@ export function HorizontalTimeline({ movements, activeRegions }: Props) {
                 {lane.items.map(
                   ({ movement, left, width, row, clippedStart, clippedEnd }) => {
                   const isPriority = mode.id !== 'survey' || SURVEY_PRIORITY.has(movement.id);
+                  const isExpandedDetail = !baseVisibleIds.has(movement.id);
                   const accessibleLabel = `${movement.nameJa}。${fmtYear(movement.dates.start)}から${
                     movement.dates.end === null ? '現在' : fmtYear(movement.dates.end)
                   }。${movement.regionIds.map((region) => REGION_LABELS[region]).join('・')}。${
@@ -493,6 +580,7 @@ export function HorizontalTimeline({ movements, activeRegions }: Props) {
                       data-timeline-bar={movement.id}
                       data-clipped-start={clippedStart || undefined}
                       data-clipped-end={clippedEnd || undefined}
+                      data-hierarchy-level={isExpandedDetail ? 'child' : 'root'}
                       onMouseEnter={() => setActiveMovementId(movement.id)}
                       onFocus={() => setActiveMovementId(movement.id)}
                       onPointerDown={(event) => {
@@ -512,12 +600,12 @@ export function HorizontalTimeline({ movements, activeRegions }: Props) {
                         isPriority
                           ? 'border-accent/50 bg-accent/20 text-ink'
                           : 'hairline bg-raised/90 text-muted'
-                      }`}
+                      } ${isExpandedDetail ? 'ml-2 border-l-2 opacity-80' : ''}`}
                       style={{
-                        left,
+                        left: left + (isExpandedDetail ? 8 : 0),
                         top: LANE_PAD_Y + row * (barHeight + BAR_GAP),
-                        width,
-                        height: barHeight,
+                        width: Math.max(1, width - (isExpandedDetail ? 8 : 0)),
+                        height: isExpandedDetail ? barHeight - 6 : barHeight,
                       }}
                     >
                       {clippedStart && (
@@ -535,7 +623,7 @@ export function HorizontalTimeline({ movements, activeRegions }: Props) {
                             : 'timeline-label-detail block w-full'
                         }
                       >
-                        {movement.nameJa}
+                        {mode.id === 'survey' ? movement.shortLabel ?? movement.nameJa : movement.nameJa}
                       </span>
                       {clippedEnd && (
                         <span
