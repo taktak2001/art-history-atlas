@@ -12,6 +12,7 @@ import {
   REGION_LABELS,
   CLASSIFICATION_LABELS,
   RELATION_LABELS,
+  VISIBILITY_LEVEL_LABELS,
   type Movement,
   type Artist,
   type Work,
@@ -33,6 +34,7 @@ export {
   REGION_LABELS,
   CLASSIFICATION_LABELS,
   RELATION_LABELS,
+  VISIBILITY_LEVEL_LABELS,
 };
 
 /* --- 参照ヘルパー --- */
