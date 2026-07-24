@@ -1385,52 +1385,6 @@ html.dark .timeline-era-option[aria-current='true'] {
   gap: 0.35rem;
 }
 
-.network-line-guide__definitions {
-  display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 1rem;
-  margin-top: 0.9rem;
-  padding-top: 0.9rem;
-  border-top: 1px solid rgb(var(--c-line));
-  color: rgb(var(--c-muted));
-  font-size: 0.75rem;
-  line-height: 1.6;
-}
-
-.network-line-guide__definitions h3 {
-  color: rgb(var(--c-ink));
-  font-weight: 700;
-}
-
-.network-line-guide__definitions ul {
-  margin-block: 0.35rem;
-  padding-left: 1rem;
-  list-style: disc;
-}
-
-.network-core-definitions {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 1.25rem;
-  padding-block: 0.4rem;
-  border-top: 1px solid rgb(var(--c-line));
-}
-
-.network-core-definitions > div {
-  display: flex;
-  flex: none;
-  gap: 0.45rem;
-  color: rgb(var(--c-muted));
-  font-size: 0.6875rem;
-  line-height: 1.5;
-  white-space: nowrap;
-}
-
-.network-core-definitions dt {
-  color: rgb(var(--c-ink));
-  font-weight: 700;
-}
-
 .network-controls__count {
   margin-left: auto;
   color: rgb(var(--c-ink));
@@ -2159,19 +2113,6 @@ html.dark .timeline-era-option[aria-current='true'] {
 
   .network-line-guide__legend {
     grid-template-columns: 1fr;
-  }
-
-  .network-line-guide__definitions {
-    grid-template-columns: 1fr;
-  }
-
-  .network-core-definitions {
-    margin-inline: -1rem;
-    padding-inline: 1rem;
-  }
-
-  .network-core-definitions > div {
-    white-space: normal;
   }
 
   .network-operation-row {
