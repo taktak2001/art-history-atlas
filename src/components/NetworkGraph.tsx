@@ -2,6 +2,7 @@
 
 import {
   useEffect,
+  useId,
   useMemo,
   useRef,
   useState,
@@ -15,7 +16,6 @@ import { RELATION_LABELS, ERA_LABELS } from '@/lib/schema';
 import {
   CORE_RELATIONSHIP_DEFINITIONS,
   formatRelationshipStatement,
-  IMPORTANT_RELATION_KINDS,
   isImportantRelationship,
   limitMobileRelationships,
   RELATION_LINE_STYLE,
@@ -23,6 +23,16 @@ import {
 } from '@/lib/network-presentation';
 import { RELATION_COLOR } from './Badges';
 import { LodControl } from '@/components/LodControl';
+import {
+  ArrowMarkerDefs,
+  RelationLine,
+} from '@/components/RelationLine';
+import {
+  getNetworkEdgeGeometry,
+  getNetworkViewBox,
+  NETWORK_SVG_SAFE_PADDING,
+  type NetworkEdgeGeometry,
+} from '@/lib/network-geometry';
 import {
   aggregateRelationshipsForVisibleMovements,
   filterMovementsByLod,
@@ -39,6 +49,7 @@ type Props = {
 };
 
 type RelationScope = 'important' | 'all';
+type RelationKindFilter = 'all' | RelationKind;
 
 type Layout = {
   positions: Map<string, { x: number; y: number }>;
@@ -48,12 +59,7 @@ type Layout = {
   nodeW: number;
   nodeH: number;
   pad: number;
-};
-
-type EdgeGeometry = {
-  d: string;
-  midX: number;
-  midY: number;
+  safePad: number;
 };
 
 const ALL_KINDS = Object.keys(RELATION_LABELS) as RelationKind[];
@@ -70,8 +76,7 @@ const ERA_JUMP_LABELS: Record<EraId, string> = {
 };
 
 function LineSample({ kind, active = true }: { kind: RelationKind; active?: boolean }) {
-  const style = RELATION_LINE_STYLE[kind];
-  const color = RELATION_COLOR[kind];
+  const markerPrefix = `sample-${useId().replaceAll(':', '')}`;
 
   return (
     <svg
@@ -80,104 +85,33 @@ function LineSample({ kind, active = true }: { kind: RelationKind; active?: bool
       width="54"
       height="16"
       viewBox="0 0 54 16"
+      overflow="visible"
     >
-      <line
-        x1="2"
-        y1="8"
-        x2={style.arrow ? 45 : 52}
-        y2="8"
-        fill="none"
-        stroke={color}
-        strokeWidth={style.width}
-        strokeDasharray={style.dasharray}
-        strokeLinecap={style.linecap}
-        opacity={active ? 1 : 0.3}
+      <ArrowMarkerDefs idPrefix={markerPrefix} kinds={[kind]} />
+      <RelationLine
+        kind={kind}
+        d={`M 2 8 L ${RELATION_LINE_STYLE[kind].arrow ? 44 : 52} 8`}
+        markerPrefix={markerPrefix}
+        state={active ? 'normal' : 'dimmed'}
       />
-      {style.arrow && (
-        <path
-          d="M 43 4 L 51 8 L 43 12"
-          fill="none"
-          stroke={color}
-          strokeWidth="2.25"
-          strokeLinecap="round"
-          strokeLinejoin="round"
-          opacity={active ? 1 : 0.3}
-        />
-      )}
     </svg>
   );
 }
 
-function getBoundaryPoint(
-  from: { x: number; y: number },
-  toward: { x: number; y: number },
-  width: number,
-  height: number,
-) {
-  const dx = toward.x - from.x;
-  const dy = toward.y - from.y;
-  const scale = 1 / Math.max(Math.abs(dx) / (width / 2), Math.abs(dy) / (height / 2));
-
-  return {
-    x: from.x + dx * scale,
-    y: from.y + dy * scale,
-  };
-}
-
 function getEdgeGeometry(
-  relationship: Pick<Relationship, 'from' | 'to'>,
+  relationship: Pick<Relationship, 'from' | 'to' | 'kind'>,
   layout: Layout,
-): EdgeGeometry | null {
+): NetworkEdgeGeometry | null {
   const fromPosition = layout.positions.get(relationship.from);
   const toPosition = layout.positions.get(relationship.to);
   if (!fromPosition || !toPosition) return null;
 
-  const fromCenter = {
-    x: fromPosition.x + layout.nodeW / 2,
-    y: fromPosition.y + layout.nodeH / 2,
-  };
-  const toCenter = {
-    x: toPosition.x + layout.nodeW / 2,
-    y: toPosition.y + layout.nodeH / 2,
-  };
-  const start = getBoundaryPoint(fromCenter, toCenter, layout.nodeW, layout.nodeH);
-  const end = getBoundaryPoint(toCenter, fromCenter, layout.nodeW, layout.nodeH);
-  const midX = (start.x + end.x) / 2;
-  const midY = (start.y + end.y) / 2;
-
-  return {
-    d: `M ${start.x} ${start.y} C ${midX} ${start.y}, ${midX} ${end.y}, ${end.x} ${end.y}`,
-    midX,
-    midY,
-  };
-}
-
-function ArrowMarkers() {
-  return (
-    <defs>
-      {ALL_KINDS.filter((kind) => RELATION_LINE_STYLE[kind].arrow).map((kind) => (
-        <marker
-          key={kind}
-          id={`network-arrow-${kind}`}
-          viewBox="0 0 10 10"
-          refX="8.5"
-          refY="5"
-          markerWidth="8"
-          markerHeight="8"
-          markerUnits="userSpaceOnUse"
-          orient="auto"
-        >
-          <path
-            d="M 1 1 L 9 5 L 1 9"
-            fill="none"
-            stroke={RELATION_COLOR[kind]}
-            strokeWidth="2"
-            strokeLinecap="round"
-            strokeLinejoin="round"
-          />
-        </marker>
-      ))}
-    </defs>
+  return getNetworkEdgeGeometry(
+    fromPosition,
+    toPosition,
+    layout.nodeW,
+    layout.nodeH,
+    RELATION_LINE_STYLE[relationship.kind].arrow,
   );
 }
 
@@ -190,12 +124,12 @@ export function NetworkGraph({ movements, relationships, eraOrder }: Props) {
     startX: 0,
     scrollLeft: 0,
   });
+  const scrollRafRef = useRef<number | null>(null);
   const [selectedNodeId, setSelectedNodeId] = useState<string | null>(null);
   const [selectedEdgeId, setSelectedEdgeId] = useState<string | null>(null);
   const [focusedEdgeId, setFocusedEdgeId] = useState<string | null>(null);
-  const [activeKinds, setActiveKinds] = useState<Set<RelationKind>>(
-    new Set(IMPORTANT_RELATION_KINDS),
-  );
+  const [relationKindFilter, setRelationKindFilter] =
+    useState<RelationKindFilter>('all');
   const [relationScope, setRelationScope] = useState<RelationScope>('important');
   const [isMobile, setIsMobile] = useState(false);
   const [activeEra, setActiveEra] = useState<EraId>(eraOrder[0]);
@@ -235,10 +169,11 @@ export function NetworkGraph({ movements, relationships, eraOrder }: Props) {
     () =>
       aggregatedEdges.filter(
         (relationship) =>
-          activeKinds.has(relationship.kind) &&
+          (relationKindFilter === 'all' ||
+            relationship.kind === relationKindFilter) &&
           (relationScope === 'all' || isImportantRelationship(relationship)),
       ),
-    [activeKinds, aggregatedEdges, relationScope],
+    [aggregatedEdges, relationKindFilter, relationScope],
   );
 
   const visibleEdges = useMemo(
@@ -269,6 +204,8 @@ export function NetworkGraph({ movements, relationships, eraOrder }: Props) {
     const nodeH = isMobile ? 58 : 60;
     const top = 58;
     const pad = isMobile ? 22 : 34;
+    const safePad = NETWORK_SVG_SAFE_PADDING;
+    const endPanSpace = isMobile ? 220 : 700;
     const positions = new Map<string, { x: number; y: number }>();
     let maxRows = 0;
 
@@ -279,20 +216,27 @@ export function NetworkGraph({ movements, relationships, eraOrder }: Props) {
       maxRows = Math.max(maxRows, inEra.length);
       inEra.forEach((movement, row) => {
         positions.set(movement.id, {
-          x: pad + column * colStep,
-          y: top + row * rowStep,
+          x: safePad + pad + column * colStep,
+          y: safePad + top + row * rowStep,
         });
       });
     });
 
     return {
       positions,
-      canvasW: pad * 2 + (eraOrder.length - 1) * colStep + nodeW,
-      canvasH: top + Math.max(maxRows, 1) * rowStep + pad,
+      canvasW:
+        safePad * 2 +
+        pad * 2 +
+        (eraOrder.length - 1) * colStep +
+        nodeW +
+        endPanSpace,
+      canvasH:
+        safePad * 2 + top + Math.max(maxRows, 1) * rowStep + pad,
       colStep,
       nodeW,
       nodeH,
       pad,
+      safePad,
     };
   }, [displayedMovements, eraOrder, isMobile]);
 
@@ -402,7 +346,9 @@ export function NetworkGraph({ movements, relationships, eraOrder }: Props) {
     const column = eraOrder.indexOf(era);
     if (column < 0) return;
     setActiveEra(era);
-    scrollToHorizontalCenter(layout.pad + column * layout.colStep + layout.nodeW / 2);
+    scrollToHorizontalCenter(
+      layout.safePad + layout.pad + column * layout.colStep + layout.nodeW / 2,
+    );
   };
 
   const selectNode = (movement: Movement) => {
@@ -429,26 +375,57 @@ export function NetworkGraph({ movements, relationships, eraOrder }: Props) {
     window.requestAnimationFrame(() => centerEdge(relationship));
   };
 
-  const toggleKind = (kind: RelationKind) => {
+  const setKindFilter = (kind: RelationKindFilter) => {
     setSelectedNodeId(null);
     setSelectedEdgeId(null);
-    setActiveKinds((previous) => {
-      const next = new Set(previous);
-      if (next.has(kind)) next.delete(kind);
-      else next.add(kind);
-      return next;
-    });
+    setRelationKindFilter(kind);
   };
 
   const setScope = (scope: RelationScope) => {
     setRelationScope(scope);
-    setActiveKinds(new Set(scope === 'important' ? IMPORTANT_RELATION_KINDS : ALL_KINDS));
+    setRelationKindFilter('all');
     setSelectedNodeId(null);
     setSelectedEdgeId(null);
     window.requestAnimationFrame(() => {
       scrollRef.current?.scrollTo({ left: 0, behavior: 'auto' });
     });
   };
+
+  const handleGraphScroll = () => {
+    if (scrollRafRef.current !== null) return;
+    scrollRafRef.current = window.requestAnimationFrame(() => {
+      scrollRafRef.current = null;
+      const viewport = scrollRef.current;
+      if (!viewport) return;
+      const center = viewport.scrollLeft + viewport.clientWidth / 2;
+      let nearestEra = eraOrder[0];
+      let nearestDistance = Number.POSITIVE_INFINITY;
+
+      eraOrder.forEach((era, column) => {
+        const eraCenter =
+          layout.safePad +
+          layout.pad +
+          column * layout.colStep +
+          layout.nodeW / 2;
+        const distance = Math.abs(eraCenter - center);
+        if (distance < nearestDistance) {
+          nearestDistance = distance;
+          nearestEra = era;
+        }
+      });
+
+      setActiveEra((current) => (current === nearestEra ? current : nearestEra));
+    });
+  };
+
+  useEffect(
+    () => () => {
+      if (scrollRafRef.current !== null) {
+        window.cancelAnimationFrame(scrollRafRef.current);
+      }
+    },
+    [],
+  );
 
   const handleGraphKeyDown = (event: KeyboardEvent<HTMLDivElement>) => {
     if (event.target !== event.currentTarget) return;
@@ -508,21 +485,17 @@ export function NetworkGraph({ movements, relationships, eraOrder }: Props) {
   ) => {
     const geometry = getEdgeGeometry(relationship, layout);
     if (!geometry) return null;
-    const style = RELATION_LINE_STYLE[relationship.kind];
     const dimmed = selectionActive && mode === 'base';
     const isHighlighted = mode === 'highlight';
 
     return (
-      <path
+      <RelationLine
         key={`${mode}-${relationship.id}`}
+        kind={relationship.kind}
         d={geometry.d}
-        fill="none"
-        stroke={RELATION_COLOR[relationship.kind]}
-        strokeWidth={isHighlighted ? 4.6 : dimmed ? 1.2 : style.width}
-        strokeDasharray={style.dasharray}
-        strokeLinecap={style.linecap}
-        opacity={isHighlighted ? 1 : dimmed ? 0.075 : 0.78}
-        markerEnd={style.arrow ? `url(#network-arrow-${relationship.kind})` : undefined}
+        markerPrefix={mode}
+        state={isHighlighted ? 'highlighted' : dimmed ? 'dimmed' : 'normal'}
+        mobile={isMobile}
         className="transition-opacity"
         data-network-edge
         data-edge-layer={mode}
@@ -534,125 +507,142 @@ export function NetworkGraph({ movements, relationships, eraOrder }: Props) {
   };
 
   return (
-    <div>
-      <LodControl
-        value={lod}
-        onChange={(next) => {
-          setSelectedNodeId(null);
-          setSelectedEdgeId(null);
-          setExpandedGroupIds(new Set());
-          setLod(next);
-        }}
-        counts={{
-          core: filterMovementsByLod(movements, 'core').length,
-          standard: filterMovementsByLod(movements, 'standard').length,
-          detailed: filterMovementsByLod(movements, 'detailed').length,
-        }}
-      />
+    <div className="network-ui">
+      <section className="network-controls" aria-label="ネットワーク表示設定">
+        <LodControl
+          value={lod}
+          onChange={(next) => {
+            setSelectedNodeId(null);
+            setSelectedEdgeId(null);
+            setExpandedGroupIds(new Set());
+            setLod(next);
+          }}
+          counts={{
+            core: filterMovementsByLod(movements, 'core').length,
+            standard: filterMovementsByLod(movements, 'standard').length,
+            detailed: filterMovementsByLod(movements, 'detailed').length,
+          }}
+          compact
+        />
 
-      <div className="sticky top-[4.25rem] z-40 -mx-4 border-y hairline bg-paper/95 px-4 py-3 backdrop-blur-sm sm:mx-0 sm:px-0">
-        <div className="flex flex-wrap items-center justify-between gap-3">
-          <div>
-            <p className="text-xs font-bold text-muted">表示する関係</p>
-            <div className="mt-1 inline-flex border hairline" aria-label="関係の表示範囲">
-              {([
-                ['important', '重要関係のみ'],
-                ['all', 'すべて表示'],
-              ] as const).map(([scope, label]) => (
-                <button
-                  key={scope}
-                  type="button"
-                  onClick={() => setScope(scope)}
-                  aria-pressed={relationScope === scope}
-                  className={`min-h-11 px-3 text-xs font-bold ${
-                    relationScope === scope
-                      ? 'bg-ink text-paper underline decoration-2 underline-offset-4'
-                      : 'bg-paper text-muted hover:text-ink'
-                  }`}
-                >
-                  {label}
-                </button>
-              ))}
-            </div>
+        <div className="network-controls__row">
+          <div
+            className="inline-flex border hairline"
+            role="group"
+            aria-label="関係の表示範囲"
+          >
+            {([
+              ['important', '重要関係のみ'],
+              ['all', 'すべて表示'],
+            ] as const).map(([scope, label]) => (
+              <button
+                key={scope}
+                type="button"
+                onClick={() => setScope(scope)}
+                aria-pressed={relationScope === scope}
+                className={`min-h-11 px-3 text-xs font-bold ${
+                  relationScope === scope
+                    ? 'bg-ink text-paper underline decoration-2 underline-offset-4'
+                    : 'bg-paper text-muted hover:text-ink'
+                }`}
+              >
+                {label}
+              </button>
+            ))}
           </div>
-          <p className="text-xs font-bold tabular-nums text-ink" aria-live="polite">
+
+          <label className="network-kind-filter">
+            <span>関係タイプ</span>
+            <select
+              value={relationKindFilter}
+              onChange={(event) =>
+                setKindFilter(event.target.value as RelationKindFilter)
+              }
+              aria-label="表示する関係タイプ"
+            >
+              <option value="all">すべて</option>
+              {ALL_KINDS.map((kind) => (
+                <option key={kind} value={kind}>
+                  {RELATION_LABELS[kind]}
+                </option>
+              ))}
+            </select>
+          </label>
+
+          <details className="network-line-guide">
+            <summary>
+              線の見方 <span aria-hidden="true">ⓘ</span>
+            </summary>
+            <div
+              className="network-line-guide__panel"
+              tabIndex={0}
+              aria-label="関係線の詳しい見方"
+            >
+              <p className="text-xs leading-relaxed text-muted">
+                色だけでなく、線種・矢印・名称を組み合わせて関係を示します。
+              </p>
+              <ul className="network-line-guide__legend" aria-label="関係タイプの凡例">
+                {ALL_KINDS.map((kind) => (
+                  <li key={kind}>
+                    <LineSample kind={kind} />
+                    <span className="font-bold text-ink">
+                      {RELATION_LABELS[kind]}
+                    </span>
+                    <span className="text-faint">
+                      {RELATION_LINE_STYLE[kind].arrow ? '有向' : '無向'}
+                    </span>
+                  </li>
+                ))}
+              </ul>
+              <div className="network-line-guide__definitions">
+                {(['succession', 'influence'] as const).map((kind) => (
+                  <section key={kind}>
+                    <h3>{RELATION_LABELS[kind]}</h3>
+                    <p>{CORE_RELATIONSHIP_DEFINITIONS[kind].definition}</p>
+                    <ul>
+                      {CORE_RELATIONSHIP_DEFINITIONS[kind].criteria.map(
+                        (criterion) => (
+                          <li key={criterion}>{criterion}</li>
+                        ),
+                      )}
+                    </ul>
+                    <p>
+                      例: {CORE_RELATIONSHIP_DEFINITIONS[kind].example}
+                    </p>
+                    <p>
+                      判定補助: {RELATIONSHIP_DECISION_AID[kind]}
+                    </p>
+                  </section>
+                ))}
+              </div>
+            </div>
+          </details>
+
+          <p className="network-controls__count" aria-live="polite">
             {visibleEdges.length}関係・{displayedMovements.length}ノード表示中
           </p>
         </div>
-      </div>
 
-      <nav className="mt-4" aria-label="ネットワークの時代ジャンプ">
-        <p className="text-xs font-bold text-muted">時代へ移動</p>
-        <div className="scroll-x mt-2 flex gap-1 pb-1">
-          {eraOrder.map((era) => (
-            <button
-              key={era}
-              type="button"
-              onClick={() => jumpToEra(era)}
-              aria-current={activeEra === era ? 'true' : undefined}
-              className={`min-h-11 shrink-0 border px-3 text-xs ${
-                activeEra === era
-                  ? 'border-ink bg-raised font-bold text-ink underline decoration-2 underline-offset-4'
-                  : 'hairline text-muted hover:text-ink'
-              }`}
-            >
-              {ERA_JUMP_LABELS[era]}
-            </button>
-          ))}
-        </div>
-      </nav>
-
-      <details className="mt-4 border-y hairline" open>
-        <summary className="min-h-11 cursor-pointer py-3 text-xs font-bold text-muted">
-          関係タイプと線種
-        </summary>
-        <div className="pb-4">
-          <p className="text-xs leading-relaxed text-faint">
-            色だけでなく、実線・破線・点線と矢印で関係の種類と方向を示します。
-          </p>
-          <div
-            className="mt-3 grid grid-cols-2 gap-1.5 sm:grid-cols-3 lg:grid-cols-5"
-            aria-label="関係タイプの凡例と絞り込み"
-          >
-            {ALL_KINDS.map((kind) => {
-              const on = activeKinds.has(kind);
-              return (
-                <button
-                  key={kind}
-                  type="button"
-                  onClick={() => toggleKind(kind)}
-                  aria-pressed={on}
-                  className={`flex min-h-11 items-center gap-2 border px-2 py-1.5 text-left text-xs transition-opacity active:translate-y-px ${
-                    on
-                      ? 'border-ink/30 bg-raised text-ink'
-                      : 'hairline bg-surface text-faint'
-                  }`}
-                >
-                  <LineSample kind={kind} active={on} />
-                  <span>{RELATION_LABELS[kind]}</span>
-                </button>
-              );
-            })}
+        <dl className="network-core-definitions">
+          <div>
+            <dt>継承</dt>
+            <dd>中心的な方法や問題意識を、後続運動が直接引き継ぐ関係</dd>
           </div>
-          <dl className="mt-4 grid gap-3 border-t hairline pt-3 text-xs sm:grid-cols-2">
-            {(['succession', 'influence'] as const).map((kind) => (
-              <div key={kind}>
-                <dt className="font-bold text-ink">{RELATION_LABELS[kind]}</dt>
-                <dd className="mt-1 leading-relaxed text-muted">
-                  {CORE_RELATIONSHIP_DEFINITIONS[kind].definition}
-                </dd>
-                <dd className="mt-1 text-faint">
-                  判定補助: {RELATIONSHIP_DECISION_AID[kind]}
-                </dd>
-              </div>
-            ))}
-          </dl>
-        </div>
-      </details>
+          <div>
+            <dt>影響</dt>
+            <dd>技法・思想・作品の一部が、別の運動へ作用した関係</dd>
+          </div>
+        </dl>
+      </section>
 
-      <div className="mt-3 flex flex-wrap items-center justify-between gap-3">
+      <div className="network-operation-row">
         <p id="network-operation-help" className="text-xs leading-relaxed text-faint">
-          ドラッグ、横スクロール、Shift＋ホイール、左右キーで移動。ノード選択時は自動で中央へ移動します。
+          <span className="sm:hidden">
+            横にスワイプして移動。ノードをタップして関係を表示
+          </span>
+          <span className="hidden sm:inline">
+            ドラッグ・横スクロール・左右キーで移動
+          </span>
         </p>
         {(selectedNodeId || selectedEdgeId) && (
           <button
@@ -668,15 +658,32 @@ export function NetworkGraph({ movements, relationships, eraOrder }: Props) {
         )}
       </div>
 
+      <nav className="network-era-nav" aria-label="ネットワークの時代移動">
+        <div className="scroll-x flex h-full items-stretch">
+          {eraOrder.map((era) => (
+            <button
+              key={era}
+              type="button"
+              onClick={() => jumpToEra(era)}
+              aria-current={activeEra === era ? 'true' : undefined}
+              className="network-era-nav__button"
+            >
+              {ERA_JUMP_LABELS[era]}
+            </button>
+          ))}
+        </div>
+      </nav>
+
       <div
         ref={scrollRef}
-        className="scroll-x mt-3 cursor-grab touch-pan-x overflow-y-hidden border hairline bg-raised focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent data-[dragging=true]:cursor-grabbing"
+        className="network-scroll scroll-x cursor-grab touch-pan-x overflow-y-hidden border hairline bg-raised focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent data-[dragging=true]:cursor-grabbing"
         role="group"
         aria-label="美術運動の関係ネットワーク図"
         aria-describedby="network-operation-help"
         tabIndex={0}
         data-network-scope={relationScope}
         data-network-lod={lod}
+        data-network-mobile={isMobile}
         data-network-scroll
         onKeyDown={handleGraphKeyDown}
         onWheel={handleWheel}
@@ -684,6 +691,7 @@ export function NetworkGraph({ movements, relationships, eraOrder }: Props) {
         onPointerMove={handlePointerMove}
         onPointerUp={stopPointerDrag}
         onPointerCancel={stopPointerDrag}
+        onScroll={handleGraphScroll}
         style={{ paddingBottom: 'calc(0.5rem + env(safe-area-inset-bottom))' }}
       >
         <div
@@ -696,8 +704,9 @@ export function NetworkGraph({ movements, relationships, eraOrder }: Props) {
               key={era}
               className="pointer-events-none absolute z-40 text-center text-[10px] font-bold text-faint"
               style={{
-                left: layout.pad + column * layout.colStep,
-                top: 16,
+                left:
+                  layout.safePad + layout.pad + column * layout.colStep,
+                top: layout.safePad,
                 width: layout.nodeW,
               }}
             >
@@ -709,10 +718,13 @@ export function NetworkGraph({ movements, relationships, eraOrder }: Props) {
             className="absolute inset-0 z-0"
             width={layout.canvasW}
             height={layout.canvasH}
+            viewBox={getNetworkViewBox(layout.canvasW, layout.canvasH)}
+            overflow="visible"
             aria-label="関係線。Tabキーで線を選択できます"
             data-network-layer="base-edges"
+            data-safe-padding={layout.safePad}
           >
-            <ArrowMarkers />
+            <ArrowMarkerDefs idPrefix="base" kinds={ALL_KINDS} />
             {visibleEdges.map((relationship) => {
               const geometry = getEdgeGeometry(relationship, layout);
               if (!geometry) return null;
@@ -826,10 +838,13 @@ export function NetworkGraph({ movements, relationships, eraOrder }: Props) {
               className="pointer-events-none absolute inset-0 z-20"
               width={layout.canvasW}
               height={layout.canvasH}
+              viewBox={getNetworkViewBox(layout.canvasW, layout.canvasH)}
+              overflow="visible"
               aria-hidden="true"
               data-network-layer="highlighted-edges"
+              data-safe-padding={layout.safePad}
             >
-              <ArrowMarkers />
+              <ArrowMarkerDefs idPrefix="highlight" kinds={ALL_KINDS} />
               {highlightedEdges.map((relationship) =>
                 renderPath(relationship, 'highlight'),
               )}
@@ -840,6 +855,8 @@ export function NetworkGraph({ movements, relationships, eraOrder }: Props) {
             className="pointer-events-none absolute inset-0 z-40"
             width={layout.canvasW}
             height={layout.canvasH}
+            viewBox={getNetworkViewBox(layout.canvasW, layout.canvasH)}
+            overflow="visible"
             aria-hidden="true"
             data-network-layer="edge-labels"
           >
