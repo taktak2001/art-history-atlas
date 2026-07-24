@@ -64,10 +64,34 @@ test('バーと追従ラベルは同一トーンで、選択時だけ線を強�
   const bar = page.locator('[data-timeline-bar="impressionism"]').first();
   const visual = bar.locator('[data-timeline-bar-visual]');
   const label = bar.locator('[data-follow-label]');
+  const statusTitle = page.locator('.timeline-status__title');
+  const regionLabel = page.locator('[data-region-lane-label]').first();
+  const tickLabel = page.locator('.timeline-tick-label').first();
 
   expect(await label.evaluate((element) => getComputedStyle(element).backgroundColor)).toBe(
     'rgba(0, 0, 0, 0)',
   );
+  const typography = await Promise.all([
+    label.evaluate((element) => {
+      const style = getComputedStyle(element);
+      return {
+        color: style.color,
+        fontWeight: Number(style.fontWeight),
+        paddingLeft: parseFloat(style.paddingLeft),
+      };
+    }),
+    statusTitle.evaluate((element) => Number(getComputedStyle(element).fontWeight)),
+    regionLabel.evaluate((element) => Number(getComputedStyle(element).fontWeight)),
+    tickLabel.evaluate((element) => Number(getComputedStyle(element).fontWeight)),
+  ]);
+  expect(typography[0]).toEqual({
+    color: 'rgb(28, 28, 30)',
+    fontWeight: 500,
+    paddingLeft: 1,
+  });
+  expect(typography[1]).toBe(600);
+  expect(typography[2]).toBe(500);
+  expect(typography[3]).toBe(400);
   const normalBorder = await visual.evaluate((element) =>
     parseFloat(getComputedStyle(element).borderTopWidth),
   );
