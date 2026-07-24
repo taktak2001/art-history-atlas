@@ -15,7 +15,8 @@ export default function NetworkPage() {
       <p className="mt-3 max-w-prose text-sm text-muted">
         ムーブメントを時代順の列に配置し、影響・反発・継承・同時代などの関係を線で結びます。
         装飾ではなく「何が何への反応として成立したか」を読み解くための図です。関係タイプで絞り込み、
-        ノードを選ぶと前後関係だけを強調します（ダブルクリックで詳細へ）。
+        ノードを選ぶと前後関係だけを強調します。スマートフォンでは重要関係から表示し、
+        必要に応じてすべての関係へ切り替えられます。
       </p>
       <div className="mt-8">
         <NetworkGraph movements={movements} relationships={relationships} eraOrder={ERA_ORDER} />

@@ -1,5 +1,12 @@
 import { describe, it, expect } from 'vitest';
-import { searchDocs, matrixCell, formatYear, formatDateRange, getMovement } from '@/lib/dataset';
+import {
+  searchDocs,
+  matrixCell,
+  formatYear,
+  formatDateRange,
+  getMovement,
+  relationships,
+} from '@/lib/dataset';
 import {
   parseCompareIds,
   canCompare,
@@ -8,6 +15,13 @@ import {
   MAX_COMPARE,
 } from '@/lib/compare';
 import { buildHeroSummary } from '@/lib/movement-detail';
+import {
+  limitMobileRelationships,
+  MOBILE_EDGE_LIMIT,
+  MOBILE_NODE_LIMIT,
+  MOBILE_PRIMARY_KINDS,
+  RELATION_LINE_STYLE,
+} from '@/lib/network-presentation';
 
 describe('検索', () => {
   it('ムーブメント名で検索できる', () => {
@@ -101,5 +115,43 @@ describe('詳細ページの導入要旨', () => {
 
     expect(summary.length).toBeLessThanOrEqual(120);
     expect(summary.length).toBeGreaterThanOrEqual(80);
+  });
+});
+
+describe('関係ネットワークの表示設定', () => {
+  it('9種類すべてに線種を定義する', () => {
+    expect(Object.keys(RELATION_LINE_STYLE)).toHaveLength(9);
+    expect(RELATION_LINE_STYLE.succession.dasharray).toBeUndefined();
+    expect(RELATION_LINE_STYLE.reaction.dasharray).toBe('9 6');
+    expect(RELATION_LINE_STYLE.influence.dasharray).toBe('18 8');
+    expect(RELATION_LINE_STYLE.contemporary.dasharray).toBe('1.5 6');
+    expect(RELATION_LINE_STYLE.revival.arrow).toBe(true);
+    expect(RELATION_LINE_STYLE['shared-idea'].width).toBe(3);
+  });
+
+  it('通常時の線幅を2.5〜3pxに収める', () => {
+    for (const style of Object.values(RELATION_LINE_STYLE)) {
+      expect(style.width).toBeGreaterThanOrEqual(2.5);
+      expect(style.width).toBeLessThanOrEqual(3);
+    }
+  });
+
+  it('モバイル初期表示は継承・反発・影響に限定する', () => {
+    expect(MOBILE_PRIMARY_KINDS).toEqual(['succession', 'reaction', 'influence']);
+  });
+
+  it('モバイルの初期エッジ数とノード数を制限する', () => {
+    const primary = relationships.filter((relationship) =>
+      MOBILE_PRIMARY_KINDS.includes(relationship.kind),
+    );
+    const limited = limitMobileRelationships(primary);
+    const nodeIds = new Set(limited.flatMap((relationship) => [
+      relationship.from,
+      relationship.to,
+    ]));
+
+    expect(limited.length).toBeLessThanOrEqual(MOBILE_EDGE_LIMIT);
+    expect(nodeIds.size).toBeLessThanOrEqual(MOBILE_NODE_LIMIT);
+    expect(primary.length).toBeGreaterThan(limited.length);
   });
 });
