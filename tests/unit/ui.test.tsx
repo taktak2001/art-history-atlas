@@ -1,9 +1,10 @@
 import { describe, it, expect } from 'vitest';
-import { render, screen } from '@testing-library/react';
+import { fireEvent, render, screen } from '@testing-library/react';
 import { MovementCard } from '@/components/MovementCard';
 import { SourceList } from '@/components/SourceList';
 import { VerificationBadge } from '@/components/Badges';
 import { WorkImage } from '@/components/WorkImage';
+import { ClassificationAccordion } from '@/components/ClassificationAccordion';
 import { getMovement, getSources } from '@/lib/dataset';
 import type { Work } from '@/lib/schema';
 
@@ -58,5 +59,49 @@ describe('WorkImage', () => {
     expect(screen.getByRole('img', { name: /プレースホルダー/ })).toBeInTheDocument();
     // <img> 要素（実画像）は描画されない
     expect(document.querySelector('img')).toBeNull();
+  });
+});
+
+describe('ClassificationAccordion', () => {
+  it('初期表示では分類名と要約だけを表示し、詳細を閉じている', () => {
+    render(<ClassificationAccordion />);
+    const button = screen.getByRole('button', { name: /時代区分/ });
+
+    expect(button).toHaveAttribute('aria-expanded', 'false');
+    expect(screen.getByText(/政治・宗教・社会・文化の大きな変化に基づく/)).toBeVisible();
+    expect(screen.queryByText('比較的長い年代幅を持つ')).not.toBeVisible();
+  });
+
+  it('選択した分類の判定基準と具体例を表示し、同時に開く項目は一つにする', () => {
+    render(<ClassificationAccordion />);
+    const periodButton = document.getElementById('classification-period-button')!;
+    const styleButton = document.getElementById('classification-style-button')!;
+
+    fireEvent.click(periodButton);
+    expect(periodButton).toHaveAttribute('aria-expanded', 'true');
+    expect(screen.getByText('比較的長い年代幅を持つ')).toBeVisible();
+    expect(screen.getByText('古代、中世、近世、近代、現代')).toBeVisible();
+
+    fireEvent.click(styleButton);
+    expect(periodButton).toHaveAttribute('aria-expanded', 'false');
+    expect(styleButton).toHaveAttribute('aria-expanded', 'true');
+    expect(screen.getByText('視覚的特徴によって識別できる')).toBeVisible();
+  });
+
+  it('矢印キーとHome・Endで分類見出し間を移動できる', () => {
+    render(<ClassificationAccordion />);
+    const periodButton = document.getElementById('classification-period-button')!;
+    const styleButton = document.getElementById('classification-style-button')!;
+    const theoryButton = document.getElementById('classification-method-theory-button')!;
+
+    periodButton.focus();
+    fireEvent.keyDown(periodButton, { key: 'ArrowDown' });
+    expect(styleButton).toHaveFocus();
+
+    fireEvent.keyDown(styleButton, { key: 'End' });
+    expect(theoryButton).toHaveFocus();
+
+    fireEvent.keyDown(theoryButton, { key: 'Home' });
+    expect(periodButton).toHaveFocus();
   });
 });

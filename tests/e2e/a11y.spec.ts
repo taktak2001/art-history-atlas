@@ -31,3 +31,17 @@ for (const p of pages) {
     expect(serious, `${p.name}に重大なアクセシビリティ違反`).toEqual([]);
   });
 }
+
+test('アクセシビリティ: 分類詳細を展開した編集方針', async ({ page }) => {
+  await page.goto('/about/');
+  await page.locator('#classification-movement-button').click();
+
+  const results = await new AxeBuilder({ page })
+    .withTags(['wcag2a', 'wcag2aa', 'wcag21a', 'wcag21aa'])
+    .analyze();
+  const serious = results.violations.filter(
+    (v) => v.impact === 'serious' || v.impact === 'critical',
+  );
+
+  expect(serious, '分類詳細の展開時に重大なアクセシビリティ違反').toEqual([]);
+});
