@@ -224,6 +224,24 @@ test('選択ノードの詳細リンクからムーブメント詳細へ遷移�
   await expect(page.getByRole('heading', { level: 1, name: 'キュビスム' })).toBeVisible();
 });
 
+test('ノードのダブルタップでは遷移せず、下部の詳細リンクだけを導線にする', async ({
+  page,
+}) => {
+  await page.setViewportSize({ width: 390, height: 844 });
+  await page.goto('/network/');
+
+  const graph = page.getByRole('group', { name: '美術運動の関係ネットワーク図' });
+  const node = graph.getByRole('button', { name: 'キュビスムを選択' });
+  await node.dblclick();
+
+  await expect(page).toHaveURL(/\/network\/$/);
+  await expect(node).toHaveAttribute('aria-pressed', 'true');
+  await expect(page.getByRole('link', { name: '詳細ページへ →' })).toHaveAttribute(
+    'href',
+    /\/movements\/cubism\/$/,
+  );
+});
+
 test('線ラベルは背景矩形を使わない', async ({ page }) => {
   await page.goto('/network/');
   const labels = page.locator('[data-network-layer="edge-labels"]');

@@ -10,7 +10,6 @@ import {
   type WheelEvent,
 } from 'react';
 import Link from 'next/link';
-import { useRouter } from 'next/navigation';
 import type { Movement, Relationship, RelationKind, EraId } from '@/lib/schema';
 import { RELATION_LABELS, ERA_LABELS } from '@/lib/schema';
 import {
@@ -96,7 +95,6 @@ function getEdgeGeometry(
 }
 
 export function NetworkGraph({ movements, relationships, eraOrder }: Props) {
-  const router = useRouter();
   const scrollRef = useRef<HTMLDivElement | null>(null);
   const lineGuideRef = useRef<HTMLDetailsElement | null>(null);
   const lineGuideSummaryRef = useRef<HTMLElement | null>(null);
@@ -791,8 +789,10 @@ export function NetworkGraph({ movements, relationships, eraOrder }: Props) {
               >
                 <button
                   type="button"
-                  onClick={() => selectNode(movement)}
-                  onDoubleClick={() => router.push(`/movements/${movement.id}/`)}
+                  onClick={(event) => {
+                    if (event.detail > 1) return;
+                    selectNode(movement);
+                  }}
                   aria-pressed={isSelected}
                   aria-label={`${movement.nameJa}を選択`}
                   className={`relative flex h-full w-full flex-col justify-center bg-surface px-2 text-left text-xs transition-opacity ${
