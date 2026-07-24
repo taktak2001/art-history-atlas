@@ -13,6 +13,7 @@ type Props = {
   counts?: Partial<Record<VisibilityLevel, number>>;
   compact?: boolean;
   exhibition?: boolean;
+  catalogue?: boolean;
 };
 
 const EXHIBITION_LABELS: Record<VisibilityLevel, string> = {
@@ -27,12 +28,15 @@ export function LodControl({
   counts,
   compact = false,
   exhibition = false,
+  catalogue = false,
 }: Props) {
   return (
     <div
       className={
         exhibition
           ? 'lod-control lod-control--exhibition'
+          : catalogue
+          ? 'lod-control lod-control--catalogue'
           : compact
           ? 'lod-control lod-control--compact'
           : 'border-y hairline py-4'
@@ -42,18 +46,22 @@ export function LodControl({
       {!exhibition && (
         <p
           className={
-            compact
+            catalogue
+              ? 'lod-control__catalogue-label'
+              : compact
               ? 'lod-control__label'
               : 'mb-2 text-xs font-bold text-ink'
           }
         >
-          表示する範囲
+          {catalogue ? 'Level of detail' : '表示する範囲'}
         </p>
       )}
       <div
         className={
           exhibition
             ? 'lod-control__exhibition-options'
+            : catalogue
+            ? 'lod-control__catalogue-options'
             : `inline-grid grid-cols-3 overflow-hidden rounded-sm border hairline bg-raised ${
                 compact ? 'lod-control__options' : 'min-w-[264px]'
               }`
@@ -80,6 +88,8 @@ export function LodControl({
                 ? `lod-control__exhibition-option ${
                     index > 0 ? 'border-l hairline' : ''
                   }`
+                : catalogue
+                ? 'lod-control__catalogue-option'
                 : `min-h-11 text-sm font-medium transition-colors active:translate-y-px ${
                     compact ? 'px-2 py-1.5' : 'px-3 py-2'
                   } ${
@@ -99,6 +109,8 @@ export function LodControl({
                 className={
                   exhibition
                     ? 'lod-control__exhibition-count'
+                    : catalogue
+                    ? 'lod-control__catalogue-count'
                     : 'ml-1 text-[10px] tabular-nums'
                 }
               >
@@ -110,7 +122,7 @@ export function LodControl({
       </div>
       <p
         className={
-          exhibition
+          exhibition || catalogue
             ? 'sr-only'
             : compact
             ? 'lod-control__description'

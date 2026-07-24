@@ -243,6 +243,26 @@ describe('LOD UI', () => {
     ).toHaveClass('sr-only');
   });
 
+  it('横型年表用LODを控えめな図録キャプションで表示する', () => {
+    render(
+      <LodControl
+        value="standard"
+        onChange={vi.fn()}
+        counts={{ core: 24, standard: 30, detailed: 30 }}
+        catalogue
+      />,
+    );
+
+    expect(screen.getByText('Level of detail')).toBeVisible();
+    expect(screen.getByRole('button', { name: /充実\s*30/ })).toHaveAttribute(
+      'aria-pressed',
+      'true',
+    );
+    expect(
+      screen.getByText('重要な細分・派生ムーブメントも表示'),
+    ).toHaveClass('sr-only');
+  });
+
   it('マトリクスのセルを+Nで個別展開する', async () => {
     window.history.replaceState({}, '', '/matrix/?lod=core');
     render(<MatrixView movements={movements} regions={activeRegions()} />);
