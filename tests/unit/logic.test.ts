@@ -16,6 +16,9 @@ import {
 } from '@/lib/compare';
 import { buildHeroSummary } from '@/lib/movement-detail';
 import {
+  formatRelationshipStatement,
+  IMPORTANT_RELATION_KINDS,
+  isImportantRelationship,
   limitMobileRelationships,
   MOBILE_EDGE_LIMIT,
   MOBILE_NODE_LIMIT,
@@ -134,6 +137,10 @@ describe('関係ネットワークの表示設定', () => {
     expect(RELATION_LINE_STYLE.reaction.dasharray).toBe('9 6');
     expect(RELATION_LINE_STYLE.influence.dasharray).toBe('18 8');
     expect(RELATION_LINE_STYLE.contemporary.dasharray).toBe('1.5 6');
+    expect(RELATION_LINE_STYLE.succession.arrow).toBe(true);
+    expect(RELATION_LINE_STYLE.reaction.arrow).toBe(true);
+    expect(RELATION_LINE_STYLE.influence.arrow).toBe(true);
+    expect(RELATION_LINE_STYLE.contemporary.arrow).toBe(false);
     expect(RELATION_LINE_STYLE.revival.arrow).toBe(true);
     expect(RELATION_LINE_STYLE['shared-idea'].width).toBe(3);
   });
@@ -147,6 +154,12 @@ describe('関係ネットワークの表示設定', () => {
 
   it('モバイル初期表示は継承・反発・影響に限定する', () => {
     expect(MOBILE_PRIMARY_KINDS).toEqual(['succession', 'reaction', 'influence']);
+    expect(IMPORTANT_RELATION_KINDS).toEqual(MOBILE_PRIMARY_KINDS);
+    expect(
+      relationships
+        .filter(isImportantRelationship)
+        .every((relationship) => MOBILE_PRIMARY_KINDS.includes(relationship.kind)),
+    ).toBe(true);
   });
 
   it('モバイルの初期エッジ数とノード数を制限する', () => {
@@ -162,6 +175,20 @@ describe('関係ネットワークの表示設定', () => {
     expect(limited.length).toBeLessThanOrEqual(MOBILE_EDGE_LIMIT);
     expect(nodeIds.size).toBeLessThanOrEqual(MOBILE_NODE_LIMIT);
     expect(primary.length).toBeGreaterThan(limited.length);
+  });
+
+  it('反発は到達先を日本語の主語として表示する', () => {
+    const reaction = relationships.find(
+      (relationship) => relationship.id === 'rel-rococo-to-neoclassicism',
+    )!;
+    const names: Record<string, string> = {
+      rococo: 'ロココ',
+      neoclassicism: '新古典主義',
+    };
+
+    expect(formatRelationshipStatement(reaction, (id) => names[id] ?? id)).toBe(
+      '新古典主義はロココに反発した',
+    );
   });
 });
 
