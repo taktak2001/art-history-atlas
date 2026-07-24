@@ -31,7 +31,9 @@ import {
 } from '@/components/RelationLine';
 import {
   getNetworkEdgeGeometry,
+  getNetworkEdgeRouteOffset,
   getNetworkViewBox,
+  getParallelEdgeRouteOffset,
   NETWORK_SVG_SAFE_PADDING,
   type NetworkEdgeGeometry,
 } from '@/lib/network-geometry';
@@ -78,12 +80,29 @@ const ERA_JUMP_LABELS: Record<EraId, string> = {
 };
 
 function getEdgeGeometry(
-  relationship: Pick<Relationship, 'from' | 'to' | 'kind'>,
+  relationship: AggregatedRelationship,
   layout: Layout,
+  visibleEdges: AggregatedRelationship[],
 ): NetworkEdgeGeometry | null {
   const fromPosition = layout.positions.get(relationship.from);
   const toPosition = layout.positions.get(relationship.to);
   if (!fromPosition || !toPosition) return null;
+  const obstacleOffset = getNetworkEdgeRouteOffset(
+    fromPosition,
+    toPosition,
+    layout.nodeW,
+    layout.nodeH,
+    layout.positions.values(),
+    layout.safePad,
+  );
+  const parallelOffset = getParallelEdgeRouteOffset(
+    relationship,
+    visibleEdges,
+  );
+  const routeOffset =
+    obstacleOffset === 0
+      ? parallelOffset
+      : obstacleOffset + Math.sign(obstacleOffset) * Math.abs(parallelOffset);
 
   return getNetworkEdgeGeometry(
     fromPosition,
@@ -91,6 +110,8 @@ function getEdgeGeometry(
     layout.nodeW,
     layout.nodeH,
     RELATION_LINE_STYLE[relationship.kind].arrow,
+    undefined,
+    routeOffset,
   );
 }
 
@@ -352,7 +373,7 @@ export function NetworkGraph({ movements, relationships, eraOrder }: Props) {
   };
 
   const centerEdge = (relationship: AggregatedRelationship) => {
-    const geometry = getEdgeGeometry(relationship, layout);
+    const geometry = getEdgeGeometry(relationship, layout, visibleEdges);
     if (geometry) scrollToHorizontalCenter(geometry.midX);
   };
 
@@ -497,7 +518,7 @@ export function NetworkGraph({ movements, relationships, eraOrder }: Props) {
     relationship: AggregatedRelationship,
     mode: 'base' | 'highlight',
   ) => {
-    const geometry = getEdgeGeometry(relationship, layout);
+    const geometry = getEdgeGeometry(relationship, layout, visibleEdges);
     if (!geometry) return null;
     const dimmed = selectionActive && mode === 'base';
     const isHighlighted = mode === 'highlight';
@@ -512,6 +533,8 @@ export function NetworkGraph({ movements, relationships, eraOrder }: Props) {
         mobile={isMobile}
         className="transition-opacity"
         data-network-edge
+        data-network-edge-id={relationship.id}
+        data-route-offset={String(geometry.routeOffset)}
         data-edge-layer={mode}
         data-edge-related={
           selectionActive ? String(highlightedEdges.some((edge) => edge.id === relationship.id)) : 'idle'
@@ -727,7 +750,11 @@ export function NetworkGraph({ movements, relationships, eraOrder }: Props) {
           >
             <ArrowMarkerDefs idPrefix="base" kinds={ALL_KINDS} />
             {visibleEdges.map((relationship) => {
-              const geometry = getEdgeGeometry(relationship, layout);
+              const geometry = getEdgeGeometry(
+                relationship,
+                layout,
+                visibleEdges,
+              );
               if (!geometry) return null;
 
               return (
@@ -864,7 +891,11 @@ export function NetworkGraph({ movements, relationships, eraOrder }: Props) {
             data-network-layer="edge-labels"
           >
             {visibleEdges.map((relationship) => {
-              const geometry = getEdgeGeometry(relationship, layout);
+              const geometry = getEdgeGeometry(
+                relationship,
+                layout,
+                visibleEdges,
+              );
               if (!geometry) return null;
               const showLabel =
                 selectedEdgeId === relationship.id ||
