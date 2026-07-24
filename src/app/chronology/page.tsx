@@ -14,12 +14,11 @@ export default function ChronologyPage() {
     <main className="chronology-page">
       <header className="chronology-page__header">
         <p className="text-xs uppercase tracking-[0.3em] text-faint">Chronology</p>
-        <h1 className="mt-2 font-serif text-4xl tracking-tight sm:text-5xl">
+        <h1 className="mt-1.5 font-serif text-3xl tracking-tight sm:text-4xl">
           縦型年表
         </h1>
-        <p className="mt-2 max-w-2xl text-sm leading-7 text-muted">
-          八つの時代から展示室を選び、歴史の転換点、代表作品、
-          ムーブメントの背景と次の展開を年代順にたどります。
+        <p className="mt-1 text-sm leading-6 text-muted">
+          展示室を選んで、美術史を読む
         </p>
       </header>
 

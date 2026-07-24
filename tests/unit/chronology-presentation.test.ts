@@ -20,9 +20,15 @@ describe('縦型年表の展示情報', () => {
     expect(new Set(CHRONOLOGY_ERAS.map((era) => era.tone)).size).toBe(8);
     expect(
       CHRONOLOGY_ERAS.every(
-        (era) => era.range.length > 0 && era.catchphrase.length > 0,
+        (era) =>
+          era.labelEn.length > 0 &&
+          era.range.length > 0 &&
+          era.catchphrase.length > 0,
       ),
     ).toBe(true);
+    expect(CHRONOLOGY_ERAS.find((era) => era.id === 'modern')?.labelEn).toBe(
+      'Modernism',
+    );
   });
 
   it('主要な歴史イベントが影響先を持つ', () => {

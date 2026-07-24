@@ -78,3 +78,49 @@ test('ミニ目次から代表作品の章へ移動できる', async ({ page }) 
   await expect(page).toHaveURL(/#works$/);
   await expect(page.getByRole('heading', { name: '代表作品', exact: true })).toBeVisible();
 });
+
+test('02章は解釈ラベルを置かず、章・サブ見出し・本文の3階層で表示する', async ({
+  page,
+}) => {
+  await page.goto('/movements/italian-renaissance/');
+
+  const chapter = page.locator('#relation');
+  const sectionTitle = chapter.getByRole('heading', {
+    level: 2,
+    name: '何が新しかったか',
+  });
+  const changedTitle = chapter.getByRole('heading', {
+    level: 3,
+    name: '転換したこと',
+  });
+  const inheritedTitle = chapter.getByRole('heading', {
+    level: 3,
+    name: '継承したこと',
+  });
+
+  await expect(sectionTitle).toBeVisible();
+  await expect(changedTitle).toBeVisible();
+  await expect(inheritedTitle).toBeVisible();
+  await expect(chapter.getByText('解釈', { exact: true })).toHaveCount(0);
+
+  const typography = await chapter.evaluate((element) => {
+    const section = element.querySelector('h2');
+    const subsection = element.querySelector('h3');
+    const body = element.querySelector<HTMLElement>('.detail-body');
+    return {
+      sectionFamily: section ? getComputedStyle(section).fontFamily : '',
+      subsectionFamily: subsection ? getComputedStyle(subsection).fontFamily : '',
+      bodyFamily: body ? getComputedStyle(body).fontFamily : '',
+      sectionSize: section ? Number.parseFloat(getComputedStyle(section).fontSize) : 0,
+      subsectionSize: subsection
+        ? Number.parseFloat(getComputedStyle(subsection).fontSize)
+        : 0,
+      bodySize: body ? Number.parseFloat(getComputedStyle(body).fontSize) : 0,
+    };
+  });
+
+  expect(typography.sectionFamily).toBe(typography.subsectionFamily);
+  expect(typography.subsectionFamily).not.toBe(typography.bodyFamily);
+  expect(typography.sectionSize).toBeGreaterThan(typography.subsectionSize);
+  expect(typography.subsectionSize).toBeGreaterThan(typography.bodySize);
+});

@@ -22,6 +22,7 @@ export type ChronologyEraTone =
 export type ChronologyEra = {
   id: EraId;
   label: string;
+  labelEn: string;
   range: string;
   catchphrase: string;
   tone: ChronologyEraTone;
@@ -31,6 +32,7 @@ export const CHRONOLOGY_ERAS: ChronologyEra[] = [
   {
     id: 'prehistoric-ancient',
     label: ERA_LABELS['prehistoric-ancient'],
+    labelEn: 'Prehistory & Antiquity',
     range: '前40000年頃〜前323年',
     catchphrase: '像を刻み、世界に秩序を与えはじめた時代',
     tone: 'earth',
@@ -38,6 +40,7 @@ export const CHRONOLOGY_ERAS: ChronologyEra[] = [
   {
     id: 'medieval',
     label: ERA_LABELS.medieval,
+    labelEn: 'Middle Ages',
     range: '313〜1453年',
     catchphrase: '光と象徴で、見えない世界を形にした時代',
     tone: 'sacred',
@@ -45,6 +48,7 @@ export const CHRONOLOGY_ERAS: ChronologyEra[] = [
   {
     id: 'renaissance',
     label: ERA_LABELS.renaissance,
+    labelEn: 'Renaissance',
     range: '1400〜1600年頃',
     catchphrase: '人間と世界を、観察と比例から捉え直した時代',
     tone: 'humanist',
@@ -52,6 +56,7 @@ export const CHRONOLOGY_ERAS: ChronologyEra[] = [
   {
     id: 'baroque-rococo',
     label: ERA_LABELS['baroque-rococo'],
+    labelEn: '17th-18th Centuries',
     range: '1600〜1830年頃',
     catchphrase: '権力、信仰、市民生活が多様な舞台を生んだ時代',
     tone: 'court',
@@ -59,6 +64,7 @@ export const CHRONOLOGY_ERAS: ChronologyEra[] = [
   {
     id: 'nineteenth',
     label: ERA_LABELS.nineteenth,
+    labelEn: '19th Century',
     range: '1800〜1910年頃',
     catchphrase: '革命と都市の速度が、見ることを更新した時代',
     tone: 'industrial',
@@ -66,6 +72,7 @@ export const CHRONOLOGY_ERAS: ChronologyEra[] = [
   {
     id: 'modern',
     label: ERA_LABELS.modern,
+    labelEn: 'Modernism',
     range: '1907〜1950年頃',
     catchphrase: '既成の現実を解体し、芸術の前提を問い直した時代',
     tone: 'avant-garde',
@@ -73,6 +80,7 @@ export const CHRONOLOGY_ERAS: ChronologyEra[] = [
   {
     id: 'postwar',
     label: ERA_LABELS.postwar,
+    labelEn: 'Postwar Art',
     range: '1943〜1980年頃',
     catchphrase: '物質、行為、制度へ作品の領域を広げた時代',
     tone: 'material',
@@ -80,6 +88,7 @@ export const CHRONOLOGY_ERAS: ChronologyEra[] = [
   {
     id: 'contemporary',
     label: ERA_LABELS.contemporary,
+    labelEn: 'Contemporary Art',
     range: '1980年代〜現在',
     catchphrase: '地域と媒体を横断し、鑑賞の場そのものを組み替える時代',
     tone: 'digital',

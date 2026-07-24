@@ -9,9 +9,14 @@ test('通史はコンパクトな俯瞰表示と1行ラベルを使う', async (
   const track = page.locator('[data-timeline-track]');
   await expect(track).toHaveAttribute('data-timeline-mode', 'survey');
   await expect(modeButton(page, '通史')).toHaveAttribute('aria-current', 'true');
-  await expect(page.getByRole('button', { name: '通史へ戻る' })).toHaveCount(0);
+  await expect(
+    page.locator('[data-timeline-status]').getByRole('button', { name: '通史' }),
+  ).toHaveCount(0);
   await expect(page.getByRole('navigation', { name: '時代ナビゲーション' })).toHaveCount(0);
   await expect(page.getByText('時代へ移動', { exact: true })).toHaveCount(0);
+  await expect(page.getByText('Level of detail', { exact: true })).toBeVisible();
+  await expect(page.getByText('Era', { exact: true })).toBeVisible();
+  await expect(page.getByText('表示中', { exact: true })).toHaveCount(0);
 
   const width = await track.evaluate((element) => element.getBoundingClientRect().width);
   if (testInfo.project.name === 'mobile') {
@@ -33,6 +38,45 @@ test('通史はコンパクトな俯瞰表示と1行ラベルを使う', async (
     )
     .toBeGreaterThan(0);
   expect(await surveyLabel.evaluate((element) => getComputedStyle(element).whiteSpace)).toBe('nowrap');
+});
+
+test('時代別の表示範囲は時代名と年代だけを示し、通史はリンク状に戻る', async ({ page }) => {
+  await page.goto('/timeline/');
+  await modeButton(page, '近代').click();
+
+  const status = page.locator('[data-timeline-status]');
+  await expect(status).toContainText('近代');
+  await expect(status).toContainText('1750–1950');
+  await expect(status).not.toContainText('表示中');
+  await expect(status).not.toContainText('同時代');
+
+  const back = status.getByRole('button', { name: '通史' });
+  await expect(back).toBeVisible();
+  expect(
+    await back.evaluate((element) => parseFloat(getComputedStyle(element).borderTopWidth)),
+  ).toBe(0);
+});
+
+test('バーと追従ラベルは同一トーンで、選択時だけ線を強める', async ({ page }, testInfo) => {
+  await page.goto('/timeline/');
+  await modeButton(page, '近代').click();
+
+  const bar = page.locator('[data-timeline-bar="impressionism"]').first();
+  const visual = bar.locator('[data-timeline-bar-visual]');
+  const label = bar.locator('[data-follow-label]');
+
+  expect(await label.evaluate((element) => getComputedStyle(element).backgroundColor)).toBe(
+    'rgba(0, 0, 0, 0)',
+  );
+  const normalBorder = await visual.evaluate((element) =>
+    parseFloat(getComputedStyle(element).borderTopWidth),
+  );
+  await bar.focus();
+  const selectedBorder = await visual.evaluate((element) =>
+    parseFloat(getComputedStyle(element).borderTopWidth),
+  );
+  expect(normalBorder).toBe(1);
+  expect(selectedBorder).toBe(testInfo.project.name === 'desktop' ? 2 : 1);
 });
 
 test('時代別モードは端末と密度に応じた幅と詳細目盛りを使う', async ({ page }, testInfo) => {
@@ -144,7 +188,7 @@ test('バーは44pxの操作領域内に22pxの展示レールとして表示す
   });
   expect(metrics.targetHeight).toBeGreaterThanOrEqual(44);
   expect(metrics.visualHeight).toBe(22);
-  expect(metrics.visualBorderTop).toBe('0px');
+  expect(metrics.visualBorderTop).toBe('1px');
   expect(await label.evaluate((element) => getComputedStyle(element).textAlign)).toBe(
     'center',
   );

@@ -2,7 +2,7 @@
   "name": "art-history-atlas",
   "version": "0.1.0",
   "private": true,
-  "description": "美術史アトラス — 先史から現代までの美術運動を時系列・地域・相互影響から学ぶPWA",
+  "description": "Art History Atlas — 先史から現代までの美術運動を時系列・地域・相互影響から学ぶPWA",
   "scripts": {
     "dev": "next dev",
     "build": "next build",

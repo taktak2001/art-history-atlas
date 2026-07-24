@@ -1,16 +1,13 @@
 import type { Metadata } from 'next';
 import Link from 'next/link';
 import { ClassificationAccordion } from '@/components/ClassificationAccordion';
+import { RelationshipStandards } from '@/components/RelationshipStandards';
 import {
   VERIFICATION_LABELS,
   VISIBILITY_LEVEL_DESCRIPTIONS,
   VISIBILITY_LEVEL_LABELS,
   type VisibilityLevel,
 } from '@/lib/schema';
-import {
-  CORE_RELATIONSHIP_DEFINITIONS,
-  RELATIONSHIP_DECISION_AID,
-} from '@/lib/network-presentation';
 
 export const metadata: Metadata = {
   title: '編集方針・分類基準',
@@ -128,42 +125,10 @@ export default function AboutPage() {
           関係の基準
         </h2>
         <p className="mt-3 text-sm leading-relaxed text-muted">
-          関係データの source は作用の起点、target は作用を受けた到達先です。
-          図では有向関係を矢印で示します。反発はデータの向きを保ちながら、
-          「到達先は起点に反発した」という自然な日本語で説明します。
+          関係データは、ムーブメント間の成立・反応・並行・再解釈を区別して記録します。
+          各項目を開くと、判定基準と例を確認できます。
         </p>
-        <div className="mt-6 border-y hairline">
-          {(['succession', 'influence'] as const).map((kind, index) => {
-            const item = CORE_RELATIONSHIP_DEFINITIONS[kind];
-            const label = kind === 'succession' ? '継承' : '影響';
-            return (
-              <article
-                key={kind}
-                className={`py-6 ${index === 0 ? 'border-b hairline' : ''}`}
-              >
-                <h3 className="font-serif text-xl text-ink">{label}</h3>
-                <p className="mt-2 text-sm leading-relaxed text-muted">{item.definition}</p>
-                <div className="mt-4 grid gap-5 sm:grid-cols-[1fr_0.72fr]">
-                  <div>
-                    <h4 className="text-xs font-bold tracking-[0.08em] text-faint">判定基準</h4>
-                    <ul className="mt-2 space-y-1 text-sm text-muted">
-                      {item.criteria.map((criterion) => (
-                        <li key={criterion}>・{criterion}</li>
-                      ))}
-                    </ul>
-                  </div>
-                  <div>
-                    <h4 className="text-xs font-bold tracking-[0.08em] text-faint">例</h4>
-                    <p className="mt-2 text-sm text-muted">{item.example}</p>
-                  </div>
-                </div>
-                <p className="mt-4 border-l-2 hairline pl-3 text-xs leading-relaxed text-faint">
-                  判定補助: {RELATIONSHIP_DECISION_AID[kind]}
-                </p>
-              </article>
-            );
-          })}
-        </div>
+        <RelationshipStandards />
       </section>
 
       <section className="mt-10">

@@ -444,7 +444,7 @@ export function HorizontalTimeline({ movements, activeRegions }: Props) {
 
   return (
     <div style={{ paddingBottom: 'calc(env(safe-area-inset-bottom) + 16px)' }}>
-      <div className="space-y-5 border-y hairline py-4">
+      <div className="timeline-controls">
         <LodControl
           value={lod}
           onChange={(next) => {
@@ -456,12 +456,12 @@ export function HorizontalTimeline({ movements, activeRegions }: Props) {
             standard: filterMovementsByLod(movements, 'standard').length,
             detailed: filterMovementsByLod(movements, 'detailed').length,
           }}
-          compact
+          catalogue
         />
-        <div>
-          <p className="mb-2 text-xs font-bold text-ink">表示モード</p>
+        <div className="timeline-era-control">
+          <p className="timeline-control-caption">Era</p>
           <div
-            className="scroll-x flex gap-1.5 pb-1 sm:grid sm:grid-cols-7 sm:overflow-visible sm:pb-0"
+            className="timeline-era-options scroll-x"
             role="group"
             aria-label="表示モード"
           >
@@ -471,11 +471,7 @@ export function HorizontalTimeline({ movements, activeRegions }: Props) {
                 type="button"
                 onClick={() => selectMode(item.id)}
                 aria-current={item.id === mode.id ? 'true' : undefined}
-                className={`min-h-11 min-w-[72px] shrink-0 rounded-sm border px-3 py-2 text-sm font-medium transition-colors active:translate-y-px sm:min-w-0 ${
-                  item.id === mode.id
-                    ? 'border-ink border-b-[3px] border-b-accent bg-ink text-paper'
-                    : 'hairline bg-raised text-muted hover:border-ink hover:text-ink'
-                }`}
+                className="timeline-era-option"
               >
                 {item.label}
               </button>
@@ -486,17 +482,16 @@ export function HorizontalTimeline({ movements, activeRegions }: Props) {
       </div>
 
       <section
-        className="sticky top-[69px] z-30 mt-3 max-h-[120px] border-y hairline bg-paper/95 px-3 py-2 backdrop-blur sm:static sm:mt-4 sm:max-h-none sm:bg-surface sm:px-4 sm:py-4"
+        className="timeline-status sticky top-[69px] z-30 mt-3 bg-paper/95 backdrop-blur sm:static sm:mt-4 sm:bg-transparent"
         aria-label="現在の表示範囲"
         data-timeline-status
       >
         <div className="flex min-h-11 items-center justify-between gap-4">
           <div aria-live="polite">
-            <p className="hidden text-[11px] font-bold tracking-[0.08em] text-muted sm:block">表示中</p>
             <p className="flex flex-wrap items-baseline gap-x-3">
-              <span className="font-serif text-xl text-ink">{mode.label}</span>
-              <span className="text-xs tabular-nums text-muted">
-                {fmtYear(mode.start)}〜{mode.end === TIMELINE_NOW ? '現在' : fmtYear(mode.end)}
+              <span className="timeline-status__title">{mode.label}</span>
+              <span className="timeline-status__range">
+                {fmtYear(mode.start)}–{mode.end === TIMELINE_NOW ? '現在' : fmtYear(mode.end)}
               </span>
             </p>
           </div>
@@ -504,15 +499,12 @@ export function HorizontalTimeline({ movements, activeRegions }: Props) {
             <button
               type="button"
               onClick={() => selectMode('survey')}
-              className="min-h-11 shrink-0 px-2 text-xs font-medium text-ink underline decoration-hairline underline-offset-4 hover:decoration-ink active:translate-y-px sm:rounded-sm sm:border sm:bg-raised sm:px-3 sm:no-underline"
+              className="timeline-back-link"
             >
-              通史へ戻る
+              <span aria-hidden="true">←</span> 通史
             </button>
           )}
         </div>
-        <p className="mt-0.5 line-clamp-2 text-xs leading-relaxed text-muted sm:mt-1 sm:text-sm">
-          {mode.description}
-        </p>
       </section>
 
       {activeMovement && !isCompactTimeline && (
@@ -565,7 +557,7 @@ export function HorizontalTimeline({ movements, activeRegions }: Props) {
         </div>
       )}
 
-      <div className="timeline-shell mt-3 flex overflow-hidden">
+      <div className="timeline-shell timeline-chart mt-3 flex overflow-hidden">
         <div
           className="timeline-region-column sticky left-0 z-20 w-20 shrink-0 sm:w-36"
           data-region-column
@@ -744,6 +736,7 @@ export function HorizontalTimeline({ movements, activeRegions }: Props) {
                       data-bar-start={left}
                       data-bar-end={left + width}
                       data-visual-width={width}
+                      data-active={activeMovementId === movement.id || undefined}
                       onMouseEnter={(event) => {
                         const focusedBar =
                           event.currentTarget.ownerDocument.querySelector(
@@ -794,7 +787,7 @@ export function HorizontalTimeline({ movements, activeRegions }: Props) {
                           data-follow-label
                           data-full-label={movement.nameJa}
                           data-short-label={movement.shortLabel}
-                          className="timeline-bar-label pointer-events-none absolute inset-y-0 left-0 flex items-center overflow-hidden px-1"
+                          className="timeline-follow-label pointer-events-none absolute inset-y-0 left-0 flex items-center overflow-hidden px-0.5"
                         >
                           <span
                             data-label-text

@@ -29,6 +29,10 @@ import {
   RELATION_LINE_STYLE,
 } from '@/lib/network-presentation';
 import {
+  RELATIONSHIP_DEFINITIONS,
+  RELATION_KINDS,
+} from '@/lib/relationship-definitions';
+import {
   TIMELINE_MODES,
   calculateFollowLabelX,
   chooseTimelineLabel,
@@ -178,6 +182,27 @@ describe('詳細ページの導入要旨', () => {
 });
 
 describe('関係ネットワークの表示設定', () => {
+  it('9種類すべてに共通の完全な関係定義を持つ', () => {
+    expect(RELATION_KINDS).toHaveLength(9);
+    expect(Object.keys(RELATIONSHIP_DEFINITIONS)).toEqual(RELATION_KINDS);
+
+    for (const kind of RELATION_KINDS) {
+      const definition = RELATIONSHIP_DEFINITIONS[kind];
+      expect(definition.label).toBeTruthy();
+      expect(definition.shortDefinition).toBeTruthy();
+      expect(definition.fullDefinition).toBeTruthy();
+      expect(definition.criteria.length).toBeGreaterThan(0);
+      expect(definition.exclusions.length).toBeGreaterThan(0);
+      expect(definition.examples.length).toBeGreaterThan(0);
+      expect(definition.cautions.length).toBeGreaterThan(0);
+      expect(definition.sourceTarget.source).toBeTruthy();
+      expect(definition.sourceTarget.target).toBeTruthy();
+      expect(definition.visualEncoding.arrow).toBe(
+        RELATION_LINE_STYLE[kind].arrow,
+      );
+    }
+  });
+
   it('9種類すべてに線種を定義する', () => {
     expect(Object.keys(RELATION_LINE_STYLE)).toHaveLength(9);
     expect(RELATION_LINE_STYLE.succession.dasharray).toBeUndefined();

@@ -8,6 +8,7 @@ import {
   ClassificationAccordion,
   classificationItems,
 } from '@/components/ClassificationAccordion';
+import { RelationshipStandards } from '@/components/RelationshipStandards';
 import { getMovement, getSources } from '@/lib/dataset';
 import type { Work } from '@/lib/schema';
 import { LodControl } from '@/components/LodControl';
@@ -129,6 +130,76 @@ describe('ClassificationAccordion', () => {
   });
 });
 
+describe('RelationshipStandards', () => {
+  it('9種類と関係データの読み方を初期状態ですべて閉じる', () => {
+    render(<RelationshipStandards />);
+
+    const triggers = document.querySelectorAll<HTMLButtonElement>(
+      '.relationship-accordion__trigger',
+    );
+    expect(triggers).toHaveLength(9);
+    for (const trigger of triggers) {
+      expect(trigger).toHaveAttribute('aria-expanded', 'false');
+      const panelId = trigger.getAttribute('aria-controls')!;
+      expect(document.getElementById(panelId)).not.toBeVisible();
+    }
+
+    expect(
+      document.getElementById('relationship-reading-button'),
+    ).toHaveAttribute('aria-expanded', 'false');
+  });
+
+  it('選択した関係だけを開き、詳細7項目を表示する', () => {
+    render(<RelationshipStandards />);
+    const succession = document.getElementById(
+      'relationship-succession-button',
+    )!;
+    const influence = document.getElementById(
+      'relationship-influence-button',
+    )!;
+    const panel = document.getElementById(
+      'relationship-succession-panel',
+    )!;
+
+    fireEvent.click(succession);
+    expect(succession).toHaveAttribute('aria-expanded', 'true');
+    expect(within(panel).getByText('詳細定義')).toBeVisible();
+    expect(within(panel).getByText('判定基準')).toBeVisible();
+    expect(within(panel).getByText('該当しないケース')).toBeVisible();
+    expect(within(panel).getByText('典型例')).toBeVisible();
+    expect(within(panel).getByText('判断上の注意')).toBeVisible();
+    expect(within(panel).getByText('図上の表現')).toBeVisible();
+    expect(within(panel).getByText('source / target の読み方')).toBeVisible();
+
+    fireEvent.click(influence);
+    expect(succession).toHaveAttribute('aria-expanded', 'false');
+    expect(influence).toHaveAttribute('aria-expanded', 'true');
+  });
+
+  it('矢印キーとHome・Endで関係見出し間を移動できる', () => {
+    render(<RelationshipStandards />);
+    const succession = document.getElementById(
+      'relationship-succession-button',
+    )!;
+    const reaction = document.getElementById(
+      'relationship-reaction-button',
+    )!;
+    const sharedIdea = document.getElementById(
+      'relationship-shared-idea-button',
+    )!;
+
+    succession.focus();
+    fireEvent.keyDown(succession, { key: 'ArrowRight' });
+    expect(reaction).toHaveFocus();
+
+    fireEvent.keyDown(reaction, { key: 'End' });
+    expect(sharedIdea).toHaveFocus();
+
+    fireEvent.keyDown(sharedIdea, { key: 'Home' });
+    expect(succession).toHaveFocus();
+  });
+});
+
 describe('LOD UI', () => {
   it('表示する範囲を説明とaria-pressedで切り替える', () => {
     const onChange = vi.fn();
@@ -145,6 +216,51 @@ describe('LOD UI', () => {
     expect(onChange).toHaveBeenCalledWith('standard');
     rerender(<LodControl value="standard" onChange={onChange} />);
     expect(screen.getByText('重要な細分・派生ムーブメントも表示')).toBeVisible();
+  });
+
+  it('縦型年表用LODを英語の索引表示へ圧縮する', () => {
+    const onChange = vi.fn();
+    render(
+      <LodControl
+        value="core"
+        onChange={onChange}
+        counts={{ core: 24, standard: 30, detailed: 30 }}
+        exhibition
+      />,
+    );
+
+    expect(
+      screen.getByRole('button', { name: /Basic（基本）\s*24件/ }),
+    ).toHaveAttribute('aria-pressed', 'true');
+    expect(
+      screen.getByRole('button', { name: /Standard（充実）\s*30件/ }),
+    ).toBeVisible();
+    expect(
+      screen.getByRole('button', { name: /Complete（すべて）\s*30件/ }),
+    ).toBeVisible();
+    expect(
+      screen.getByText('美術史の骨格となる主要項目を表示'),
+    ).toHaveClass('sr-only');
+  });
+
+  it('横型年表用LODを控えめな図録キャプションで表示する', () => {
+    render(
+      <LodControl
+        value="standard"
+        onChange={vi.fn()}
+        counts={{ core: 24, standard: 30, detailed: 30 }}
+        catalogue
+      />,
+    );
+
+    expect(screen.getByText('Level of detail')).toBeVisible();
+    expect(screen.getByRole('button', { name: /充実\s*30/ })).toHaveAttribute(
+      'aria-pressed',
+      'true',
+    );
+    expect(
+      screen.getByText('重要な細分・派生ムーブメントも表示'),
+    ).toHaveClass('sr-only');
   });
 
   it('マトリクスのセルを+Nで個別展開する', async () => {

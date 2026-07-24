@@ -29,9 +29,10 @@ export function SiteHeader() {
         <Link
           href="/"
           className="site-wordmark"
+          aria-label="Art History Atlas"
           onClick={() => setOpen(false)}
         >
-          <span className="site-wordmark__stack">
+          <span className="site-wordmark__stack" aria-hidden="true">
             <span className="site-wordmark__line">ART</span>
             <span className="site-wordmark__line">HISTORY</span>
             <span className="site-wordmark__line">ATLAS</span>

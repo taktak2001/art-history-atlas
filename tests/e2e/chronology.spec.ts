@@ -15,8 +15,42 @@ test('初期表示は時代ヒーローだけを示し、選択した展示を�
   await expect(hero).toHaveAttribute('aria-expanded', 'false');
   await expect(page.locator('[data-chronology-movement]')).toHaveCount(0);
   await expect(hero).not.toContainText('人間と世界を、観察と比例から捉え直した時代');
+  await expect(hero).toContainText('Renaissance');
   await expect(hero).toContainText('1400〜1600年頃');
-  await expect(hero).toContainText(/\d+件/);
+  await expect(hero).toContainText(/\d+ movements?/);
+  await expect(page.getByText('展示室を選んで、美術史を読む')).toBeVisible();
+  await expect(
+    page.getByRole('button', { name: /Basic（基本）\s*24件/ }),
+  ).toBeVisible();
+  await expect(page.locator('.chronology-era__toggle')).toHaveCount(0);
+
+  const entranceMetrics = await page.evaluate(() => {
+    const header = document.querySelector<HTMLElement>('.chronology-page__header');
+    const firstEra = document.querySelector<HTMLElement>('.chronology-era');
+    const firstButton = document.querySelector<HTMLElement>(
+      '.chronology-era__hero',
+    );
+    const title = firstButton?.querySelector<HTMLElement>(
+      '.chronology-era__title',
+    );
+    const stripeWidth = firstButton
+      ? Number.parseFloat(getComputedStyle(firstButton, '::before').width)
+      : 0;
+    return {
+      entranceHeight:
+        header && firstEra
+          ? firstEra.getBoundingClientRect().top -
+            header.getBoundingClientRect().top
+          : 999,
+      stripeWidth,
+      titleSize: title ? Number.parseFloat(getComputedStyle(title).fontSize) : 0,
+    };
+  });
+  expect(entranceMetrics.entranceHeight).toBeLessThan(180);
+  expect(entranceMetrics.stripeWidth).toBeGreaterThanOrEqual(3);
+  expect(entranceMetrics.stripeWidth).toBeLessThanOrEqual(4);
+  expect(entranceMetrics.titleSize).toBeGreaterThanOrEqual(20);
+  expect(entranceMetrics.titleSize).toBeLessThanOrEqual(24);
 
   const closedHeight = (await firstHero.boundingBox())?.height ?? 0;
   if (testInfo.project.name === 'mobile') {
@@ -111,19 +145,20 @@ test('歴史イベントから影響先へ移動できる', async ({ page }) => 
   await expect(war.getByRole('link', { name: /シュルレアリスム/ })).toBeVisible();
 });
 
-test('時代ナビゲーションは展示を開き、キーボードでも閉じられる', async ({
+test('Eraカード全体をキーボードで開閉でき、独立した時代ナビを置かない', async ({
   page,
 }) => {
   await page.goto('/chronology/');
-  await page.getByRole('navigation', { name: '時代ナビゲーション' }).getByRole(
-    'link',
-    { name: '19世紀', exact: true },
-  ).click();
 
   const hero = page.locator('#era-nineteenth').getByRole('button');
-  await expect(hero).toHaveAttribute('aria-expanded', 'true');
+  await expect(
+    page.getByRole('navigation', { name: '時代ナビゲーション' }),
+  ).toHaveCount(0);
+  await expect(hero).toContainText('19th Century');
   await hero.focus();
   await page.keyboard.press('Enter');
+  await expect(hero).toHaveAttribute('aria-expanded', 'true');
+  await page.keyboard.press('Space');
   await expect(hero).toHaveAttribute('aria-expanded', 'false');
 });
 
