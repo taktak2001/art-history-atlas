@@ -15,7 +15,7 @@ import {
 import type { Movement } from '@/lib/schema';
 import { ClassificationBadge, RegionBadges, VerificationBadge, RelationBadge } from '@/components/Badges';
 import { SourceList } from '@/components/SourceList';
-import { WorkImage } from '@/components/WorkImage';
+import { WorkGrid } from '@/components/WorkGrid';
 
 export function generateStaticParams() {
   return movements.map((m) => ({ slug: m.id }));
@@ -189,17 +189,10 @@ export default async function MovementDetailPage({
               </ul>
             )}
             {works.length > 0 && (
-              <ul className="mt-4 grid gap-4 sm:grid-cols-2">
-                {works.map((w) => (
-                  <li key={w.id}>
-                    <Link href={`/works/${w.id}/`} className="block">
-                      <WorkImage work={w} />
-                      <p className="mt-2 font-serif text-sm text-ink">{w.titleJa}</p>
-                      <p className="text-xs text-faint">{w.creatorName}・{w.year}</p>
-                    </Link>
-                  </li>
-                ))}
-              </ul>
+              <div className="mt-5">
+                <h3 className="mb-3 text-sm text-muted">代表作品</h3>
+                <WorkGrid works={works} />
+              </div>
             )}
             {artists.length === 0 && works.length === 0 && (
               <p className="mt-3 text-sm text-faint">個別の作家・作品データは今後追加予定です。</p>

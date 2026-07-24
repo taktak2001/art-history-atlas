@@ -10,6 +10,9 @@
  * 使用: npm run validate:data
  */
 import { z } from 'zod';
+import { existsSync } from 'node:fs';
+import { join, dirname } from 'node:path';
+import { fileURLToPath } from 'node:url';
 import {
   Movement,
   Artist,
@@ -17,6 +20,8 @@ import {
   Relationship,
   Source,
 } from '../src/lib/schema';
+
+const __dirname = dirname(fileURLToPath(import.meta.url));
 import { movements } from '../src/data/movements';
 import { artists } from '../src/data/artists';
 import { works } from '../src/data/works';
@@ -103,12 +108,60 @@ for (const s of sources) {
 }
 
 console.log('▶ 画像メタデータのライセンス必須チェック');
+const PD_LICENSES = ['public-domain', 'cc0'];
+const fileUrlSchema = z.string().url();
 for (const w of works) {
   if (w.image) {
     const img = w.image;
     if (!img.license) fail(`work ${w.id}: 画像ライセンス未指定`);
     if (!img.credit) fail(`work ${w.id}: 画像クレジット未指定`);
     if (!img.sourceUrl) fail(`work ${w.id}: 画像原典URL未指定`);
+    if (!img.alt || img.alt.trim().length === 0) fail(`work ${w.id}: 画像altが空`);
+    // Public Domain 判定とライセンスの整合
+    if (img.isPublicDomain && !PD_LICENSES.includes(img.license)) {
+      fail(`work ${w.id}: isPublicDomain=true だがライセンスが ${img.license}`);
+    }
+    if ((img.license === 'cc-by' || img.license === 'cc-by-sa') && img.isPublicDomain) {
+      fail(`work ${w.id}: ${img.license} なのに isPublicDomain=true`);
+    }
+    // 原典URL・画像URLの形式（到達性は検査しない。ネットワーク不通と URL 不存在は区別する）
+    if (img.sourceUrl && !fileUrlSchema.safeParse(img.sourceUrl).success)
+      fail(`work ${w.id}: 画像sourceUrlの形式不正`);
+    if (img.fileUrl) {
+      if (img.fileUrl.startsWith('/')) {
+        // ローカル画像パスの場合は public/ 配下の実在を確認
+        const p = join(__dirname, '..', 'public', img.fileUrl.replace(/^\//, ''));
+        if (!existsSync(p)) fail(`work ${w.id}: ローカル画像が存在しない ${img.fileUrl}`);
+      } else if (!fileUrlSchema.safeParse(img.fileUrl).success) {
+        fail(`work ${w.id}: 画像fileUrlの形式不正`);
+      }
+    }
+  }
+}
+
+console.log('▶ 各ムーブメントに2作品以上あるか');
+for (const m of movements) {
+  const count = works.filter((w) => w.movementIds.includes(m.id)).length;
+  if (count < 2) fail(`movement ${m.id}: 作品が${count}件（2件未満）`);
+}
+
+console.log('▶ 作品タイトルの重複');
+{
+  const titles = works.map((w) => w.titleJa);
+  const seen = new Set<string>();
+  for (const t of titles) {
+    if (seen.has(t)) fail(`作品タイトル重複: "${t}"`);
+    seen.add(t);
+  }
+}
+
+console.log('▶ 同一画像URLの重複');
+{
+  const urls = works.filter((w) => w.image?.fileUrl).map((w) => w.image!.fileUrl!);
+  const seen = new Set<string>();
+  for (const u of urls) {
+    if (seen.has(u)) fail(`画像fileUrl重複: ${u}`);
+    seen.add(u);
   }
 }
 

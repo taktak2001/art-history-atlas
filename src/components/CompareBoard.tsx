@@ -3,7 +3,8 @@
 import { useCallback, useMemo, useState } from 'react';
 import Link from 'next/link';
 import { useSearchParams, useRouter } from 'next/navigation';
-import { movements } from '@/lib/dataset';
+import { movements, worksOf } from '@/lib/dataset';
+import { WorkImage } from './WorkImage';
 import {
   compareRows,
   parseCompareIds,
@@ -125,6 +126,29 @@ export function CompareBoard() {
               </tr>
             </thead>
             <tbody>
+              {/* 代表作品（各ムーブメント1〜2点、画像優先）で視覚的に比較 */}
+              <tr>
+                <th scope="row" className="sticky left-0 z-10 border-r border-t hairline bg-raised p-3 text-left align-top text-xs text-muted">
+                  代表作品
+                </th>
+                {selected.map((m) => {
+                  const reps = worksOf(m).slice(0, 2);
+                  return (
+                    <td key={m.id} className="border-l border-t hairline p-3 align-top">
+                      <div className="grid grid-cols-2 gap-2">
+                        {reps.map((w) => (
+                          <Link key={w.id} href={`/works/${w.id}/`} className="group block">
+                            <WorkImage work={w} sizes="140px" />
+                            <span className="mt-1 line-clamp-1 block text-[11px] text-muted group-hover:text-ink">
+                              {w.titleJa}
+                            </span>
+                          </Link>
+                        ))}
+                      </div>
+                    </td>
+                  );
+                })}
+              </tr>
               {compareRows.map((row) => (
                 <tr key={row.key}>
                   <th scope="row" className="sticky left-0 z-10 border-r border-t hairline bg-raised p-3 text-left align-top text-xs text-muted">
