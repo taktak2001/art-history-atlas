@@ -621,10 +621,171 @@ html.dark .relation-badge {
   }
 }
 
+/* 横型タイムライン：表の箱ではなく、年代軸に沿う展示レールとして見せる */
+.timeline-shell {
+  border-block: 1px solid rgb(var(--c-line) / 0.62);
+  background: rgb(var(--c-paper));
+}
+
+.timeline-track {
+  background: rgb(var(--c-paper));
+}
+
+.timeline-region-column {
+  border-inline-end: 1px solid rgb(var(--c-line) / 0.5);
+  background: rgb(var(--c-paper));
+  box-shadow: 1px 0 0 rgb(var(--c-line) / 0.14);
+}
+
+.timeline-region-heading,
+.timeline-region-label {
+  color: rgb(var(--c-muted));
+}
+
+.timeline-region-heading {
+  letter-spacing: 0.08em;
+}
+
+.timeline-region-label {
+  border-top: 1px solid rgb(var(--c-line) / 0.22);
+  font-weight: 500;
+  letter-spacing: 0.015em;
+}
+
+.timeline-axis {
+  border-bottom: 1px solid rgb(var(--c-line) / 0.48);
+}
+
+.timeline-era-band {
+  border-inline-end: 1px solid rgb(var(--c-line) / 0.42);
+  background: transparent;
+  color: rgb(var(--c-faint));
+  letter-spacing: 0.035em;
+}
+
+.timeline-gridline {
+  pointer-events: none;
+}
+
+.timeline-gridline--major {
+  border-inline-start: 1px solid rgb(var(--c-line) / 0.42);
+}
+
+.timeline-gridline--minor {
+  border-inline-start: 0;
+}
+
+.timeline-tick-label {
+  background: rgb(var(--c-paper) / 0.92);
+  color: rgb(var(--c-faint));
+  font-size: 0.625rem;
+  font-weight: 500;
+}
+
+.timeline-origin-lane,
+.timeline-lane {
+  border-bottom: 1px solid rgb(var(--c-line) / 0.22);
+  background: transparent;
+}
+
+.timeline-origin-rail {
+  flex-direction: column;
+  justify-content: center;
+  align-items: flex-start;
+  text-decoration: none;
+}
+
+.timeline-origin-rail::before {
+  position: absolute;
+  inset-inline: 0;
+  top: 50%;
+  height: 1.875rem;
+  border-inline-start: 2px solid rgb(var(--c-accent) / 0.48);
+  background: rgb(var(--c-accent) / 0.1);
+  content: '';
+  transform: translateY(-50%);
+  transition:
+    background-color 140ms ease,
+    border-color 140ms ease;
+}
+
+.timeline-origin-rail > span {
+  position: relative;
+}
+
+.timeline-origin-rail:hover::before,
+.timeline-origin-rail:focus-visible::before {
+  border-inline-start-color: rgb(var(--c-accent) / 0.85);
+  background: rgb(var(--c-accent) / 0.18);
+}
+
+.timeline-bar {
+  color: rgb(var(--c-ink));
+  text-decoration: none;
+}
+
+.timeline-bar-visual {
+  height: 1.375rem;
+  border-inline-start: 2px solid rgb(var(--c-accent) / 0.5);
+  background: rgb(var(--c-accent) / 0.1);
+  box-shadow:
+    inset 0 1px 0 rgb(var(--c-accent) / 0.2),
+    inset 0 -1px 0 rgb(var(--c-line) / 0.24);
+  color: rgb(var(--c-ink));
+  transform: translateY(-50%);
+  transition:
+    background-color 140ms ease,
+    border-color 140ms ease,
+    box-shadow 140ms ease;
+}
+
+.timeline-bar-visual--secondary {
+  border-inline-start-color: rgb(var(--c-line) / 0.72);
+  background: rgb(var(--c-surface) / 0.7);
+  box-shadow:
+    inset 0 1px 0 rgb(var(--c-line) / 0.38),
+    inset 0 -1px 0 rgb(var(--c-line) / 0.2);
+  color: rgb(var(--c-muted));
+}
+
+.timeline-bar-visual--child {
+  height: 1.25rem;
+  opacity: 0.82;
+}
+
+.timeline-bar:hover .timeline-bar-visual,
+.timeline-bar:focus-visible .timeline-bar-visual {
+  border-inline-start-color: rgb(var(--c-accent) / 0.9);
+  background: rgb(var(--c-accent) / 0.18);
+  box-shadow:
+    inset 0 1px 0 rgb(var(--c-accent) / 0.32),
+    inset 0 -1px 0 rgb(var(--c-accent) / 0.2);
+}
+
+.timeline-bar:focus-visible {
+  outline: 1px solid rgb(var(--c-ink));
+  outline-offset: 1px;
+}
+
+.timeline-bar-label {
+  width: max-content;
+  justify-content: center;
+  background: rgb(var(--c-accent) / 0.07);
+  color: inherit;
+  font-weight: 600;
+  text-align: center;
+}
+
+.timeline-bar-visual--secondary .timeline-bar-label {
+  background: rgb(var(--c-paper) / 0.66);
+}
+
 .timeline-label-survey {
   overflow: hidden;
   white-space: nowrap;
   text-overflow: ellipsis;
+  line-height: 1.1;
+  text-align: center;
 }
 
 .timeline-label-detail {
@@ -633,6 +794,20 @@ html.dark .relation-badge {
   white-space: normal;
   -webkit-box-orient: vertical;
   -webkit-line-clamp: 2;
+  font-size: 0.625rem;
+  line-height: 0.6875rem;
+  text-align: center;
+}
+
+@media (max-width: 639px) {
+  .timeline-region-heading,
+  .timeline-region-label {
+    padding-inline: 0.5rem;
+  }
+
+  .timeline-bar-label {
+    font-size: 0.625rem;
+  }
 }
 
 /* 本文リンク */

@@ -21,8 +21,17 @@ test('通史はコンパクトな俯瞰表示と1行ラベルを使う', async (
     expect(width).toBeLessThanOrEqual(1300);
   }
 
-  const surveyLabel = page.locator('[data-timeline-bar="impressionism"] .timeline-label-survey').first();
-  await expect(surveyLabel).toBeVisible();
+  const surveyLabel = page
+    .locator(
+      '[data-timeline-bar="early-christian-byzantine"] .timeline-label-survey',
+    )
+    .first();
+  await expect(surveyLabel).toHaveCount(1);
+  await expect
+    .poll(() =>
+      surveyLabel.evaluate((element) => element.getBoundingClientRect().width),
+    )
+    .toBeGreaterThan(0);
   expect(await surveyLabel.evaluate((element) => getComputedStyle(element).whiteSpace)).toBe('nowrap');
 });
 
@@ -111,6 +120,46 @@ test('詳細ラベルは2行まで表示し、PCのフォーカスで正式情�
       .locator('[data-timeline-hit-area]')
       .evaluate((element) => element.getBoundingClientRect().height),
   ).toBeGreaterThanOrEqual(44);
+});
+
+test('バーは44pxの操作領域内に22pxの展示レールとして表示する', async ({ page }) => {
+  await page.goto('/timeline/');
+  await modeButton(page, '近代').click();
+
+  const bar = page.locator('[data-timeline-bar="impressionism"]').first();
+  const visual = bar.locator('[data-timeline-bar-visual]');
+  const label = bar.locator('[data-label-text]');
+  const lane = page.locator('[data-timeline-lane]').first();
+
+  const metrics = await bar.evaluate((element) => {
+    const visualElement = element.querySelector<HTMLElement>(
+      '[data-timeline-bar-visual]',
+    );
+    if (!visualElement) throw new Error('timeline bar visual is missing');
+    return {
+      targetHeight: element.getBoundingClientRect().height,
+      visualHeight: visualElement.getBoundingClientRect().height,
+      visualBorderTop: getComputedStyle(visualElement).borderTopWidth,
+    };
+  });
+  expect(metrics.targetHeight).toBeGreaterThanOrEqual(44);
+  expect(metrics.visualHeight).toBe(22);
+  expect(metrics.visualBorderTop).toBe('0px');
+  expect(await label.evaluate((element) => getComputedStyle(element).textAlign)).toBe(
+    'center',
+  );
+  expect(await lane.evaluate((element) => getComputedStyle(element).backgroundColor)).toBe(
+    'rgba(0, 0, 0, 0)',
+  );
+
+  const tickCounts = await page.locator('[data-timeline-tick]').evaluateAll((ticks) => ({
+    all: ticks.length,
+    major: ticks.filter((tick) => tick.getAttribute('data-major-tick') === 'true')
+      .length,
+  }));
+  expect(tickCounts.major).toBeGreaterThanOrEqual(2);
+  expect(tickCounts.major).toBeLessThan(tickCounts.all);
+  await expect(visual).toBeVisible();
 });
 
 test('iPhone幅では表示状態と地域列が固定され、1タップで詳細へ移動する', async ({ page }, testInfo) => {
