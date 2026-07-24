@@ -52,7 +52,7 @@ npm run dev            # http://localhost:3000
 
 データは `src/data/` の TypeScript モジュールで管理し、`src/lib/schema.ts` の Zod スキーマで検証されます。
 
-1. **ムーブメント** — `src/data/movements.ts` に `Movement` 型のオブジェクトを追加。`id` は英小文字ハイフンの slug。`sourceIds` に最低 1 件の出典 ID を紐づける。年代が概算なら `dates.circa = true` と `note` を付す。
+1. **ムーブメント** — `src/data/movements.ts` に `Movement` 型のオブジェクトを追加。`id` は英小文字ハイフンの slug。`sourceIds` に最低 1 件の出典 ID を紐づけ、`visibilityLevel`（`core` / `standard` / `detailed`）を必ず指定する。分類上の親がある場合だけ `parentMovementId`、非因果の縮約グループに属する場合だけ `groupId` を使う。年代が概算なら `dates.circa = true` と `note` を付す。
 2. **作家 / 作品** — `src/data/artists.ts` / `src/data/works.ts` に追加。ムーブメントの `artistIds` / `workIds` から参照。
 3. **関係** — `src/data/relationships.ts` に有向エッジを追加（`from` / `to` は既存ムーブメント ID）。
 4. 追加後に検証：`npm run validate:data`

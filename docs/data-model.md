@@ -8,6 +8,15 @@
 
 基本情報：`id`（slug）, `nameJa`, `nameEn`, `aliases[]`, `classification`, `era`, `dates`, `regionIds[]`, `cities[]`。
 
+表示・階層：`visibilityLevel`, `parentMovementId?`, `groupId?`, `isRepresentative?`, `displayOrder?`, `shortLabel?`。
+
+- `visibilityLevel`: `core | standard | detailed`。選択レベルまでを累積表示する。
+- `parentMovementId`: 分類上の直接の親。影響・継承・反発を意味しない。
+- `groupId`: 検索・縮約用の非因果グループ。定義と代表IDは `MOVEMENT_GROUPS` に置く。
+- `isRepresentative`: 親子内で代表表示に使う項目を明示する補助フラグ。
+- `displayOrder`: 同一スコープ内の表示順。未指定時は年代と名称で安定ソートする。
+- `shortLabel`: 通史など高密度表示用の短縮名（24文字以内）。正式名は常に `nameJa`。
+
 解説項目：`summary`, `coreIdea`, `socialContext`, `politicalContext?`, `religiousContext?`, `philosophy?`, `technologyContext?`, `reactionAgainst`, `inheritedFrom`, `visualTraits`, `compositionSpace`, `colorLight`, `technique`, `materials`, `subjects`, `artistStatus`, `productionSystem`, `patronage`, `marketExhibition`, `audience`, `legacy`, `contemporaryConnection`, `viewingPoints[]`。
 
 関連：`keywords[]`, `artistIds[]`, `workIds[]`, `sourceIds[]`（最低 1）, `verification`。
@@ -47,6 +56,8 @@
 
 **情報確認状態（verification）** — 確認済み / 単一資料 / 諸説あり / 要確認。
 
+**表示密度（visibilityLevel）** — 主要 `core` / 標準 `standard` / 詳細 `detailed`。現在の30件は `24 / 30 / 30`。`detailed` は「詳細専用項目が必ず存在する」という意味ではなく、収録済み全件を表示する上限レベル。
+
 ## 年代（DateRange）の表現
 
 `{ start, end|null, peak?|null, circa, note? }`。西暦の整数、紀元前は負値（前440年＝ `-440`）。継続中は `end: null`。概算・諸説ありは `circa: true` と `note` で明示し、断定を避ける。
@@ -58,5 +69,8 @@
 3. ID 重複
 4. 出典 URL の http(s) 形式
 5. 画像メタデータのライセンス・クレジット・出典 URL 必須
+6. `parentMovementId` の実在・自己参照・循環参照・LOD順序
+7. `groupId` の定義、代表項目の実在と所属、`displayOrder` の同一スコープ重複
+8. `shortLabel` の長さと、LODの累積件数（core 20件以上、standard ≥ core、detailed = 全件）
 
 `npm run validate:data` で実行。単体テスト（`tests/unit/data.test.ts`）でも同等の検証を行う。
