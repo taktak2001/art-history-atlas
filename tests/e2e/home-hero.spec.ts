@@ -25,20 +25,54 @@ test('ホームのファーストビューに3つの探索導線を表示する'
 
   const geometry = await hero.evaluate((element) => {
     const rect = element.getBoundingClientRect();
+    const tagline = element.querySelector<HTMLElement>('.home-hero__tagline');
+    const taglineStyles = tagline ? getComputedStyle(tagline) : null;
     return {
       bottom: rect.bottom,
       height: rect.height,
+      width: rect.width,
       viewportHeight: window.innerHeight,
+      taglineHeight: tagline?.getBoundingClientRect().height ?? 0,
+      taglineLineHeight: taglineStyles ? Number.parseFloat(taglineStyles.lineHeight) : 0,
     };
   });
   expect(geometry.bottom).toBeLessThanOrEqual(geometry.viewportHeight + 1);
-  expect(geometry.height).toBeGreaterThanOrEqual(400);
-  expect(geometry.height).toBeLessThanOrEqual(geometry.viewportHeight * 0.72);
+  expect(geometry.height).toBeGreaterThanOrEqual(260);
+  expect(geometry.height).toBeLessThanOrEqual(geometry.width < 640 ? 340 : 330);
+  expect(geometry.taglineHeight).toBeLessThanOrEqual(geometry.taglineLineHeight * 2 + 1);
+
+  const nextSectionTop = await page.getByRole('heading', { level: 2, name: 'Explore by Era' }).evaluate(
+    (element) => element.getBoundingClientRect().top,
+  );
+  expect(nextSectionTop).toBeLessThan(geometry.viewportHeight);
 
   for (const link of await navigation.getByRole('link').all()) {
     const box = await link.boundingBox();
     expect(box?.height).toBeGreaterThanOrEqual(44);
   }
+});
+
+test('iPad幅でもHeroの次にコンテンツが見え、横にはみ出さない', async ({ page }, testInfo) => {
+  test.skip(testInfo.project.name !== 'desktop', '固定iPadビューポートはdesktop projectで検証する');
+  await page.setViewportSize({ width: 820, height: 1180 });
+  await page.goto('/');
+
+  const layout = await page.evaluate(() => {
+    const hero = document.querySelector<HTMLElement>('[data-home-hero]');
+    const nextHeading = Array.from(document.querySelectorAll('h2')).find(
+      (heading) => heading.textContent === 'Explore by Era',
+    );
+    return {
+      heroBottom: hero?.getBoundingClientRect().bottom ?? Number.POSITIVE_INFINITY,
+      nextHeadingTop: nextHeading?.getBoundingClientRect().top ?? Number.POSITIVE_INFINITY,
+      viewportHeight: window.innerHeight,
+      hasHorizontalOverflow: document.documentElement.scrollWidth > window.innerWidth,
+    };
+  });
+
+  expect(layout.heroBottom).toBeLessThan(layout.viewportHeight * 0.45);
+  expect(layout.nextHeadingTop).toBeLessThan(layout.viewportHeight);
+  expect(layout.hasHorizontalOverflow).toBe(false);
 });
 
 test('ホームのセクション見出しは英語と短い日本語説明で対になる', async ({ page }) => {
@@ -64,7 +98,7 @@ test('ホームのセクション見出しは英語と短い日本語説明で�
 test('ヘッダーは英字3行ロゴと均衡した操作領域を持つ', async ({ page }) => {
   await page.goto('/');
 
-  const wordmark = page.getByRole('link', { name: 'Art History Atlas ホーム' });
+  const wordmark = page.getByRole('link', { name: 'ART HISTORY ATLAS', exact: true });
   await expect(wordmark).toBeVisible();
   await expect(wordmark.locator('.site-wordmark__line')).toHaveCount(3);
   await expect(wordmark.locator('.site-wordmark__line').nth(0)).toHaveText('ART');
