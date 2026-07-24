@@ -5,7 +5,11 @@ test('ホームのファーストビューに3つの探索導線を表示する'
 
   const hero = page.locator('[data-home-hero]');
   await expect(page).toHaveTitle('Art History Atlas');
-  await expect(page.getByRole('heading', { level: 1 })).toHaveText('Art History Atlas');
+  const title = page.getByRole('heading', {
+    level: 1,
+    name: 'Art History Atlas',
+  });
+  await expect(title).toHaveText('ART HISTORY ATLAS');
   await expect(page.getByText('発生・継承・転換から読む美術史。')).toBeVisible();
 
   const navigation = page.getByRole('navigation', { name: '主要な探索方法' });
@@ -40,6 +44,24 @@ test('ホームのファーストビューに3つの探索導線を表示する'
   expect(geometry.height).toBeGreaterThanOrEqual(260);
   expect(geometry.height).toBeLessThanOrEqual(geometry.width < 640 ? 340 : 330);
   expect(geometry.taglineHeight).toBeLessThanOrEqual(geometry.taglineLineHeight * 2 + 1);
+
+  const titleTypography = await title.evaluate((element) => {
+    const styles = getComputedStyle(element);
+    return {
+      fontSize: Number.parseFloat(styles.fontSize),
+      letterSpacing: Number.parseFloat(styles.letterSpacing),
+      hasHorizontalOverflow: element.scrollWidth > element.clientWidth + 1,
+    };
+  });
+  if ((page.viewportSize()?.width ?? 1280) < 640) {
+    expect(titleTypography.fontSize).toBeGreaterThanOrEqual(32);
+    expect(titleTypography.fontSize).toBeLessThanOrEqual(34);
+  } else {
+    expect(titleTypography.fontSize).toBeGreaterThanOrEqual(40);
+    expect(titleTypography.fontSize).toBeLessThanOrEqual(56);
+  }
+  expect(titleTypography.letterSpacing).toBeGreaterThan(0);
+  expect(titleTypography.hasHorizontalOverflow).toBe(false);
 
   const nextSectionTop = await page.getByRole('heading', { level: 2, name: 'Explore by Era' }).evaluate(
     (element) => element.getBoundingClientRect().top,
