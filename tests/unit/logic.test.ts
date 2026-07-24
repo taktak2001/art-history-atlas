@@ -22,6 +22,15 @@ import {
   MOBILE_PRIMARY_KINDS,
   RELATION_LINE_STYLE,
 } from '@/lib/network-presentation';
+import {
+  TIMELINE_MODES,
+  clipMovementToMode,
+  movementOverlapsMode,
+  timelineBarMinimumWidth,
+  timelineModeById,
+  timelineTicks,
+  timelineWidthForMode,
+} from '@/lib/timeline-presentation';
 
 describe('検索', () => {
   it('ムーブメント名で検索できる', () => {
@@ -153,5 +162,56 @@ describe('関係ネットワークの表示設定', () => {
     expect(limited.length).toBeLessThanOrEqual(MOBILE_EDGE_LIMIT);
     expect(nodeIds.size).toBeLessThanOrEqual(MOBILE_NODE_LIMIT);
     expect(primary.length).toBeGreaterThan(limited.length);
+  });
+});
+
+describe('横型タイムラインの表示設定', () => {
+  it('通史はコンパクト、時代別はデータ密度に応じて広くする', () => {
+    const survey = timelineModeById('survey');
+    const ancient = timelineModeById('ancient');
+    const modern = timelineModeById('modern');
+    const contemporary = timelineModeById('contemporary');
+
+    expect(timelineWidthForMode(survey, 30)).toBe(1180);
+    expect(timelineWidthForMode(ancient, 2)).toBe(1000);
+    expect(timelineWidthForMode(modern, 12)).toBe(2300);
+    expect(timelineWidthForMode(contemporary, 16)).toBe(2400);
+  });
+
+  it('すべての時代別モードが指定した幅の目安内に収まる', () => {
+    for (const mode of TIMELINE_MODES) {
+      const width = timelineWidthForMode(mode, 100);
+      expect(width).toBeGreaterThanOrEqual(mode.minWidth);
+      expect(width).toBeLessThanOrEqual(mode.maxWidth);
+    }
+  });
+
+  it('詳細モードはバーの最低幅を136pxにする', () => {
+    expect(timelineBarMinimumWidth(timelineModeById('survey'))).toBe(64);
+    expect(timelineBarMinimumWidth(timelineModeById('early-modern'))).toBe(136);
+    expect(timelineBarMinimumWidth(timelineModeById('modern'))).toBe(136);
+  });
+
+  it('表示範囲外を除外し、またぐムーブメントを端でクリップする', () => {
+    const modern = timelineModeById('modern');
+    const rococo = getMovement('rococo')!;
+    const cubism = getMovement('cubism')!;
+    const superflat = getMovement('superflat')!;
+
+    expect(movementOverlapsMode(rococo, modern)).toBe(true);
+    expect(clipMovementToMode(rococo, modern)).toMatchObject({
+      start: modern.start,
+      clippedStart: true,
+    });
+    expect(clipMovementToMode(cubism, modern)).toMatchObject({
+      clippedStart: false,
+      clippedEnd: false,
+    });
+    expect(movementOverlapsMode(superflat, modern)).toBe(false);
+  });
+
+  it('時代別モードの年代目盛りを通史より詳細化する', () => {
+    expect(timelineTicks(timelineModeById('modern'))).toHaveLength(21);
+    expect(timelineTicks(timelineModeById('contemporary')).length).toBeGreaterThan(10);
   });
 });

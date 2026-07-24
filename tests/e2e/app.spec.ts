@@ -54,9 +54,10 @@ test('横型タイムラインを時代別に切り替え、対象年代だけ�
   await page.goto('/timeline/');
 
   await expect(page.getByRole('button', { name: '通史', exact: true })).toHaveAttribute(
-    'aria-pressed',
+    'aria-current',
     'true',
   );
+  await expect(page.getByRole('region', { name: '現在の表示範囲' })).toContainText('通史');
   await expect(page.getByText('先史の造形')).toBeVisible();
   await expect(page.getByText('古代の規範')).toBeVisible();
   const surveyWidth = await page
@@ -67,21 +68,25 @@ test('横型タイムラインを時代別に切り替え、対象年代だけ�
 
   await page.getByRole('button', { name: '近代', exact: true }).click();
   await expect(page.getByRole('button', { name: '近代', exact: true })).toHaveAttribute(
-    'aria-pressed',
+    'aria-current',
     'true',
   );
-  await expect(page.getByText('1750 - 1950')).toBeVisible();
-  await expect(page.getByRole('link', { name: '印象派', exact: true }).first()).toBeVisible();
+  await expect(page.getByRole('region', { name: '現在の表示範囲' })).toContainText(
+    '1750〜1950',
+  );
+  await expect(page.locator('[data-timeline-bar="impressionism"]').first()).toBeVisible();
   await expect(page.getByRole('link', { name: /スーパーフラット/ })).toHaveCount(0);
   const modernWidth = await page
     .getByRole('group', { name: /近代の横型タイムライン/ })
     .locator('[data-timeline-track]')
     .evaluate((element) => element.getBoundingClientRect().width);
-  expect(modernWidth).toBeLessThanOrEqual(960);
+  expect(modernWidth).toBeGreaterThanOrEqual(1800);
+  expect(modernWidth).toBeGreaterThan(surveyWidth + 500);
+  expect(modernWidth).toBeLessThanOrEqual(2400);
 
-  await page.getByRole('button', { name: '現代', exact: true }).first().click();
-  await expect(page.getByRole('button', { name: '現代', exact: true }).last()).toHaveAttribute(
-    'aria-pressed',
+  await page.getByRole('group', { name: '表示モード' }).getByRole('button', { name: '現代' }).click();
+  await expect(page.getByRole('group', { name: '表示モード' }).getByRole('button', { name: '現代' })).toHaveAttribute(
+    'aria-current',
     'true',
   );
   await expect(page.getByRole('link', { name: /スーパーフラット/ }).first()).toBeVisible();

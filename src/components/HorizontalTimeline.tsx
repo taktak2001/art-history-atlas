@@ -3,182 +3,81 @@
 import Link from 'next/link';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import type { Movement, RegionId } from '@/lib/schema';
-import { REGION_LABELS } from '@/lib/schema';
+import { CLASSIFICATION_LABELS, REGION_LABELS } from '@/lib/schema';
+import {
+  TIMELINE_ERA_BANDS,
+  TIMELINE_MODES,
+  TIMELINE_NOW,
+  clipMovementToMode,
+  movementOverlapsMode,
+  timelineBarMinimumWidth,
+  timelineModeById,
+  timelineTicks,
+  timelineWidthForMode,
+  yearToTimelineX,
+  type TimelineEraBand,
+  type TimelineModeId,
+} from '@/lib/timeline-presentation';
 
 type Props = {
   movements: Movement[];
   activeRegions: RegionId[];
 };
 
-type ModeId = 'survey' | 'ancient' | 'medieval' | 'early-modern' | 'modern' | 'contemporary';
-
-type TimelineMode = {
-  id: ModeId;
-  label: string;
-  start: number;
-  end: number;
-  width: number;
-  tickStep: number;
-  description: string;
-};
-
-type EraBand = {
-  label: string;
-  start: number;
-  end: number;
-  mode: ModeId;
-  jumpYear: number;
-};
-
-const NOW = 2026;
-const HEADER_H = 54;
+const HEADER_H = 60;
 const SURVEY_SUMMARY_H = 54;
-const BAR_H = 24;
-const BAR_GAP = 6;
-const LANE_PAD_Y = 7;
-const MIN_LANE_H = 42;
+const SURVEY_BAR_H = 26;
+const DETAIL_BAR_H = 44;
+const BAR_GAP = 8;
+const LANE_PAD_Y = 8;
+const MIN_LANE_H = 46;
 
-const MODES: TimelineMode[] = [
-  {
-    id: 'survey',
-    label: '通史',
-    start: -40000,
-    end: NOW,
-    width: 1180,
-    tickStep: 0,
-    description: '各時代に読める幅を配分し、先史と古代は要点に圧縮しています。',
-  },
-  {
-    id: 'ancient',
-    label: '古代',
-    start: -3000,
-    end: 500,
-    width: 720,
-    tickStep: 500,
-    description: '紀元前3000年から500年まで。古代地中海世界を中心に表示します。',
-  },
-  {
-    id: 'medieval',
-    label: '中世',
-    start: 300,
-    end: 1450,
-    width: 820,
-    tickStep: 200,
-    description: '300年から1450年まで。ビザンティンからゴシックへの流れを表示します。',
-  },
-  {
-    id: 'early-modern',
-    label: '近世',
-    start: 1400,
-    end: 1800,
-    width: 850,
-    tickStep: 50,
-    description: '1400年から1800年まで。ルネサンスからバロック、ロココへの展開を表示します。',
-  },
-  {
-    id: 'modern',
-    label: '近代',
-    start: 1750,
-    end: 1950,
-    width: 940,
-    tickStep: 25,
-    description: '1750年から1950年まで。古典の再編からモダニズムの成立までを表示します。',
-  },
-  {
-    id: 'contemporary',
-    label: '現代',
-    start: 1900,
-    end: NOW,
-    width: 900,
-    tickStep: 20,
-    description: '1900年から現在まで。モダニズム、戦後美術、現代美術を表示します。',
-  },
-];
-
-const ERA_BANDS: EraBand[] = [
-  { label: '先史', start: -40000, end: -3000, mode: 'survey', jumpYear: -40000 },
-  { label: '古代', start: -3000, end: 500, mode: 'ancient', jumpYear: -480 },
-  { label: '中世', start: 500, end: 1400, mode: 'medieval', jumpYear: 700 },
-  { label: 'ルネサンス', start: 1400, end: 1600, mode: 'early-modern', jumpYear: 1400 },
-  { label: '近世', start: 1600, end: 1750, mode: 'early-modern', jumpYear: 1600 },
-  { label: '19世紀', start: 1750, end: 1900, mode: 'modern', jumpYear: 1800 },
-  { label: '20世紀', start: 1900, end: 2000, mode: 'contemporary', jumpYear: 1900 },
-  { label: '現代', start: 2000, end: NOW, mode: 'contemporary', jumpYear: 2000 },
-];
-
-// 通史では年代の長さではなく、美術史を読むための情報量に応じて横幅を配分する。
-const SURVEY_SEGMENTS = [
-  { start: -40000, end: -3000, weight: 0.1 },
-  { start: -3000, end: 500, weight: 0.1 },
-  { start: 500, end: 1400, weight: 0.12 },
-  { start: 1400, end: 1600, weight: 0.14 },
-  { start: 1600, end: 1750, weight: 0.11 },
-  { start: 1750, end: 1900, weight: 0.15 },
-  { start: 1900, end: 1950, weight: 0.12 },
-  { start: 1950, end: NOW, weight: 0.16 },
-] as const;
-
-const SURVEY_TICKS = [-40000, -3000, 500, 1400, 1600, 1750, 1900, 1950, 2000, NOW];
+const SURVEY_PRIORITY = new Set([
+  'gothic',
+  'italian-renaissance',
+  'baroque',
+  'neoclassicism',
+  'romanticism',
+  'realism',
+  'impressionism',
+  'post-impressionism',
+  'cubism',
+  'dada',
+  'surrealism',
+  'abstract-expressionism',
+  'pop-art',
+  'minimalism',
+  'conceptual-art',
+  'mono-ha',
+]);
 
 const fmtYear = (year: number) => {
-  if (year === NOW) return '現在';
+  if (year === TIMELINE_NOW) return '現在';
   return year < 0 ? `前${Math.abs(year).toLocaleString('ja-JP')}` : `${year}`;
 };
-
-const clamp = (value: number, min: number, max: number) =>
-  Math.min(max, Math.max(min, value));
-
-function yearToX(year: number, mode: TimelineMode) {
-  const clampedYear = clamp(year, mode.start, mode.end);
-  if (mode.id !== 'survey') {
-    return ((clampedYear - mode.start) / (mode.end - mode.start)) * mode.width;
-  }
-
-  let progress = 0;
-  for (const segment of SURVEY_SEGMENTS) {
-    if (clampedYear >= segment.end) {
-      progress += segment.weight;
-      continue;
-    }
-    if (clampedYear >= segment.start) {
-      const localProgress = (clampedYear - segment.start) / (segment.end - segment.start);
-      progress += localProgress * segment.weight;
-    }
-    break;
-  }
-  return progress * mode.width;
-}
-
-function ticksForMode(mode: TimelineMode) {
-  if (mode.id === 'survey') return SURVEY_TICKS;
-
-  const ticks: number[] = [];
-  const first = Math.ceil(mode.start / mode.tickStep) * mode.tickStep;
-  for (let year = first; year <= mode.end; year += mode.tickStep) ticks.push(year);
-  if (ticks.at(-1) !== mode.end) ticks.push(mode.end);
-  return ticks;
-}
-
-function overlapsMode(movement: Movement, mode: TimelineMode) {
-  const end = movement.dates.end ?? NOW;
-  return movement.dates.start < mode.end && end > mode.start;
-}
 
 export function HorizontalTimeline({ movements, activeRegions }: Props) {
   const scrollRef = useRef<HTMLDivElement>(null);
   const pendingJump = useRef<number | null>(null);
+  const lastPointerType = useRef<string>('mouse');
   const drag = useRef<{ startX: number; scrollLeft: number; active: boolean }>({
     startX: 0,
     scrollLeft: 0,
     active: false,
   });
-  const [modeId, setModeId] = useState<ModeId>('survey');
+  const [modeId, setModeId] = useState<TimelineModeId>('survey');
+  const [activeMovementId, setActiveMovementId] = useState<string | null>(null);
 
-  const mode = MODES.find((item) => item.id === modeId) ?? MODES[0];
+  const mode = timelineModeById(modeId);
   const modeMovements = useMemo(
-    () => movements.filter((movement) => overlapsMode(movement, mode)),
+    () => movements.filter((movement) => movementOverlapsMode(movement, mode)),
     [movements, mode],
   );
+  const timelineWidth = useMemo(
+    () => timelineWidthForMode(mode, modeMovements.length),
+    [mode, modeMovements.length],
+  );
+  const barHeight = mode.id === 'survey' ? SURVEY_BAR_H : DETAIL_BAR_H;
 
   // 通史では先史と古代を個別の長大バーにせず、専用の要約帯にまとめる。
   const plottedMovements = useMemo(
@@ -195,16 +94,27 @@ export function HorizontalTimeline({ movements, activeRegions }: Props) {
         const candidates = plottedMovements
           .filter((movement) => movement.regionIds.includes(region))
           .map((movement) => {
-            const startX = yearToX(Math.max(movement.dates.start, mode.start), mode);
-            const endX = yearToX(Math.min(movement.dates.end ?? NOW, mode.end), mode);
-            const minWidth = mode.id === 'survey' ? 58 : 76;
+            const clipped = clipMovementToMode(movement, mode);
+            const startX = yearToTimelineX(clipped.start, mode, timelineWidth);
+            const endX = yearToTimelineX(clipped.end, mode, timelineWidth);
+            const minWidth = timelineBarMinimumWidth(mode);
+            const width = Math.min(timelineWidth, Math.max(minWidth, endX - startX));
             return {
               movement,
-              left: startX,
-              width: Math.min(mode.width - startX, Math.max(minWidth, endX - startX)),
+              left: Math.min(startX, timelineWidth - width),
+              width,
+              ...clipped,
             };
           })
-          .sort((a, b) => a.left - b.left || b.width - a.width);
+          .sort((a, b) => {
+            if (mode.id === 'survey') {
+              const priorityDifference =
+                Number(SURVEY_PRIORITY.has(b.movement.id)) -
+                Number(SURVEY_PRIORITY.has(a.movement.id));
+              if (priorityDifference !== 0) return priorityDifference;
+            }
+            return a.left - b.left || b.width - a.width;
+          });
 
         const rowEnds: number[] = [];
         const items = candidates.map((item) => {
@@ -222,12 +132,12 @@ export function HorizontalTimeline({ movements, activeRegions }: Props) {
           items,
           height: Math.max(
             MIN_LANE_H,
-            rowEnds.length * (BAR_H + BAR_GAP) + LANE_PAD_Y * 2 - BAR_GAP,
+            rowEnds.length * (barHeight + BAR_GAP) + LANE_PAD_Y * 2 - BAR_GAP,
           ),
         };
       })
       .filter((lane) => lane.items.length > 0);
-  }, [activeRegions, plottedMovements, mode]);
+  }, [activeRegions, plottedMovements, mode, timelineWidth, barHeight]);
 
   const laneOffsets = useMemo(() => {
     let offset = HEADER_H + (mode.id === 'survey' ? SURVEY_SUMMARY_H : 0);
@@ -243,15 +153,20 @@ export function HorizontalTimeline({ movements, activeRegions }: Props) {
     (mode.id === 'survey' ? SURVEY_SUMMARY_H : 0) +
     laneLayouts.reduce((sum, lane) => sum + lane.height, 0);
 
-  const visibleEraBands = ERA_BANDS.filter(
+  const visibleEraBands = TIMELINE_ERA_BANDS.filter(
     (era) => era.start < mode.end && era.end > mode.start,
   );
-  const ticks = ticksForMode(mode);
+  const ticks = timelineTicks(mode);
+  const activeMovement =
+    modeMovements.find((movement) => movement.id === activeMovementId) ?? null;
 
   const scrollToYear = (year: number, behavior: ScrollBehavior = 'smooth') => {
     const element = scrollRef.current;
     if (!element) return;
-    const left = Math.max(0, yearToX(year, mode) - element.clientWidth * 0.18);
+    const left = Math.max(
+      0,
+      yearToTimelineX(year, mode, timelineWidth) - element.clientWidth * 0.18,
+    );
     element.scrollTo({ left, behavior });
   };
 
@@ -269,8 +184,9 @@ export function HorizontalTimeline({ movements, activeRegions }: Props) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [modeId]);
 
-  const selectMode = (nextMode: ModeId) => {
+  const selectMode = (nextMode: TimelineModeId) => {
     pendingJump.current = null;
+    setActiveMovementId(null);
     if (nextMode === modeId) {
       scrollRef.current?.scrollTo({ left: 0, behavior: 'smooth' });
       return;
@@ -278,7 +194,8 @@ export function HorizontalTimeline({ movements, activeRegions }: Props) {
     setModeId(nextMode);
   };
 
-  const jumpToEra = (era: EraBand) => {
+  const jumpToEra = (era: TimelineEraBand) => {
+    setActiveMovementId(null);
     if (era.mode === modeId) {
       scrollToYear(era.jumpYear);
       return;
@@ -310,17 +227,38 @@ export function HorizontalTimeline({ movements, activeRegions }: Props) {
   };
 
   return (
-    <div>
-      <div className="space-y-4 rounded-sm border hairline bg-surface p-3 sm:p-4">
+    <div style={{ paddingBottom: 'calc(env(safe-area-inset-bottom) + 16px)' }}>
+      <div className="space-y-5 border-y hairline py-4">
+        <div>
+          <p className="mb-2 text-xs font-bold text-ink">表示モード</p>
+          <div className="grid grid-cols-3 gap-1.5 sm:grid-cols-6" role="group" aria-label="表示モード">
+            {TIMELINE_MODES.map((item) => (
+              <button
+                key={item.id}
+                type="button"
+                onClick={() => selectMode(item.id)}
+                aria-current={item.id === mode.id ? 'true' : undefined}
+                className={`min-h-11 rounded-sm border px-3 py-2 text-sm font-medium transition-colors active:translate-y-px ${
+                  item.id === mode.id
+                    ? 'border-ink border-b-[3px] border-b-accent bg-ink text-paper'
+                    : 'hairline bg-raised text-muted hover:border-ink hover:text-ink'
+                }`}
+              >
+                {item.label}
+              </button>
+            ))}
+          </div>
+        </div>
+
         <nav aria-label="時代ナビゲーション">
-          <p className="mb-2 text-xs font-medium text-muted">時代へ移動</p>
+          <p className="mb-2 text-xs font-bold text-ink">時代へ移動</p>
           <div className="grid grid-cols-4 overflow-hidden rounded-sm border hairline bg-raised sm:grid-cols-8">
-            {ERA_BANDS.map((era, index) => (
+            {TIMELINE_ERA_BANDS.map((era, index) => (
               <button
                 key={era.label}
                 type="button"
                 onClick={() => jumpToEra(era)}
-                className={`min-h-10 px-1.5 py-2 text-xs text-muted transition-colors hover:bg-surface hover:text-ink active:translate-y-px ${
+                className={`min-h-11 px-1.5 py-2 text-xs text-muted transition-colors hover:bg-surface hover:text-ink active:translate-y-px ${
                   index % 4 !== 0 ? 'border-l hairline' : ''
                 } ${index >= 4 ? 'border-t hairline sm:border-t-0' : ''} ${
                   index > 0 && index % 4 === 0 ? 'sm:border-l' : ''
@@ -331,37 +269,77 @@ export function HorizontalTimeline({ movements, activeRegions }: Props) {
             ))}
           </div>
         </nav>
+      </div>
 
-        <div>
-          <p className="mb-2 text-xs font-medium text-muted">表示範囲</p>
-          <div className="grid grid-cols-3 gap-1.5 sm:grid-cols-6" role="group" aria-label="表示範囲">
-            {MODES.map((item) => (
-              <button
-                key={item.id}
-                type="button"
-                onClick={() => selectMode(item.id)}
-                aria-pressed={item.id === mode.id}
-                className={`min-h-10 rounded-sm border hairline px-3 py-2 text-sm transition-colors active:translate-y-px ${
-                  item.id === mode.id
-                    ? 'bg-ink text-paper'
-                    : 'bg-raised text-muted hover:text-ink'
-                }`}
-              >
-                {item.label}
-              </button>
-            ))}
+      <section
+        className="sticky top-[69px] z-30 mt-4 border-y hairline bg-paper/95 px-3 py-3 backdrop-blur sm:static sm:bg-surface sm:px-4 sm:py-4"
+        aria-label="現在の表示範囲"
+        data-timeline-status
+      >
+        <div className="flex min-h-11 items-center justify-between gap-4">
+          <div aria-live="polite">
+            <p className="text-[11px] font-bold tracking-[0.08em] text-muted">表示中</p>
+            <p className="flex flex-wrap items-baseline gap-x-3">
+              <span className="font-serif text-xl text-ink">{mode.label}</span>
+              <span className="text-xs tabular-nums text-muted">
+                {fmtYear(mode.start)}〜{mode.end === TIMELINE_NOW ? '現在' : fmtYear(mode.end)}
+              </span>
+            </p>
           </div>
-          <div className="mt-3 flex flex-wrap items-baseline justify-between gap-x-4 gap-y-1">
-            <p className="text-sm text-ink">{mode.description}</p>
-            <p className="whitespace-nowrap text-xs tabular-nums text-faint">
-              {fmtYear(mode.start)} - {mode.end === NOW ? '現在' : fmtYear(mode.end)}
+          {mode.id !== 'survey' && (
+            <button
+              type="button"
+              onClick={() => selectMode('survey')}
+              className="min-h-11 shrink-0 rounded-sm border hairline bg-raised px-3 text-xs font-medium text-ink hover:border-ink active:translate-y-px"
+            >
+              通史へ戻る
+            </button>
+          )}
+        </div>
+        <p className="mt-1 text-xs leading-relaxed text-muted sm:text-sm">{mode.description}</p>
+      </section>
+
+      {activeMovement && (
+        <div
+          className="border-x border-b hairline bg-raised px-3 py-3 sm:px-4"
+          role="status"
+          data-movement-inspector
+        >
+          <div className="grid gap-x-6 gap-y-2 text-xs sm:grid-cols-[minmax(180px,1.4fr)_1fr_1fr_1fr]">
+            <p>
+              <span className="block font-bold text-muted">正式名称</span>
+              <span className="mt-0.5 block text-sm font-medium text-ink">
+                {activeMovement.nameJa}
+              </span>
+            </p>
+            <p>
+              <span className="block font-bold text-muted">年代</span>
+              <span className="mt-0.5 block tabular-nums text-ink">
+                {fmtYear(activeMovement.dates.start)}〜
+                {activeMovement.dates.end === null ? '現在' : fmtYear(activeMovement.dates.end)}
+              </span>
+            </p>
+            <p>
+              <span className="block font-bold text-muted">地域</span>
+              <span className="mt-0.5 block text-ink">
+                {activeMovement.regionIds.map((region) => REGION_LABELS[region]).join('・')}
+              </span>
+            </p>
+            <p>
+              <span className="block font-bold text-muted">分類</span>
+              <span className="mt-0.5 block text-ink">
+                {CLASSIFICATION_LABELS[activeMovement.classification]}
+              </span>
             </p>
           </div>
         </div>
-      </div>
+      )}
 
-      <div className="mt-4 flex overflow-hidden rounded-sm border hairline bg-raised">
-        <div className="w-[88px] shrink-0 border-r hairline sm:w-32">
+      <div className="mt-3 flex overflow-hidden rounded-sm border hairline bg-raised">
+        <div
+          className="sticky left-0 z-20 w-[96px] shrink-0 border-r hairline bg-raised sm:w-36"
+          data-region-column
+        >
           <div className="flex items-end px-2 pb-2 text-[10px] text-faint" style={{ height: HEADER_H }}>
             地域
           </div>
@@ -376,6 +354,7 @@ export function HorizontalTimeline({ movements, activeRegions }: Props) {
           {laneLayouts.map((lane) => (
             <div
               key={lane.region}
+              data-region-lane-label={lane.region}
               className="flex items-center border-t hairline px-2 text-[11px] leading-snug text-muted sm:text-xs"
               style={{ height: lane.height }}
             >
@@ -397,12 +376,22 @@ export function HorizontalTimeline({ movements, activeRegions }: Props) {
           <div
             className="relative"
             data-timeline-track
-            style={{ width: mode.width, height: chartHeight }}
+            data-timeline-mode={mode.id}
+            data-lane-count={laneLayouts.length}
+            style={{ width: timelineWidth, height: chartHeight }}
           >
             <div className="absolute inset-x-0 top-0 border-b hairline" style={{ height: HEADER_H }}>
               {visibleEraBands.map((era, index) => {
-                const left = yearToX(Math.max(era.start, mode.start), mode);
-                const right = yearToX(Math.min(era.end, mode.end), mode);
+                const left = yearToTimelineX(
+                  Math.max(era.start, mode.start),
+                  mode,
+                  timelineWidth,
+                );
+                const right = yearToTimelineX(
+                  Math.min(era.end, mode.end),
+                  mode,
+                  timelineWidth,
+                );
                 return (
                   <div
                     key={era.label}
@@ -421,7 +410,7 @@ export function HorizontalTimeline({ movements, activeRegions }: Props) {
               <div
                 key={tick}
                 className="absolute bottom-0 top-7 border-l hairline"
-                style={{ left: yearToX(tick, mode) }}
+                style={{ left: yearToTimelineX(tick, mode, timelineWidth) }}
                 aria-hidden="true"
               >
                 <span
@@ -459,8 +448,8 @@ export function HorizontalTimeline({ movements, activeRegions }: Props) {
                     end: 500,
                   },
                 ].map((summary) => {
-                  const left = yearToX(summary.start, mode);
-                  const right = yearToX(summary.end, mode);
+                  const left = yearToTimelineX(summary.start, mode, timelineWidth);
+                  const right = yearToTimelineX(summary.end, mode, timelineWidth);
                   return (
                     <Link
                       key={summary.id}
@@ -480,29 +469,82 @@ export function HorizontalTimeline({ movements, activeRegions }: Props) {
             {laneOffsets.map((lane, index) => (
               <div
                 key={lane.region}
+                data-timeline-lane={lane.region}
                 className={`absolute inset-x-0 border-b hairline ${
                   index % 2 === 1 ? 'bg-surface/35' : ''
                 }`}
                 style={{ top: lane.top, height: lane.height }}
               >
-                {lane.items.map(({ movement, left, width, row }) => {
-                  const start = Math.max(movement.dates.start, mode.start);
-                  const end = Math.min(movement.dates.end ?? NOW, mode.end);
+                {lane.items.map(
+                  ({ movement, left, width, row, clippedStart, clippedEnd }) => {
+                  const isPriority = mode.id !== 'survey' || SURVEY_PRIORITY.has(movement.id);
+                  const accessibleLabel = `${movement.nameJa}。${fmtYear(movement.dates.start)}から${
+                    movement.dates.end === null ? '現在' : fmtYear(movement.dates.end)
+                  }。${movement.regionIds.map((region) => REGION_LABELS[region]).join('・')}。${
+                    CLASSIFICATION_LABELS[movement.classification]
+                  }`;
                   return (
                     <Link
                       key={movement.id}
                       href={`/movements/${movement.id}/`}
                       prefetch={false}
-                      title={`${movement.nameJa}（${fmtYear(start)}-${movement.dates.end === null ? '現在' : fmtYear(end)}）`}
-                      className="absolute flex items-center overflow-hidden rounded-sm border border-accent/40 bg-accent/20 px-1.5 text-left text-[11px] text-ink transition-colors hover:bg-accent/35 focus-visible:z-20 active:translate-y-px"
+                      aria-label={accessibleLabel}
+                      title={accessibleLabel}
+                      data-timeline-bar={movement.id}
+                      data-clipped-start={clippedStart || undefined}
+                      data-clipped-end={clippedEnd || undefined}
+                      onMouseEnter={() => setActiveMovementId(movement.id)}
+                      onFocus={() => setActiveMovementId(movement.id)}
+                      onPointerDown={(event) => {
+                        lastPointerType.current = event.pointerType;
+                        if (event.pointerType !== 'touch') setActiveMovementId(movement.id);
+                      }}
+                      onClick={(event) => {
+                        if (
+                          lastPointerType.current === 'touch' &&
+                          activeMovementId !== movement.id
+                        ) {
+                          event.preventDefault();
+                          setActiveMovementId(movement.id);
+                        }
+                      }}
+                      className={`absolute flex items-center overflow-hidden rounded-sm border px-2 text-left text-[11px] leading-tight transition-colors hover:border-accent hover:bg-accent/30 focus-visible:z-20 active:translate-y-px ${
+                        isPriority
+                          ? 'border-accent/50 bg-accent/20 text-ink'
+                          : 'hairline bg-raised/90 text-muted'
+                      }`}
                       style={{
                         left,
-                        top: LANE_PAD_Y + row * (BAR_H + BAR_GAP),
+                        top: LANE_PAD_Y + row * (barHeight + BAR_GAP),
                         width,
-                        height: BAR_H,
+                        height: barHeight,
                       }}
                     >
-                      <span className="truncate">{movement.nameJa}</span>
+                      {clippedStart && (
+                        <span
+                          className="absolute inset-y-0 left-0 z-10 flex w-3 items-center bg-gradient-to-r from-paper/90 to-transparent text-[10px]"
+                          aria-hidden="true"
+                        >
+                          ‹
+                        </span>
+                      )}
+                      <span
+                        className={
+                          mode.id === 'survey'
+                            ? 'timeline-label-survey block w-full'
+                            : 'timeline-label-detail block w-full'
+                        }
+                      >
+                        {movement.nameJa}
+                      </span>
+                      {clippedEnd && (
+                        <span
+                          className="absolute inset-y-0 right-0 z-10 flex w-3 items-center justify-end bg-gradient-to-l from-paper/90 to-transparent text-[10px]"
+                          aria-hidden="true"
+                        >
+                          ›
+                        </span>
+                      )}
                     </Link>
                   );
                 })}
@@ -513,7 +555,7 @@ export function HorizontalTimeline({ movements, activeRegions }: Props) {
       </div>
 
       <p className="mt-2 text-xs text-faint">
-        横にスワイプ、または余白をドラッグして移動できます。バーを選ぶと詳細を開きます。
+        横にスワイプ、または余白をドラッグして移動できます。バーはホバーまたはフォーカスで詳細を表示し、タッチでは2回目の選択で詳細ページを開きます。
       </p>
 
       <details className="mt-4 rounded-sm border hairline bg-surface p-3">
@@ -543,8 +585,13 @@ export function HorizontalTimeline({ movements, activeRegions }: Props) {
                       </Link>
                     </td>
                     <td className="py-1.5 pr-3 tabular-nums text-muted">
-                      {fmtYear(movement.dates.start)}-
-                      {movement.dates.end === null ? '現在' : fmtYear(movement.dates.end)}
+                      {movement.dates.start < mode.start && '以前から '}
+                      {fmtYear(Math.max(movement.dates.start, mode.start))}〜
+                      {movement.dates.end === null && mode.end === TIMELINE_NOW
+                        ? '現在'
+                        : movement.dates.end === null || movement.dates.end > mode.end
+                        ? `${fmtYear(mode.end)}以後へ`
+                        : fmtYear(movement.dates.end)}
                     </td>
                     <td className="py-1.5 text-muted">
                       {movement.regionIds.map((region) => REGION_LABELS[region]).join('・')}
