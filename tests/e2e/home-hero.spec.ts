@@ -4,19 +4,20 @@ test('ホームのファーストビューに3つの探索導線を表示する'
   await page.goto('/');
 
   const hero = page.locator('[data-home-hero]');
+  await expect(page).toHaveTitle(/美術史アトラス/);
   await expect(page.getByRole('heading', { level: 1 })).toHaveText('美術史アトラス');
   await expect(page.getByText('発生・継承・転換から読む美術史。')).toBeVisible();
 
   const navigation = page.getByRole('navigation', { name: '主要な探索方法' });
-  await expect(navigation.getByRole('link', { name: '横型タイムライン' })).toHaveAttribute(
+  await expect(navigation.getByRole('link', { name: /Timeline.*年代と地域の重なりを見る/ })).toHaveAttribute(
     'href',
     '/timeline/',
   );
-  await expect(navigation.getByRole('link', { name: '縦型年表' })).toHaveAttribute(
+  await expect(navigation.getByRole('link', { name: /Chronology.*時代の流れを展示形式で読む/ })).toHaveAttribute(
     'href',
     '/chronology/',
   );
-  await expect(navigation.getByRole('link', { name: '関係ネットワーク' })).toHaveAttribute(
+  await expect(navigation.getByRole('link', { name: /Relationship Network.*継承・反発・影響を辿る/ })).toHaveAttribute(
     'href',
     '/network/',
   );
@@ -31,11 +32,32 @@ test('ホームのファーストビューに3つの探索導線を表示する'
     };
   });
   expect(geometry.bottom).toBeLessThanOrEqual(geometry.viewportHeight + 1);
-  expect(geometry.height).toBeGreaterThan(500);
+  expect(geometry.height).toBeGreaterThanOrEqual(400);
+  expect(geometry.height).toBeLessThanOrEqual(geometry.viewportHeight * 0.72);
 
   for (const link of await navigation.getByRole('link').all()) {
     const box = await link.boundingBox();
     expect(box?.height).toBeGreaterThanOrEqual(44);
+  }
+});
+
+test('ホームのセクション見出しは英語と短い日本語説明で対になる', async ({ page }) => {
+  await page.goto('/');
+
+  const sections = [
+    ['Explore by Era', '時代ごとの価値基準から読む'],
+    ['Turning Points', '視点・空間・制度の前提が変わった局面'],
+    ['Reactions & Breaks', '前時代への応答と反発を辿る'],
+    ['Across Regions', '同時代の地域差を比較する'],
+    ['Comparisons', '2つのムーブメントを並べて読む'],
+    ['Latest Additions', '最近追加したムーブメント'],
+    ['Sources & Methodology', '出典・編集方針・分類基準'],
+  ];
+
+  for (const [heading, description] of sections) {
+    await expect(page.getByRole('heading', { level: 2, name: heading })).toBeVisible();
+    await expect(page.getByText(description, { exact: true })).toBeVisible();
+    expect(description.length).toBeLessThanOrEqual(40);
   }
 });
 
