@@ -42,3 +42,39 @@ test('iPhone幅で作品グリッドが横あふれしない', async ({ page }) 
   const clientW = await page.evaluate(() => document.documentElement.clientWidth);
   expect(scrollW).toBeLessThanOrEqual(clientW + 1);
 });
+
+for (const movement of [
+  { slug: 'prehistoric-ritual', title: '先史美術' },
+  { slug: 'italian-renaissance', title: 'イタリア・ルネサンス' },
+  { slug: 'mono-ha', title: 'もの派' },
+]) {
+  test(`${movement.title}の詳細が8章の図録構成で表示される`, async ({ page }) => {
+    await page.goto(`/movements/${movement.slug}/`);
+
+    await expect(page.getByRole('heading', { level: 1 })).toContainText(movement.title);
+    await expect(page.getByRole('navigation', { name: '詳細ページ目次' })).toBeVisible();
+    await expect(page.getByRole('heading', { name: '思想と歴史的背景' })).toBeVisible();
+    await expect(page.getByRole('heading', { name: '代表作品', exact: true })).toBeVisible();
+    await expect(page.getByRole('heading', { name: '出典', exact: true })).toBeVisible();
+    await expect(page.getByText('学説上の注意')).toBeVisible();
+  });
+}
+
+test('もの派の画像未登録作品も図録レイアウトと権利案内を維持する', async ({ page }) => {
+  await page.goto('/movements/mono-ha/');
+
+  await expect(page.getByText('作品 01')).toBeVisible();
+  await expect(page.getByText('画像は権利確認後に順次収録').first()).toBeVisible();
+  await expect(page.getByText(/画像は権利確認後に収録予定/).first()).toBeVisible();
+  await expect(page.getByRole('link', { name: /作品詳細で確認/ }).first()).toBeVisible();
+});
+
+test('ミニ目次から代表作品の章へ移動できる', async ({ page }) => {
+  await page.goto('/movements/italian-renaissance/');
+
+  await page.getByRole('navigation', { name: '詳細ページ目次' })
+    .getByRole('link', { name: '作品' })
+    .click();
+  await expect(page).toHaveURL(/#works$/);
+  await expect(page.getByRole('heading', { name: '代表作品', exact: true })).toBeVisible();
+});

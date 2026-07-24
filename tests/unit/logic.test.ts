@@ -7,6 +7,7 @@ import {
   compareRows,
   MAX_COMPARE,
 } from '@/lib/compare';
+import { buildHeroSummary } from '@/lib/movement-detail';
 
 describe('検索', () => {
   it('ムーブメント名で検索できる', () => {
@@ -79,5 +80,26 @@ describe('年代フォーマット', () => {
   it('継続中のムーブメントは「現在」を含む', () => {
     const m = getMovement('superflat')!;
     expect(formatDateRange(m)).toContain('現在');
+  });
+});
+
+describe('詳細ページの導入要旨', () => {
+  it('既存データから80〜120字の要旨を作る', () => {
+    const movement = getMovement('italian-renaissance')!;
+    const summary = buildHeroSummary(movement.summary, movement.coreIdea);
+
+    expect(summary.length).toBeGreaterThanOrEqual(80);
+    expect(summary.length).toBeLessThanOrEqual(120);
+    expect(summary.startsWith(movement.summary)).toBe(true);
+  });
+
+  it('長文は120字以内で自然に切る', () => {
+    const summary = buildHeroSummary(
+      'これは導入要旨です。'.repeat(20),
+      '補足の中心思想です。',
+    );
+
+    expect(summary.length).toBeLessThanOrEqual(120);
+    expect(summary.length).toBeGreaterThanOrEqual(80);
   });
 });

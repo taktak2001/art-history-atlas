@@ -5,7 +5,9 @@ import AxeBuilder from '@axe-core/playwright';
 const pages = [
   { path: '/', name: 'ホーム' },
   { path: '/movements/', name: 'ムーブメント一覧' },
-  { path: '/movements/impressionism/', name: 'ムーブメント詳細' },
+  { path: '/movements/prehistoric-ritual/', name: '先史美術詳細' },
+  { path: '/movements/italian-renaissance/', name: 'ルネサンス詳細' },
+  { path: '/movements/mono-ha/', name: 'もの派詳細' },
   { path: '/chronology/', name: '縦型年表' },
   { path: '/matrix/', name: 'マトリクス' },
   { path: '/compare/?ids=gothic,baroque', name: '比較' },
