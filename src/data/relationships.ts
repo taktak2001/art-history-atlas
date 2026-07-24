@@ -361,9 +361,9 @@ export const relationships: Relationship[] = [
     id: 'rel-light-space-to-immersive',
     from: 'light-and-space',
     to: 'immersive-digital',
-    kind: 'influence',
-    note: '光・空間・知覚を素材とする方法が、後の没入型デジタルインスタレーションへ影響した。',
-    sourceIds: ['teamlab-tokyo'],
+    kind: 'shared-idea',
+    note: '光・知覚・環境という関心を共有する。ただし直接の系譜ではなく、技術・制作体制・目的が異なり半世紀の距離がある（一本の発展史として結ばない）。',
+    sourceIds: ['teamlab-tokyo', 'gugg-turrell'],
   },
   {
     id: 'rel-baroque-to-immersive',

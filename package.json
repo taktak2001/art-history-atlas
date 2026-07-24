@@ -13,7 +13,8 @@
     "gen:icons": "node scripts/generate-icons.mjs",
     "test": "vitest run",
     "test:watch": "vitest",
-    "test:e2e": "playwright test",
+    "build:e2e": "NEXT_PUBLIC_DISABLE_BASEPATH=1 next build",
+    "test:e2e": "npm run build:e2e && playwright test",
     "check": "npm run typecheck && npm run lint && npm run validate:data && npm run test"
   },
   "dependencies": {

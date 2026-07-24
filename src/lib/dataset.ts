@@ -53,13 +53,21 @@ export const getSources = (ids: string[]): Source[] =>
 export const movementsChronological = (): Movement[] =>
   [...movements].sort((a, b) => a.dates.start - b.dates.start);
 
-/** 指定ムーブメントの作家 */
+/**
+ * 指定ムーブメントの作家。作家側の movementIds から導出する
+ * （movement.artistIds への手動登録に依存しない）。
+ */
 export const artistsOf = (m: Movement): Artist[] =>
-  m.artistIds.map((id) => artistById.get(id)).filter((a): a is Artist => Boolean(a));
+  artists.filter((a) => a.movementIds.includes(m.id));
 
-/** 指定ムーブメントの作品 */
+/**
+ * 指定ムーブメントの作品。作品側の movementIds から導出し、
+ * 画像付きの作品を先頭へ（詳細グリッドで代表作が見えやすいように）。
+ */
 export const worksOf = (m: Movement): Work[] =>
-  m.workIds.map((id) => workById.get(id)).filter((w): w is Work => Boolean(w));
+  works
+    .filter((w) => w.movementIds.includes(m.id))
+    .sort((a, b) => Number(Boolean(b.image)) - Number(Boolean(a.image)));
 
 /** 指定ムーブメントに接続する関係（両方向） */
 export const relationshipsOf = (id: string): Relationship[] =>

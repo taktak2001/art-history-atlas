@@ -11,11 +11,16 @@
  * GitHub Pages のサブパス配下（/art-history-atlas）でも動くよう、
  * 自身の登録スコープから BASE を導出する（ルート配信・サブパス配信の双方に対応）。
  */
-const VERSION = 'v1';
+const VERSION = 'v2';
 const SHELL_CACHE = `aha-shell-${VERSION}`;
 const PAGES_CACHE = `aha-pages-${VERSION}`;
 const ASSETS_CACHE = `aha-assets-${VERSION}`;
+const IMAGE_CACHE = `aha-images-${VERSION}`;
 const PAGES_LIMIT = 40; // 閲覧ページのキャッシュ上限
+const IMAGE_LIMIT = 60; // 作品画像キャッシュの上限（無制限キャッシュを防ぐ）
+
+// 外部画像を許可するホスト（Wikimedia のパブリックドメイン画像のみ）
+const IMAGE_HOSTS = ['commons.wikimedia.org', 'upload.wikimedia.org'];
 
 // 登録スコープから配信ベースパスを求める（例: "/art-history-atlas" または ""）。
 const BASE = new URL(self.registration.scope).pathname.replace(/\/$/, '');
@@ -42,7 +47,7 @@ self.addEventListener('activate', (event) => {
       .then((keys) =>
         Promise.all(
           keys
-            .filter((k) => ![SHELL_CACHE, PAGES_CACHE, ASSETS_CACHE].includes(k))
+            .filter((k) => ![SHELL_CACHE, PAGES_CACHE, ASSETS_CACHE, IMAGE_CACHE].includes(k))
             .map((k) => caches.delete(k)),
         ),
       )
@@ -64,7 +69,30 @@ self.addEventListener('fetch', (event) => {
   if (request.method !== 'GET') return;
 
   const url = new URL(request.url);
-  if (url.origin !== self.location.origin) return; // 外部（画像CDN等）は制御しない
+
+  // 外部の作品画像（Wikimedia）: cache-first + 件数上限（無制限キャッシュを防ぐ）
+  if (IMAGE_HOSTS.includes(url.hostname)) {
+    event.respondWith(
+      caches.open(IMAGE_CACHE).then(async (cache) => {
+        const cached = await cache.match(request);
+        if (cached) return cached;
+        try {
+          const res = await fetch(request);
+          // 正常応答（basic/cors/opaque）のみ保存
+          if (res && (res.ok || res.type === 'opaque')) {
+            cache.put(request, res.clone());
+            trimCache(IMAGE_CACHE, IMAGE_LIMIT);
+          }
+          return res;
+        } catch {
+          return cached || Response.error();
+        }
+      }),
+    );
+    return;
+  }
+
+  if (url.origin !== self.location.origin) return; // その他の外部は制御しない
 
   // ナビゲーション: network-first
   if (request.mode === 'navigate') {

@@ -216,26 +216,38 @@ export const Source = z.object({
 export type Source = z.infer<typeof Source>;
 
 /** 画像メタデータ（権利処理のためのフィールドを必須化） */
-export const ImageMeta = z.object({
-  /** 作品名 */
-  title: z.string().min(1),
-  /** 作者 */
-  creator: z.string().min(1),
-  /** 制作年（表記のまま） */
-  date: z.string().min(1),
-  /** 画像提供元 */
-  provider: z.string().min(1),
-  /** 原典URL（画像の出所ページ） */
-  sourceUrl: z.string().url(),
-  /** 直接の画像ファイルURL（任意、ホットリンクは慎重に） */
-  fileUrl: z.string().url().optional(),
-  license: ImageLicense,
-  /** クレジット表記 */
-  credit: z.string().min(1),
-  isPublicDomain: z.boolean(),
-  /** 最終確認日 */
-  verifiedOn: z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
-});
+export const ImageMeta = z
+  .object({
+    /** 作品名 */
+    title: z.string().min(1),
+    /** 作者 */
+    creator: z.string().min(1),
+    /** 制作年（表記のまま） */
+    date: z.string().min(1),
+    /** 画像提供元 */
+    provider: z.string().min(1),
+    /** 原典URL（画像の出所ページ = 原典ページURL） */
+    sourceUrl: z.string().url(),
+    /** 直接の画像ファイルURL（Wikimedia Commons Special:FilePath 等の安定エンドポイント） */
+    fileUrl: z.string().url().optional(),
+    license: ImageLicense,
+    /** クレジット表記 */
+    credit: z.string().min(1),
+    isPublicDomain: z.boolean(),
+    /** 代替テキスト（スクリーンリーダー向け・必須） */
+    alt: z.string().min(1),
+    /** 最終確認日 */
+    verifiedOn: z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
+    /** 確認方法の注記（例: 取得経路・検証の限界） */
+    verificationNote: z.string().optional(),
+  })
+  // Public Domain判定とライセンスの整合性を強制する
+  .refine((img) => (img.isPublicDomain ? img.license === 'public-domain' || img.license === 'cc0' : true), {
+    message: 'isPublicDomain=true のライセンスは public-domain または cc0 でなければならない',
+  })
+  .refine((img) => (img.license === 'cc-by' || img.license === 'cc-by-sa' ? img.isPublicDomain === false : true), {
+    message: 'CC BY / CC BY-SA は isPublicDomain=false でなければならない',
+  });
 export type ImageMeta = z.infer<typeof ImageMeta>;
 
 /** 作品 */

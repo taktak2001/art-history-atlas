@@ -2,8 +2,11 @@
 
 // GitHub Pages のプロジェクトサイトはサブパス配下（/art-history-atlas）で配信される。
 // production ビルド時のみ basePath / assetPrefix を付与する（ローカル開発はルート配信）。
+// ローカル E2E（out/ をルート配信して検証）では NEXT_PUBLIC_DISABLE_BASEPATH=1 で無効化できる。
+// 本番デプロイでは常に付与される（この env は CI/デプロイでは設定しない）。
 const isProd = process.env.NODE_ENV === 'production';
-const basePath = isProd ? '/art-history-atlas' : '';
+const disableBasePath = process.env.NEXT_PUBLIC_DISABLE_BASEPATH === '1';
+const basePath = isProd && !disableBasePath ? '/art-history-atlas' : '';
 
 const nextConfig = {
   output: 'export',
