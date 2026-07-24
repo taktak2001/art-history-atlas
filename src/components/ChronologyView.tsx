@@ -280,16 +280,23 @@ export function ChronologyView({ movements }: { movements: Movement[] }) {
   };
 
   const toggleEra = (era: EraId) => {
-    setExpandedEras((current) => {
-      const next = new Set(current);
-      if (next.has(era)) next.delete(era);
-      else next.add(era);
-      return next;
-    });
+    const willExpand = !expandedEras.has(era);
+    setExpandedEras(willExpand ? new Set([era]) : new Set());
+
+    if (willExpand) {
+      window.requestAnimationFrame(() => {
+        document.getElementById(`era-${era}`)?.scrollIntoView({
+          behavior: window.matchMedia('(prefers-reduced-motion: reduce)').matches
+            ? 'auto'
+            : 'smooth',
+          block: 'start',
+        });
+      });
+    }
   };
 
   const navigateToEra = (era: EraId) => {
-    setExpandedEras((current) => new Set(current).add(era));
+    setExpandedEras(new Set([era]));
     window.requestAnimationFrame(() => {
       document.getElementById(`era-${era}`)?.scrollIntoView({
         behavior: window.matchMedia('(prefers-reduced-motion: reduce)').matches
@@ -303,7 +310,7 @@ export function ChronologyView({ movements }: { movements: Movement[] }) {
   return (
     <>
       <div className="chronology-controls">
-        <LodControl value={lod} onChange={setLod} counts={counts} />
+        <LodControl value={lod} onChange={setLod} counts={counts} compact />
       </div>
 
       <nav
@@ -359,14 +366,19 @@ export function ChronologyView({ movements }: { movements: Movement[] }) {
                   {String(eraIndex + 1).padStart(2, '0')}
                 </span>
                 <span className="chronology-era__identity">
-                  <span className="chronology-era__range">{era.range}</span>
                   <span className="chronology-era__title">{era.label}</span>
-                  <span className="chronology-era__catchphrase">
-                    「{era.catchphrase}」
+                  <span className="chronology-era__meta">
+                    <span className="chronology-era__range">{era.range}</span>
+                    <span aria-hidden="true">・</span>
+                    <span>{eraMovements.length}件</span>
                   </span>
+                  {isExpanded && (
+                    <span className="chronology-era__catchphrase">
+                      「{era.catchphrase}」
+                    </span>
+                  )}
                 </span>
                 <span className="chronology-era__action">
-                  <span>{eraMovements.length}件の展示</span>
                   <span className="chronology-era__toggle" aria-hidden="true">
                     {isExpanded ? '−' : '＋'}
                   </span>
