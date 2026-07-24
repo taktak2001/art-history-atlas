@@ -9,6 +9,7 @@ import {
   type PointerEvent,
   type WheelEvent,
 } from 'react';
+import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import type { Movement, Relationship, RelationKind, EraId } from '@/lib/schema';
 import { RELATION_LABELS, ERA_LABELS } from '@/lib/schema';
@@ -949,12 +950,12 @@ export function NetworkGraph({ movements, relationships, eraOrder }: Props) {
                   : `${selectedGroup.label}の内訳を展開`}
               </button>
             )}
-          <a
+          <Link
             href={`/movements/${selectedMovement.id}/`}
             className="mt-2 inline-block text-sm prose-link"
           >
             詳細ページへ →
-          </a>
+          </Link>
         </section>
       )}
 
