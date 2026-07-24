@@ -449,7 +449,7 @@ test('閲覧モードはマウスパン・ダブルクリック・キーボー�
     .not.toBe(beforeX);
 
   await stage.dispatchEvent('dblclick', { clientX: 720, clientY: 520 });
-  await expect(viewer).toHaveAttribute('data-viewer-scale', '2');
+  await expect(viewer).toHaveAttribute('data-viewer-scale', '1.75');
   await stage.press('0');
   await expect
     .poll(async () => Number((await viewer.getAttribute('data-viewer-scale')) ?? 0))
@@ -520,6 +520,98 @@ test('iPhone幅の閲覧モードは2本指の中点を保ってピンチズー�
   await expect
     .poll(async () => Number((await viewer.getAttribute('data-viewer-scale')) ?? 0))
     .toBeGreaterThan(0);
+});
+
+test('閲覧モードは固定軸と一定寸法のノードでセマンティックズームする', async ({
+  page,
+}, testInfo) => {
+  await page.goto('/timeline/');
+  await modeButton(page, '近代').click();
+  await page.getByRole('button', { name: 'タイムラインを全画面で表示' }).click();
+
+  const viewer = page.locator('[data-timeline-viewer="active"]');
+  const stage = viewer.locator('[data-timeline-viewer-stage]');
+  const timeAxis = viewer.locator('.timeline-viewer-time-axis');
+  const regionAxis = viewer.locator('.timeline-viewer-region-axis');
+  const origin = viewer.locator('.timeline-viewer-axis-origin');
+  const firstNode = viewer.locator('[data-viewer-node]:visible').first();
+  const fixedBefore = await Promise.all([
+    timeAxis.boundingBox(),
+    regionAxis.boundingBox(),
+    origin.boundingBox(),
+    firstNode.boundingBox(),
+  ]);
+
+  if (testInfo.project.name === 'desktop') {
+    await stage.hover({ position: { x: 650, y: 420 } });
+    await page.mouse.down();
+    await page.mouse.move(520, 350, { steps: 4 });
+    await page.mouse.up();
+  } else {
+    await stage.dispatchEvent('pointerdown', {
+      pointerId: 21,
+      pointerType: 'touch',
+      clientX: 240,
+      clientY: 380,
+      isPrimary: true,
+    });
+    await stage.dispatchEvent('pointermove', {
+      pointerId: 21,
+      pointerType: 'touch',
+      clientX: 190,
+      clientY: 340,
+      isPrimary: true,
+    });
+    await stage.dispatchEvent('pointerup', {
+      pointerId: 21,
+      pointerType: 'touch',
+      clientX: 190,
+      clientY: 340,
+      isPrimary: true,
+    });
+  }
+
+  for (let index = 0; index < 4; index += 1) {
+    const beforeScale = Number(await viewer.getAttribute('data-viewer-scale'));
+    await viewer.getByRole('button', { name: '拡大' }).click();
+    await expect
+      .poll(async () => Number((await viewer.getAttribute('data-viewer-scale')) ?? 0))
+      .toBeGreaterThan(beforeScale);
+  }
+
+  const maximumScale = testInfo.project.name === 'mobile' ? 3 : 4;
+  await expect
+    .poll(async () => Number((await viewer.getAttribute('data-viewer-scale')) ?? 0))
+    .toBeLessThanOrEqual(maximumScale);
+  await expect(viewer).toHaveAttribute('data-semantic-level', /contextual|detailed/);
+
+  const fixedAfter = await Promise.all([
+    timeAxis.boundingBox(),
+    regionAxis.boundingBox(),
+    origin.boundingBox(),
+    viewer.locator('[data-viewer-node]:visible').first().boundingBox(),
+  ]);
+  expect(fixedAfter[0]?.height).toBe(fixedBefore[0]?.height);
+  expect(fixedAfter[1]?.width).toBe(fixedBefore[1]?.width);
+  expect(fixedAfter[2]).toEqual(fixedBefore[2]);
+
+  const nodeBox = fixedAfter[3];
+  expect(nodeBox?.height).toBeLessThanOrEqual(
+    testInfo.project.name === 'mobile' ? 60 : 68,
+  );
+  expect(nodeBox?.width).toBeLessThanOrEqual(
+    testInfo.project.name === 'mobile' ? 180 : 220,
+  );
+  const detailedNode = viewer.locator('[data-viewer-node]:visible').first();
+  await expect(detailedNode.locator('.timeline-viewer-node__date')).toBeVisible();
+  await expect(
+    detailedNode.locator('.timeline-viewer-node__english-inline'),
+  ).toBeVisible();
+  const nodeFontSize = await detailedNode
+    .locator('.timeline-viewer-node__name')
+    .evaluate((element) => parseFloat(getComputedStyle(element).fontSize));
+  expect(nodeFontSize).toBeGreaterThanOrEqual(12);
+  expect(nodeFontSize).toBeLessThanOrEqual(18);
 });
 
 test('閲覧モードにaxeの重大なアクセシビリティ違反がない', async ({ page }) => {
