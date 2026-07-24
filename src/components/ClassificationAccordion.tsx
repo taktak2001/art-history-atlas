@@ -15,7 +15,7 @@ export const classificationItems: ClassificationItem[] = [
   {
     id: 'period',
     name: '時代区分',
-    summary: '政治・宗教・社会・文化の大きな変化に基づく、年代上の枠組みです。',
+    summary: '政治・宗教・社会・文化の大きな変化に基づく、年代上の枠組み',
     definition:
       '美術史を、政治・宗教・社会・文化の大きな変化に基づいて分けた年代上の区分です。個別の表現様式や運動ではなく、複数の様式・流派・運動を含む上位概念です。',
     criteria: [
@@ -28,7 +28,7 @@ export const classificationItems: ClassificationItem[] = [
   {
     id: 'style',
     name: '様式',
-    summary: '構図・空間・色彩・光・技法など、作品に共有される視覚的特徴のまとまりです。',
+    summary: '構図・空間・色彩・光・技法など、作品に共有される視覚的特徴のまとまり',
     definition:
       '作品に共通して現れる、視覚的・形式的な特徴のまとまりです。構図、空間表現、色彩、光、人物表現、装飾、技法などから識別します。必ずしも芸術家自身が名乗ったものではなく、後世の美術史家による分類も含みます。',
     criteria: [
@@ -41,7 +41,7 @@ export const classificationItems: ClassificationItem[] = [
   {
     id: 'movement',
     name: '芸術運動',
-    summary: '共通する問題意識や理念から、既存の美術へ新しい表現を提示した動きです。',
+    summary: '共通する問題意識や理念から、既存の美術へ新しい表現を提示した動き',
     definition:
       '複数の芸術家が、共通する問題意識や理念のもとで、既存の美術に対して新しい表現を提示した動きです。',
     criteria: [
@@ -55,7 +55,7 @@ export const classificationItems: ClassificationItem[] = [
   {
     id: 'school',
     name: '流派',
-    summary: '地域・師弟関係・工房・教育機関・技法的伝統を共有する芸術家の系譜です。',
+    summary: '地域・師弟関係・工房・教育機関・技法的伝統を共有する芸術家の系譜',
     definition:
       '特定の地域、師弟関係、工房、教育機関、技法的伝統などを共有する芸術家の系譜です。芸術運動ほど明確な理念や宣言を持たず、地域性や人的ネットワークを中心に形成されます。',
     criteria: [
@@ -69,7 +69,7 @@ export const classificationItems: ClassificationItem[] = [
   {
     id: 'collective',
     name: '芸術家集団',
-    summary: '共同制作・展覧会・声明・出版などを行った、実在する組織です。',
+    summary: '共同制作・展覧会・声明・出版などを行った、実在する組織',
     definition:
       '実際に組織として結成され、共同制作、展覧会、声明、出版などを行った具体的なグループです。',
     criteria: [
@@ -83,7 +83,7 @@ export const classificationItems: ClassificationItem[] = [
   {
     id: 'tendency',
     name: '制作傾向',
-    summary: '組織や声明を必須とせず、複数の作家に共通する表現・制作上の方向性です。',
+    summary: '組織や声明を必須とせず、複数の作家に共通する表現・制作上の方向性',
     definition:
       '明確な組織や共通声明を持たないものの、複数の作家に共通して見られる表現上・制作上の方向性です。後世の批評家や美術史家がまとめて命名した場合も多くあります。',
     criteria: [
@@ -97,7 +97,7 @@ export const classificationItems: ClassificationItem[] = [
   {
     id: 'method-theory',
     name: '方法論・理論',
-    summary: '作品の様式ではなく、美術を制作・解釈・分析するための理論的枠組みです。',
+    summary: '作品の様式ではなく、美術を制作・解釈・分析するための理論的枠組み',
     definition:
       '作品そのものの様式ではなく、美術を制作・解釈・分析するための考え方や理論的枠組みです。',
     criteria: [
