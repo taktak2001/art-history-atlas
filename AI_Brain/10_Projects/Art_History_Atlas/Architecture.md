@@ -45,7 +45,7 @@
 - `WorkGrid`: 代表作品グリッド（→ 作品詳細）。
 - `CompareBoard`(client): URL共有可能な比較。代表作画像を並置。
 - `NetworkGraph`(client): 時代カラム配置 + SVGベジェのエッジ + 関係タイプフィルタ + ノード選択で前後強調。テキスト代替リスト内蔵。
-- `HorizontalTimeline`(client): 地域レーン、ドラッグ/ズーム、粒度切替。テキスト代替表内蔵。
+- `HorizontalTimeline`(client): 時代ナビと6つの表示モード、通史用の非線形軸、先史・古代の要約帯、地域別の自動段組み、ドラッグ/スワイプ、表示範囲に連動するテキスト代替表を内蔵。通史幅は1180px、時代別は720〜940pxに制限。
 - `Badges`（分類/地域/確認状態/関係タイプ）, `MovementCard`, `SourceList`, `MovementsExplorer`(client 検索)
 
 ## 5. PWA / Service Worker

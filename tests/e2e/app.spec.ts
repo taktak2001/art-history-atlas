@@ -45,9 +45,46 @@ test('地域フィルタ（日本）を適用できる', async ({ page }) => {
 
 test('横型タイムラインのテキスト代替が利用できる', async ({ page }) => {
   await page.goto('/timeline/');
-  await page.getByText(/テキスト形式で表示/).click();
+  await page.getByText(/通史をテキスト形式で表示/).click();
   await expect(page.getByRole('table')).toBeVisible();
   await expect(page.getByRole('cell', { name: /印象派/ }).first()).toBeVisible();
+});
+
+test('横型タイムラインを時代別に切り替え、対象年代だけを表示できる', async ({ page }) => {
+  await page.goto('/timeline/');
+
+  await expect(page.getByRole('button', { name: '通史', exact: true })).toHaveAttribute(
+    'aria-pressed',
+    'true',
+  );
+  await expect(page.getByText('先史の造形')).toBeVisible();
+  await expect(page.getByText('古代の規範')).toBeVisible();
+  const surveyWidth = await page
+    .getByRole('group', { name: /通史の横型タイムライン/ })
+    .locator('[data-timeline-track]')
+    .evaluate((element) => element.getBoundingClientRect().width);
+  expect(surveyWidth).toBeLessThanOrEqual(1200);
+
+  await page.getByRole('button', { name: '近代', exact: true }).click();
+  await expect(page.getByRole('button', { name: '近代', exact: true })).toHaveAttribute(
+    'aria-pressed',
+    'true',
+  );
+  await expect(page.getByText('1750 - 1950')).toBeVisible();
+  await expect(page.getByRole('link', { name: '印象派', exact: true }).first()).toBeVisible();
+  await expect(page.getByRole('link', { name: /スーパーフラット/ })).toHaveCount(0);
+  const modernWidth = await page
+    .getByRole('group', { name: /近代の横型タイムライン/ })
+    .locator('[data-timeline-track]')
+    .evaluate((element) => element.getBoundingClientRect().width);
+  expect(modernWidth).toBeLessThanOrEqual(960);
+
+  await page.getByRole('button', { name: '現代', exact: true }).first().click();
+  await expect(page.getByRole('button', { name: '現代', exact: true }).last()).toHaveAttribute(
+    'aria-pressed',
+    'true',
+  );
+  await expect(page.getByRole('link', { name: /スーパーフラット/ }).first()).toBeVisible();
 });
 
 test('PWA: manifestとService Workerが提供される', async ({ page, request }) => {

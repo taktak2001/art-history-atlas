@@ -35,6 +35,7 @@
 7. Service Worker: 外部画像専用キャッシュ `aha-images`（上限60、cache-first）。VERSION `v2`。
 8. `validate-data.ts` 拡張: ≥2作品/PD整合/alt/タイトル重複/画像URL重複/ローカルパス実在。
 9. 編集監査: Light&Space↔teamLab、もの派↔アルテ・ポーヴェラを非直線的に修正。第2機関出典17件追加。`docs/editorial-audit-phase2.md` に記録。
+10. 横型タイムライン再設計: 時代ナビ、通史/古代/中世/近世/近代/現代モード、非線形の通史軸、先史・古代の要約帯、地域レーンの重なり回避、モバイル横幅制限を実装。
 
 ### Phase 2 のコミット（`claude/phase2-content-images`）
 - foundation（schema/dataset/artists）
