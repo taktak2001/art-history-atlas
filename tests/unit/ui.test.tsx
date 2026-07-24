@@ -1,5 +1,5 @@
-import { describe, it, expect } from 'vitest';
-import { fireEvent, render, screen } from '@testing-library/react';
+import { describe, it, expect, vi } from 'vitest';
+import { fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import { MovementCard } from '@/components/MovementCard';
 import { SourceList } from '@/components/SourceList';
 import { VerificationBadge } from '@/components/Badges';
@@ -10,6 +10,10 @@ import {
 } from '@/components/ClassificationAccordion';
 import { getMovement, getSources } from '@/lib/dataset';
 import type { Work } from '@/lib/schema';
+import { LodControl } from '@/components/LodControl';
+import { MatrixView } from '@/components/MatrixView';
+import { MovementsExplorer } from '@/components/MovementsExplorer';
+import { movements, activeRegions } from '@/lib/dataset';
 
 describe('MovementCard', () => {
   it('ムーブメント名・英名・要約を表示する', () => {
@@ -122,5 +126,71 @@ describe('ClassificationAccordion', () => {
 
     fireEvent.keyDown(theoryButton, { key: 'Home' });
     expect(periodButton).toHaveFocus();
+  });
+});
+
+describe('LOD UI', () => {
+  it('表示密度をテキストとaria-pressedで切り替える', () => {
+    const onChange = vi.fn();
+    render(<LodControl value="core" onChange={onChange} />);
+
+    expect(screen.getByRole('button', { name: '主要' })).toHaveAttribute(
+      'aria-pressed',
+      'true',
+    );
+    fireEvent.click(screen.getByRole('button', { name: '標準' }));
+    expect(onChange).toHaveBeenCalledWith('standard');
+  });
+
+  it('マトリクスのセルを+Nで個別展開する', async () => {
+    window.history.replaceState({}, '', '/matrix/?lod=core');
+    render(<MatrixView movements={movements} regions={activeRegions()} />);
+
+    const cell = document.querySelector(
+      '[data-matrix-cell="france:nineteenth"]',
+    ) as HTMLElement;
+    const reveal = within(cell).getByRole('button', { name: /\+2/ });
+    fireEvent.click(reveal);
+
+    expect(reveal).toHaveAttribute('aria-expanded', 'true');
+    expect(within(cell).getByText('ポスト印象派')).toBeVisible();
+  });
+
+  it('マトリクスに固定コーナー・時代ヘッダー・地域ヘッダーを持つ', () => {
+    window.history.replaceState({}, '', '/matrix/?lod=core');
+    render(<MatrixView movements={movements} regions={activeRegions()} />);
+
+    const region = screen.getByRole('region', {
+      name: '地域と時代のマトリクス表',
+    });
+    expect(region).toHaveAttribute('tabindex', '0');
+    expect(region.querySelector('[data-sticky-cell="corner"]')).toHaveTextContent(
+      '地域 ＼ 時代',
+    );
+    expect(region.querySelectorAll('[data-sticky-cell="column"]').length).toBeGreaterThan(0);
+    expect(region.querySelectorAll('[data-sticky-cell="row"]').length).toBeGreaterThan(0);
+  });
+
+  it('LOD外の検索結果を表示し、必要な密度へ切り替える', async () => {
+    window.history.replaceState({}, '', '/movements/?lod=core');
+    render(<MovementsExplorer />);
+
+    fireEvent.change(screen.getByRole('searchbox'), { target: { value: '未来派' } });
+    expect(screen.getByText('現在の表示密度では非表示')).toBeVisible();
+
+    fireEvent.click(screen.getByRole('button', { name: '標準で表示' }));
+    await waitFor(() =>
+      expect(window.location.search).toContain('lod=standard'),
+    );
+    expect(screen.queryByText('現在の表示密度では非表示')).not.toBeInTheDocument();
+  });
+
+  it('一覧をフラット表示から階層表示へ切り替える', () => {
+    window.history.replaceState({}, '', '/movements/?lod=core');
+    render(<MovementsExplorer />);
+
+    fireEvent.click(screen.getByRole('button', { name: '階層' }));
+    expect(document.querySelector('[data-movement-view="hierarchy"]')).toBeInTheDocument();
+    expect(screen.getByRole('heading', { name: '印象派周辺' })).toBeVisible();
   });
 });

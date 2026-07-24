@@ -103,6 +103,16 @@ export const ERA_ORDER: EraId[] = [
   'contemporary',
 ];
 
+/** 表示密度。値は「その項目が初めて現れるレベル」を表す */
+export const VisibilityLevel = z.enum(['core', 'standard', 'detailed']);
+export type VisibilityLevel = z.infer<typeof VisibilityLevel>;
+
+export const VISIBILITY_LEVEL_LABELS: Record<VisibilityLevel, string> = {
+  core: '主要',
+  standard: '標準',
+  detailed: '詳細',
+};
+
 /** 情報の確認状態：事実の確からしさを利用者に明示する */
 export const VerificationStatus = z.enum([
   'verified', // 複数の信頼できる資料で確認
@@ -304,6 +314,18 @@ export const Movement = z.object({
   nameJa: z.string().min(1),
   nameEn: z.string().min(1),
   aliases: z.array(z.string()).default([]),
+  /** この項目が初めて表示されるLOD */
+  visibilityLevel: VisibilityLevel,
+  /** 表示整理上の親。継承・影響などの因果関係には使用しない */
+  parentMovementId: slug.optional(),
+  /** 因果を意味しない表示上のまとまり */
+  groupId: slug.optional(),
+  /** グループを縮約表示するときの代表項目 */
+  isRepresentative: z.boolean().optional(),
+  /** 同一階層内の安定した表示順 */
+  displayOrder: z.number().int().nonnegative().optional(),
+  /** 高密度画面用の短縮表示 */
+  shortLabel: z.string().min(1).max(24).optional(),
   classification: ClassificationKind,
   era: EraId,
   dates: DateRange,

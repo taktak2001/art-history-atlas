@@ -27,6 +27,12 @@ import { artists } from '../src/data/artists';
 import { works } from '../src/data/works';
 import { relationships } from '../src/data/relationships';
 import { sources } from '../src/data/sources';
+import {
+  LOD_ORDER,
+  MOVEMENT_GROUPS,
+  filterMovementsByLod,
+  hasMovementHierarchyCycle,
+} from '../src/lib/movement-hierarchy';
 
 let errors = 0;
 const fail = (msg: string) => {
@@ -87,6 +93,71 @@ for (const m of movements) {
   for (const w of m.workIds) if (!workIds.has(w)) fail(`movement ${m.id}: 作品 "${w}" が存在しない`);
   for (const s of m.sourceIds) if (!sourceIds.has(s)) fail(`movement ${m.id}: 出典 "${s}" が存在しない`);
 }
+
+console.log('▶ Movement LOD・階層');
+const groupIds = new Set(MOVEMENT_GROUPS.map((group) => group.id));
+const displayOrderScopes = new Map<string, Set<number>>();
+for (const m of movements) {
+  if (m.parentMovementId) {
+    const parent = movements.find((candidate) => candidate.id === m.parentMovementId);
+    if (!parent) {
+      fail(`movement ${m.id}: parentMovementId "${m.parentMovementId}" が存在しない`);
+    } else {
+      if (m.parentMovementId === m.id) {
+        fail(`movement ${m.id}: parentMovementId の自己参照は不可`);
+      }
+      if (LOD_ORDER[m.visibilityLevel] < LOD_ORDER[parent.visibilityLevel]) {
+        fail(
+          `movement ${m.id}: 子のLOD ${m.visibilityLevel} が親 ${parent.id} (${parent.visibilityLevel}) より低密度`,
+        );
+      }
+    }
+  }
+  if (m.groupId) {
+    if (!/^[a-z0-9]+(?:-[a-z0-9]+)*$/.test(m.groupId)) {
+      fail(`movement ${m.id}: groupId "${m.groupId}" の形式が不正`);
+    }
+    if (!groupIds.has(m.groupId)) {
+      fail(`movement ${m.id}: groupId "${m.groupId}" が未定義`);
+    }
+  }
+  if (m.shortLabel && m.shortLabel.length > 24) {
+    fail(`movement ${m.id}: shortLabel が24文字を超える`);
+  }
+  if (m.displayOrder !== undefined) {
+    const scope = m.parentMovementId ?? m.groupId ?? '__root__';
+    const used = displayOrderScopes.get(scope) ?? new Set<number>();
+    if (used.has(m.displayOrder)) {
+      fail(`movement ${m.id}: 表示スコープ "${scope}" で displayOrder ${m.displayOrder} が重複`);
+    }
+    used.add(m.displayOrder);
+    displayOrderScopes.set(scope, used);
+  }
+}
+if (hasMovementHierarchyCycle(movements)) {
+  fail('movements: parentMovementId に循環参照がある');
+}
+for (const group of MOVEMENT_GROUPS) {
+  const representative = movements.find(
+    (movement) => movement.id === group.representativeMovementId,
+  );
+  if (!representative) {
+    fail(`group ${group.id}: 代表ムーブメント "${group.representativeMovementId}" が存在しない`);
+  } else if (representative.groupId !== group.id) {
+    fail(`group ${group.id}: 代表ムーブメントが同じgroupIdを持たない`);
+  } else if (!representative.isRepresentative) {
+    fail(`group ${group.id}: 代表ムーブメントに isRepresentative=true がない`);
+  }
+}
+const coreCount = filterMovementsByLod(movements, 'core').length;
+const standardCount = filterMovementsByLod(movements, 'standard').length;
+const detailedCount = filterMovementsByLod(movements, 'detailed').length;
+if (coreCount < 20) fail(`movements: coreが${coreCount}件（20件未満）`);
+if (standardCount < coreCount) fail('movements: standard件数がcore件数を下回る');
+if (detailedCount !== movements.length) {
+  fail(`movements: detailed ${detailedCount}件が全件 ${movements.length}件と一致しない`);
+}
+console.log(`  ✓ LOD件数: core ${coreCount} / standard ${standardCount} / detailed ${detailedCount}`);
 // 作家の参照
 for (const a of artists) {
   for (const m of a.movementIds) if (!movementIds.has(m)) fail(`artist ${a.id}: ムーブメント "${m}" が存在しない`);

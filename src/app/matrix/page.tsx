@@ -1,12 +1,6 @@
 import type { Metadata } from 'next';
-import Link from 'next/link';
-import {
-  ERA_ORDER,
-  ERA_LABELS,
-  REGION_LABELS,
-  activeRegions,
-  matrixCell,
-} from '@/lib/dataset';
+import { activeRegions, movements } from '@/lib/dataset';
+import { MatrixView } from '@/components/MatrixView';
 
 export const metadata: Metadata = {
   title: '時代×地域マトリクス',
@@ -25,57 +19,11 @@ export default function MatrixPage() {
         美術活動の不在を意味しません。西洋美術史を唯一の発展経路として描かないための視点です。
       </p>
 
-      <div className="scroll-x mt-8 rounded-sm border hairline">
-        <table className="w-full border-collapse text-sm">
-          <caption className="sr-only">時代を列、地域を行とし、該当するムーブメントを各セルに示した表</caption>
-          <thead>
-            <tr>
-              <th scope="col" className="sticky left-0 z-10 border-b border-r hairline bg-surface p-3 text-left text-xs text-muted">
-                地域 ＼ 時代
-              </th>
-              {ERA_ORDER.map((era) => (
-                <th key={era} scope="col" className="min-w-[160px] border-b border-l hairline bg-surface p-3 text-left font-serif text-sm">
-                  {ERA_LABELS[era]}
-                </th>
-              ))}
-            </tr>
-          </thead>
-          <tbody>
-            {regions.map((region) => (
-              <tr key={region}>
-                <th scope="row" className="sticky left-0 z-10 border-r border-t hairline bg-raised p-3 text-left text-xs text-muted">
-                  {REGION_LABELS[region]}
-                </th>
-                {ERA_ORDER.map((era) => {
-                  const cell = matrixCell(era, region);
-                  return (
-                    <td key={era} className="border-l border-t hairline align-top p-2">
-                      {cell.length === 0 ? (
-                        <span aria-hidden="true" className="text-faint">—</span>
-                      ) : (
-                        <ul className="space-y-1">
-                          {cell.map((m) => (
-                            <li key={m.id}>
-                              <Link
-                                href={`/movements/${m.id}/`}
-                                className="block rounded-sm bg-accent/10 px-2 py-1 text-xs text-ink hover:bg-accent/20"
-                              >
-                                {m.nameJa}
-                              </Link>
-                            </li>
-                          ))}
-                        </ul>
-                      )}
-                    </td>
-                  );
-                })}
-              </tr>
-            ))}
-          </tbody>
-        </table>
+      <div className="mt-8">
+        <MatrixView movements={movements} regions={regions} />
       </div>
       <p className="mt-4 text-xs text-faint">
-        セルを選ぶと該当ムーブメントの詳細へ移動します。横スクロールで全時代を確認できます。
+        セルを選ぶと該当ムーブメントの詳細へ移動します。表内を縦横にスクロールして、全地域・全時代を確認できます。
       </p>
     </div>
   );

@@ -2,7 +2,7 @@ import { test, expect } from '@playwright/test';
 
 test('ホームからムーブメント詳細へ移動できる', async ({ page }) => {
   await page.goto('/');
-  await expect(page.getByRole('heading', { level: 1 })).toContainText('美術史とは');
+  await expect(page.getByRole('heading', { level: 1 })).toHaveText('美術史アトラス');
   // 主要な転換点のカードから印象派へ
   await page.getByRole('link', { name: /印象派/ }).first().click();
   await expect(page).toHaveURL(/\/movements\/impressionism\/?$/);
@@ -30,7 +30,7 @@ test('2件のムーブメントを比較できる', async ({ page }) => {
   await expect(page.getByRole('columnheader', { name: /ゴシック美術/ })).toBeVisible();
   await expect(page.getByRole('columnheader', { name: /イタリア・ルネサンス/ })).toBeVisible();
   // 比較項目の行が存在する
-  await expect(page.getByRole('rowheader', { name: '中心思想' })).toBeVisible();
+  await expect(page.getByRole('rowheader', { name: '思想' })).toBeVisible();
   await expect(page.getByRole('rowheader', { name: '後世への影響' })).toBeVisible();
 });
 
@@ -50,7 +50,7 @@ test('横型タイムラインのテキスト代替が利用できる', async ({
   await expect(page.getByRole('cell', { name: /印象派/ }).first()).toBeVisible();
 });
 
-test('横型タイムラインを時代別に切り替え、対象年代だけを表示できる', async ({ page }) => {
+test('横型タイムラインを時代別に切り替え、対象年代だけを表示できる', async ({ page }, testInfo) => {
   await page.goto('/timeline/');
 
   await expect(page.getByRole('button', { name: '通史', exact: true })).toHaveAttribute(
@@ -80,9 +80,14 @@ test('横型タイムラインを時代別に切り替え、対象年代だけ�
     .getByRole('group', { name: /近代の横型タイムライン/ })
     .locator('[data-timeline-track]')
     .evaluate((element) => element.getBoundingClientRect().width);
-  expect(modernWidth).toBeGreaterThanOrEqual(1800);
-  expect(modernWidth).toBeGreaterThan(surveyWidth + 500);
-  expect(modernWidth).toBeLessThanOrEqual(2400);
+  if (testInfo.project.name === 'mobile') {
+    expect(modernWidth).toBeGreaterThanOrEqual(1000);
+    expect(modernWidth).toBeLessThanOrEqual(1100);
+  } else {
+    expect(modernWidth).toBeGreaterThanOrEqual(1800);
+    expect(modernWidth).toBeGreaterThan(surveyWidth + 500);
+    expect(modernWidth).toBeLessThanOrEqual(2400);
+  }
 
   await page.getByRole('group', { name: '表示モード' }).getByRole('button', { name: '現代' }).click();
   await expect(page.getByRole('group', { name: '表示モード' }).getByRole('button', { name: '現代' })).toHaveAttribute(

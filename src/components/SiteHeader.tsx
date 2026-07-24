@@ -25,19 +25,22 @@ export function SiteHeader() {
 
   return (
     <header className="sticky top-0 z-40 border-b hairline bg-paper/90 backdrop-blur supports-[backdrop-filter]:bg-paper/80">
-      <div className="mx-auto flex max-w-layout items-center justify-between gap-4 px-4 py-3">
+      <div className="site-header__inner mx-auto flex max-w-layout items-center justify-between gap-4 px-4">
         <Link
           href="/"
-          className="flex flex-col leading-none"
+          className="site-wordmark"
+          aria-label="Art History Atlas ホーム"
           onClick={() => setOpen(false)}
         >
-          <span className="font-serif text-lg tracking-wide">美術史アトラス</span>
-          <span className="text-[11px] uppercase tracking-[0.2em] text-faint">
-            Art History Atlas
+          <span className="sr-only">Art History Atlas</span>
+          <span className="site-wordmark__stack" aria-hidden="true">
+            <span className="site-wordmark__line"><span>A</span><span>R</span><span>T</span></span>
+            <span className="site-wordmark__line"><span>H</span><span>I</span><span>S</span><span>T</span><span>O</span><span>R</span><span>Y</span></span>
+            <span className="site-wordmark__line"><span>A</span><span>T</span><span>L</span><span>A</span><span>S</span></span>
           </span>
         </Link>
 
-        <div className="flex items-center gap-1">
+        <div className="site-header__actions flex items-center">
           <nav aria-label="主要ナビゲーション" className="hidden lg:block">
             <ul className="flex items-center gap-1">
               {NAV.map((item) => (
@@ -62,7 +65,7 @@ export function SiteHeader() {
 
           <button
             type="button"
-            className="ml-1 inline-flex h-11 w-11 items-center justify-center rounded lg:hidden"
+            className="site-header-control inline-flex h-11 w-11 items-center justify-center lg:hidden"
             aria-expanded={open}
             aria-controls="mobile-nav"
             onClick={() => setOpen((v) => !v)}

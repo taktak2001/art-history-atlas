@@ -36,31 +36,27 @@ export default function HomePage() {
 
   return (
     <div className="mx-auto max-w-layout px-4">
-      {/* 1. アプリの目的 */}
-      <section className="border-b hairline py-14 sm:py-20">
-        <p className="text-xs uppercase tracking-[0.3em] text-faint">Art History Atlas</p>
-        <h1 className="mt-4 max-w-3xl font-serif text-3xl leading-tight sm:text-5xl">
-          美術史とは、様式名を暗記するものではない。
-        </h1>
-        <p className="mt-6 max-w-prose text-base leading-relaxed text-muted sm:text-lg">
-          社会・思想・技術・制度と視覚表現の<strong className="text-ink">相互作用</strong>を理解するための学習ツールです。
-          各ムーブメントを「何を問題として生まれ、前時代の何を継承・否定し、後世へ何を引き継いだか」という
-          関係の網の中で捉えます。先史から現代まで、西洋を主軸としつつ日本・東アジアの動向を並行して扱います。
-        </p>
-        <div className="mt-8 flex flex-wrap gap-3">
-          <Link href="/timeline/" className="rounded-sm bg-ink px-5 py-3 text-sm text-paper transition-opacity hover:opacity-90">
-            横型タイムラインを見る →
+      {/* 1. 主要な探索方法 */}
+      <section className="home-hero border-b hairline" data-home-hero>
+        <div>
+          <h1 className="home-hero__title">
+            美術史アトラス
+          </h1>
+          <p className="home-hero__tagline">
+            発生・継承・転換から読む美術史。
+          </p>
+        </div>
+        <nav className="home-hero__actions" aria-label="主要な探索方法">
+          <Link href="/timeline/" className="home-hero__cta">
+            横型タイムライン
           </Link>
-          <Link href="/chronology/" className="rounded-sm border hairline px-5 py-3 text-sm text-ink hover:border-ink/40">
-            縦型年表で読む
+          <Link href="/chronology/" className="home-hero__cta">
+            縦型年表
           </Link>
-          <Link href="/network/" className="rounded-sm border hairline px-5 py-3 text-sm text-ink hover:border-ink/40">
+          <Link href="/network/" className="home-hero__cta">
             関係ネットワーク
           </Link>
-        </div>
-        <p className="mt-6 text-sm text-faint">
-          収録：ムーブメント{movements.length}件・関係{relationships.length}件（100件以上へ拡張できる設計）
-        </p>
+        </nav>
       </section>
 
       {/* 2. 時代を選ぶ入口 */}

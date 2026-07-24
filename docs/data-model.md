@@ -8,6 +8,15 @@
 
 基本情報：`id`（slug）, `nameJa`, `nameEn`, `aliases[]`, `classification`, `era`, `dates`, `regionIds[]`, `cities[]`。
 
+表示・階層：`visibilityLevel`, `parentMovementId?`, `groupId?`, `isRepresentative?`, `displayOrder?`, `shortLabel?`。
+
+- `visibilityLevel`: `core | standard | detailed`。選択レベルまでを累積表示する。
+- `parentMovementId`: 分類上の直接の親。影響・継承・反発を意味しない。
+- `groupId`: 検索・縮約用の非因果グループ。定義と代表IDは `MOVEMENT_GROUPS` に置く。
+- `isRepresentative`: 親子内で代表表示に使う項目を明示する補助フラグ。
+- `displayOrder`: 同一スコープ内の表示順。未指定時は年代と名称で安定ソートする。
+- `shortLabel`: 通史など高密度表示用の短縮名（24文字以内）。正式名は常に `nameJa`。
+
 解説項目：`summary`, `coreIdea`, `socialContext`, `politicalContext?`, `religiousContext?`, `philosophy?`, `technologyContext?`, `reactionAgainst`, `inheritedFrom`, `visualTraits`, `compositionSpace`, `colorLight`, `technique`, `materials`, `subjects`, `artistStatus`, `productionSystem`, `patronage`, `marketExhibition`, `audience`, `legacy`, `contemporaryConnection`, `viewingPoints[]`。
 
 関連：`keywords[]`, `artistIds[]`, `workIds[]`, `sourceIds[]`（最低 1）, `verification`。
@@ -23,6 +32,12 @@
 ### Relationship（関係エッジ）
 
 `id`, `from`, `to`（ともに既存 Movement ID）, `kind`, `note`, `sourceIds[]`。ムーブメント間の関係を**独立したエッジデータ**として保持する。
+
+- `from`（UI上の「起点」）: 影響・継承・展開が始まる側。
+- `to`（UI上の「終点」「到達先」）: 影響・継承・展開を受けた側。
+- 有向関係は `from → to` として描画する。同時代・共通する思想は方向を断定しないため矢印を付けない。
+- 反発もデータ方向は「反発された側 → 反発した側」。日本語表示では主語を入れ替え、「`to` は `from` に反発した」とする。
+- `parentMovementId` と `groupId` は表示階層であり、Relationship の因果を推測・生成する根拠にしない。
 
 ### Source（出典）
 
@@ -45,7 +60,13 @@
 
 **関係タイプ（kind）** — 継承 / 反発 / 影響 / 同時代 / 地域的展開 / 理論的関連 / 技術的関連 / 後世に再評価 / 共通する思想。
 
+- **継承**: 前の運動の中心的な方法・問題意識・形式を、次の運動が引き継ぎ発展させた関係。比較的近い時代の系譜で、中心的要素に関わり、その関係を除くと後続運動の成立説明が大きく崩れるもの。
+- **影響**: 特定の技法・思想・作品・作家が別の運動の一部に作用した関係。時代・地域が離れても成立し、直接の後継関係を必要としない。
+- 判定補助: 「成立説明に不可欠な構造」なら継承、「成立の一因だが直接の後継ではない」なら影響を第一候補とする。
+
 **情報確認状態（verification）** — 確認済み / 単一資料 / 諸説あり / 要確認。
+
+**表示密度（visibilityLevel）** — 主要 `core` / 標準 `standard` / 詳細 `detailed`。現在の30件は `24 / 30 / 30`。`detailed` は「詳細専用項目が必ず存在する」という意味ではなく、収録済み全件を表示する上限レベル。
 
 ## 年代（DateRange）の表現
 
@@ -58,5 +79,8 @@
 3. ID 重複
 4. 出典 URL の http(s) 形式
 5. 画像メタデータのライセンス・クレジット・出典 URL 必須
+6. `parentMovementId` の実在・自己参照・循環参照・LOD順序
+7. `groupId` の定義、代表項目の実在と所属、`displayOrder` の同一スコープ重複
+8. `shortLabel` の長さと、LODの累積件数（core 20件以上、standard ≥ core、detailed = 全件）
 
 `npm run validate:data` で実行。単体テスト（`tests/unit/data.test.ts`）でも同等の検証を行う。
