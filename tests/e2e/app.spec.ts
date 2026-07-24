@@ -8,7 +8,7 @@ test('ホームからムーブメント詳細へ移動できる', async ({ page 
   await expect(page).toHaveURL(/\/movements\/impressionism\/?$/);
   await expect(page.getByRole('heading', { level: 1 })).toContainText('印象派');
   // 詳細ページに指定項目（出典）が表示される
-  await expect(page.getByRole('heading', { name: '参考文献・出典' })).toBeVisible();
+  await expect(page.getByRole('heading', { name: '出典', exact: true })).toBeVisible();
 });
 
 test('検索から作品を表示できる', async ({ page }) => {
@@ -97,6 +97,7 @@ test('PWA: manifestとService Workerが提供される', async ({ page, request 
   expect(manifest.ok()).toBeTruthy();
   const manifestJson = await manifest.json();
   expect(manifestJson.name).toContain('美術史アトラス');
+  expect(manifestJson.display).toBe('standalone');
   expect(manifestJson.icons.length).toBeGreaterThanOrEqual(2);
   const sw = await request.get('/sw.js');
   expect(sw.ok()).toBeTruthy();

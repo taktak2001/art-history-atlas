@@ -1,4 +1,5 @@
 import type { Source } from '@/lib/schema';
+import { toDisplayText } from '@/lib/movement-detail';
 
 const KIND_LABELS: Record<Source['kind'], string> = {
   museum: '美術館',
@@ -28,14 +29,16 @@ export function SourceList({ sources }: { sources: Source[] }) {
             rel="noopener noreferrer"
             className="prose-link font-medium"
           >
-            {s.title}
+            {toDisplayText(s.title)}
           </a>
           <span className="ml-1 text-xs text-faint">↗</span>
-          <p className="mt-0.5 text-muted">{s.publisher}</p>
+          <p className="mt-0.5 text-muted">{toDisplayText(s.publisher)}</p>
           <p className="mt-0.5 text-xs text-faint">
             {KIND_LABELS[s.kind]}・{RELIABILITY_LABELS[s.reliability]}・参照日 {s.accessed}
           </p>
-          <p className="mt-0.5 text-xs text-muted">対応する記述：{s.supports}</p>
+          <p className="mt-0.5 text-xs text-muted">
+            対応する記述：{toDisplayText(s.supports)}
+          </p>
         </li>
       ))}
     </ol>
