@@ -333,6 +333,7 @@ export function ChronologyView({ movements }: { movements: Movement[] }) {
                 aria-controls={panelId}
                 onClick={() => toggleEra(era.id)}
               >
+                <span className="sr-only">第{eraIndex + 1}章</span>
                 <span className="chronology-era__number" aria-hidden="true">
                   {String(eraIndex + 1).padStart(2, '0')}
                 </span>
@@ -358,37 +359,55 @@ export function ChronologyView({ movements }: { movements: Movement[] }) {
                     )}
                   </span>
                 </span>
+                <span className="chronology-era__chevron" aria-hidden="true">
+                  <svg
+                    width="20"
+                    height="20"
+                    viewBox="0 0 24 24"
+                    aria-hidden="true"
+                    fill="none"
+                    stroke="currentColor"
+                    strokeWidth="1.5"
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                  >
+                    <path d="m9 5 7 7-7 7" />
+                  </svg>
+                </span>
               </button>
 
-              {isExpanded && (
-                <div
-                  id={panelId}
-                  className="chronology-exhibit"
-                  data-era-panel={era.id}
-                >
-                  <p className="chronology-exhibit__intro">
-                    時代の背景、代表作品、ムーブメントの継承を年代順にたどります。
-                  </p>
-                  <div className="chronology-exhibit__rail">
-                    {entries.map((entry) =>
-                      entry.kind === 'event' ? (
-                        <HistoricEventEntry
-                          key={`event-${entry.event.id}`}
-                          event={entry.event}
-                          movementById={movementById}
-                        />
-                      ) : (
-                        <MovementEntry
-                          key={`movement-${entry.movement.id}`}
-                          movement={entry.movement}
-                          allMovements={movements}
-                          visibleMovements={visible}
-                        />
-                      ),
-                    )}
-                  </div>
-                </div>
-              )}
+              <div
+                id={panelId}
+                className="chronology-exhibit"
+                data-era-panel={isExpanded ? era.id : undefined}
+                hidden={!isExpanded}
+              >
+                {isExpanded && (
+                  <>
+                    <p className="chronology-exhibit__intro">
+                      時代の背景、代表作品、ムーブメントの継承を年代順にたどります。
+                    </p>
+                    <div className="chronology-exhibit__rail">
+                      {entries.map((entry) =>
+                        entry.kind === 'event' ? (
+                          <HistoricEventEntry
+                            key={`event-${entry.event.id}`}
+                            event={entry.event}
+                            movementById={movementById}
+                          />
+                        ) : (
+                          <MovementEntry
+                            key={`movement-${entry.movement.id}`}
+                            movement={entry.movement}
+                            allMovements={movements}
+                            visibleMovements={visible}
+                          />
+                        ),
+                      )}
+                    </div>
+                  </>
+                )}
+              </div>
             </section>
           );
         })}

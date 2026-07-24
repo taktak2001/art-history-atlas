@@ -56,7 +56,7 @@ export const CHRONOLOGY_ERAS: ChronologyEra[] = [
   {
     id: 'baroque-rococo',
     label: ERA_LABELS['baroque-rococo'],
-    labelEn: '17th-18th Centuries',
+    labelEn: '17th–18th Centuries',
     range: '1600〜1830年頃',
     catchphrase: '権力、信仰、市民生活が多様な舞台を生んだ時代',
     tone: 'court',
