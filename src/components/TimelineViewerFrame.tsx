@@ -13,17 +13,6 @@ import {
   type ReactNode,
   type WheelEvent,
 } from 'react';
-import { ArrowMarkerDefs, RelationLine } from '@/components/RelationLine';
-import {
-  getRectangleBoundaryPoint,
-  insetPointToward,
-} from '@/lib/network-geometry';
-import { IMPORTANT_RELATION_KINDS } from '@/lib/network-presentation';
-import { RELATION_COLOR } from '@/lib/relationship-definitions';
-import {
-  RELATION_LABELS,
-  type RelationKind,
-} from '@/lib/schema';
 import {
   yearToTimelineX,
   type TimelineMode,
@@ -52,20 +41,10 @@ export type TimelineViewerNode = {
   dateLabel: string;
   regionLabel: string;
   classificationLabel: string;
-  relationCount: number;
-  summary: string;
   barStart: number;
   barEnd: number;
   centerY: number;
   priority: boolean;
-  selected: boolean;
-};
-
-export type TimelineViewerRelation = {
-  id: string;
-  from: string;
-  to: string;
-  kind: RelationKind;
 };
 
 export type TimelineViewerRegion = {
@@ -84,10 +63,8 @@ type Props = {
   timelineMode: TimelineMode;
   timelineWidth: number;
   nodes: TimelineViewerNode[];
-  relations: TimelineViewerRelation[];
   regions: TimelineViewerRegion[];
   onClose: () => void;
-  onSelectNode: (movementId: string) => void;
   onSemanticLevelChange: (level: TimelineViewerSemanticLevel) => void;
   children: ReactNode;
 };
@@ -112,7 +89,6 @@ const IDENTITY_TRANSFORM: TimelineViewerTransform = {
 const DOUBLE_TAP_DELAY = 320;
 const DRAG_THRESHOLD = 5;
 const AXIS_EDGE_PADDING = 10;
-const RELATION_MARKER_PREFIX = 'timeline-viewer';
 
 const pointerCenter = (points: TimelineViewerPoint[]) => ({
   x: points.reduce((sum, point) => sum + point.x, 0) / points.length,
@@ -139,62 +115,6 @@ const formatViewerYear = (year: number) => {
   return year < 0 ? `前${Math.abs(year).toLocaleString('ja-JP')}` : `${year}`;
 };
 
-const relationCurve = (
-  fromRect: DOMRect,
-  toRect: DOMRect,
-  directed: boolean,
-) => {
-  const fromCenter = {
-    x: fromRect.left + fromRect.width / 2,
-    y: fromRect.top + fromRect.height / 2,
-  };
-  const toCenter = {
-    x: toRect.left + toRect.width / 2,
-    y: toRect.top + toRect.height / 2,
-  };
-  const fromBoundary = getRectangleBoundaryPoint(
-    fromCenter,
-    toCenter,
-    fromRect.width,
-    fromRect.height,
-  );
-  const toBoundary = getRectangleBoundaryPoint(
-    toCenter,
-    fromCenter,
-    toRect.width,
-    toRect.height,
-  );
-  const start = insetPointToward(fromBoundary, toCenter, 2);
-  const end = insetPointToward(toBoundary, fromCenter, directed ? 5 : 2);
-  const distance = Math.max(1, Math.hypot(end.x - start.x, end.y - start.y));
-  const handle = Math.min(72, Math.max(24, distance * 0.22));
-  const direction = Math.sign(end.x - start.x || 1);
-  const firstControl = {
-    x: start.x + direction * handle,
-    y: start.y,
-  };
-  const secondControl = {
-    x: end.x - direction * handle,
-    y: end.y,
-  };
-
-  return {
-    d: `M ${start.x} ${start.y} C ${firstControl.x} ${firstControl.y}, ${secondControl.x} ${secondControl.y}, ${end.x} ${end.y}`,
-    midpoint: {
-      x:
-        start.x * 0.125 +
-        firstControl.x * 0.375 +
-        secondControl.x * 0.375 +
-        end.x * 0.125,
-      y:
-        start.y * 0.125 +
-        firstControl.y * 0.375 +
-        secondControl.y * 0.375 +
-        end.y * 0.125,
-    },
-  };
-};
-
 export function TimelineViewerFrame({
   active,
   contentHeight,
@@ -204,10 +124,8 @@ export function TimelineViewerFrame({
   timelineMode,
   timelineWidth,
   nodes,
-  relations,
   regions,
   onClose,
-  onSelectNode,
   onSemanticLevelChange,
   children,
 }: Props) {
@@ -215,7 +133,6 @@ export function TimelineViewerFrame({
   const stageRef = useRef<HTMLDivElement>(null);
   const canvasRef = useRef<HTMLDivElement>(null);
   const nodeLayerRef = useRef<HTMLDivElement>(null);
-  const relationLayerRef = useRef<SVGSVGElement>(null);
   const timeAxisRef = useRef<HTMLDivElement>(null);
   const regionAxisRef = useRef<HTMLDivElement>(null);
   const scaleOutputRef = useRef<HTMLOutputElement>(null);
@@ -236,9 +153,6 @@ export function TimelineViewerFrame({
   const [axisTicks, setAxisTicks] = useState(() =>
     semanticTimelineTicks(timelineMode, timelineWidth, 1),
   );
-
-  const selectedNode = nodes.find((node) => node.selected) ?? null;
-  const relationKinds = Array.from(new Set(relations.map((relation) => relation.kind)));
 
   const updateFixedLayers = useCallback(
     (transform: TimelineViewerTransform) => {
@@ -301,7 +215,6 @@ export function TimelineViewerFrame({
         label.style.visibility = visible ? 'visible' : 'hidden';
       }
 
-      const visibleNodeRects = new Map<string, DOMRect>();
       for (const node of nodeLayer.querySelectorAll<HTMLElement>(
         '[data-viewer-node]',
       )) {
@@ -342,40 +255,6 @@ export function TimelineViewerFrame({
 
         node.style.transform = `translate3d(${desiredX}px, ${startScreen.y - nodeHeight / 2}px, 0)`;
         node.style.visibility = visible ? 'visible' : 'hidden';
-        if (visible && !visibleNodeRects.has(node.dataset.movementId ?? '')) {
-          visibleNodeRects.set(
-            node.dataset.movementId ?? '',
-            node.getBoundingClientRect(),
-          );
-        }
-      }
-
-      for (const path of relationLayerRef.current?.querySelectorAll<SVGPathElement>(
-        '[data-viewer-relation]',
-      ) ?? []) {
-        const fromRect = visibleNodeRects.get(path.dataset.from ?? '');
-        const toRect = visibleNodeRects.get(path.dataset.to ?? '');
-        const label = relationLayerRef.current?.querySelector<SVGTextElement>(
-          `[data-viewer-relation-label="${path.dataset.relationId}"]`,
-        );
-        if (!fromRect || !toRect) {
-          path.style.visibility = 'hidden';
-          if (label) label.style.visibility = 'hidden';
-          continue;
-        }
-        const kind = path.dataset.relationKind as RelationKind;
-        const geometry = relationCurve(
-          fromRect,
-          toRect,
-          !['contemporary', 'shared-idea'].includes(kind),
-        );
-        path.setAttribute('d', geometry.d);
-        path.style.visibility = 'visible';
-        if (label) {
-          label.setAttribute('x', String(geometry.midpoint.x));
-          label.setAttribute('y', String(geometry.midpoint.y - 5));
-          label.style.visibility = 'visible';
-        }
       }
     },
     [contentOriginX, timelineMode, timelineWidth],
@@ -614,7 +493,6 @@ export function TimelineViewerFrame({
     fitContent,
     nodes,
     regions,
-    relations,
     semanticLevel,
     updateFixedLayers,
   ]);
@@ -953,59 +831,6 @@ export function TimelineViewerFrame({
             <span>年代 →</span>
           </div>
 
-          <svg
-            ref={relationLayerRef}
-            className="timeline-viewer-relationship-layer"
-            aria-hidden="true"
-          >
-            <ArrowMarkerDefs
-              idPrefix={RELATION_MARKER_PREFIX}
-              kinds={relationKinds}
-            />
-            {relations.map((relation) => {
-              const selectedMovementId = selectedNode?.movementId;
-              const related =
-                selectedMovementId === relation.from ||
-                selectedMovementId === relation.to;
-              return (
-                <g
-                  key={relation.id}
-                  data-viewer-relation-group
-                  data-important={
-                    IMPORTANT_RELATION_KINDS.includes(relation.kind) ||
-                    undefined
-                  }
-                  data-related={related || undefined}
-                >
-                  <RelationLine
-                    kind={relation.kind}
-                    d="M 0 0 L 0 0"
-                    markerPrefix={RELATION_MARKER_PREFIX}
-                    state={
-                      selectedMovementId
-                        ? related
-                          ? 'highlighted'
-                          : 'dimmed'
-                        : 'normal'
-                    }
-                    data-viewer-relation
-                    data-relation-id={relation.id}
-                    data-from={relation.from}
-                    data-to={relation.to}
-                    data-relation-kind={relation.kind}
-                  />
-                  <text
-                    className="timeline-viewer-relationship-label"
-                    data-viewer-relation-label={relation.id}
-                    fill={RELATION_COLOR[relation.kind]}
-                  >
-                    {RELATION_LABELS[relation.kind]}
-                  </text>
-                </g>
-              );
-            })}
-          </svg>
-
           <div
             ref={nodeLayerRef}
             className="timeline-viewer-node-layer"
@@ -1023,48 +848,21 @@ export function TimelineViewerFrame({
                 data-bar-end={node.barEnd}
                 data-center-y={node.centerY}
                 data-priority={node.priority || undefined}
-                data-selected={node.selected || undefined}
                 aria-label={`${node.nameJa}。${node.dateLabel}。${node.regionLabel}。${node.classificationLabel}`}
                 title={`${node.nameJa} (${node.nameEn})`}
-                onMouseEnter={() => onSelectNode(node.movementId)}
-                onFocus={() => onSelectNode(node.movementId)}
-                onPointerDown={() => onSelectNode(node.movementId)}
               >
                 <span className="timeline-viewer-node__short">
                   {node.shortLabel ?? node.nameJa}
                 </span>
                 <span className="timeline-viewer-node__name">
                   {node.nameJa}
-                  <span className="timeline-viewer-node__english-inline">
-                    （{node.nameEn}）
-                  </span>
                 </span>
                 <span className="timeline-viewer-node__date">
                   {node.dateLabel}
                 </span>
-                <span className="timeline-viewer-node__context">
-                  {node.regionLabel} / {node.classificationLabel}
-                </span>
-                <span className="timeline-viewer-node__relations">
-                  関係 {node.relationCount}
-                </span>
               </Link>
             ))}
           </div>
-
-          {selectedNode && (
-            <aside
-              className="timeline-viewer-selection"
-              aria-live="polite"
-              aria-label="選択中のムーブメント"
-            >
-              <p>{selectedNode.nameJa}</p>
-              <span>
-                {selectedNode.dateLabel} / 関係 {selectedNode.relationCount}
-              </span>
-              <small>{selectedNode.summary}</small>
-            </aside>
-          )}
         </>
       )}
 

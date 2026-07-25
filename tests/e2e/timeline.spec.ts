@@ -58,7 +58,7 @@ test('時代別の表示範囲は時代名と年代だけを示し、通史は�
   ).toBe(0);
 });
 
-test('バーと追従ラベルは同一トーンで、選択時だけ線を強める', async ({ page }, testInfo) => {
+test('バーと追従ラベルは薄いラベル型で、フォーカス時も細い枠を保つ', async ({ page }) => {
   await page.goto('/timeline/');
   await modeButton(page, '近代').click();
 
@@ -87,7 +87,7 @@ test('バーと追従ラベルは同一トーンで、選択時だけ線を強�
   ]);
   expect(typography[0]).toEqual({
     color: 'rgb(28, 28, 30)',
-    fontWeight: 600,
+    fontWeight: 500,
     paddingLeft: 1,
   });
   expect(typography[1]).toBe(600);
@@ -101,7 +101,7 @@ test('バーと追従ラベルは同一トーンで、選択時だけ線を強�
     parseFloat(getComputedStyle(element).borderTopWidth),
   );
   expect(normalBorder).toBe(1);
-  expect(selectedBorder).toBe(testInfo.project.name === 'desktop' ? 2 : 1);
+  expect(selectedBorder).toBe(1);
 });
 
 test('時代別モードは端末と密度に応じた幅と自動フィット目盛りを使う', async ({ page }, testInfo) => {
@@ -163,17 +163,16 @@ test('近代では対象範囲、使用レーン、クリップ表示だけを�
   expect(emptyLanes).toBe(0);
 });
 
-test('詳細ラベルは600ウェイトの1行表示で、PCのフォーカスに正式情報を示す', async ({ page }, testInfo) => {
+test('詳細ラベルは名称と年代だけの1行表示で、PCでも直接詳細へ遷移する', async ({ page }, testInfo) => {
   test.skip(testInfo.project.name !== 'desktop', 'desktop project only');
   await page.goto('/timeline/');
   await modeButton(page, '現代').click();
 
   const conceptual = page.locator('[data-timeline-bar="conceptual-art"]').first();
   await conceptual.focus();
-  const inspector = page.locator('[data-movement-inspector]');
-  await expect(inspector).toContainText('コンセプチュアル・アート');
-  await expect(inspector).toContainText('方法論・理論');
-  await expect(inspector).toContainText('国際的');
+  await expect(page.locator('[data-movement-inspector]')).toHaveCount(0);
+  await expect(conceptual).toHaveAttribute('href', '/movements/conceptual-art/');
+  await expect(conceptual.locator('[data-label-date]')).toContainText('1965〜1975');
 
   const labelStyle = await conceptual.locator('.timeline-label-detail').evaluate((element) => {
     const style = getComputedStyle(element);
@@ -186,7 +185,7 @@ test('詳細ラベルは600ウェイトの1行表示で、PCのフォーカス�
     };
   });
   expect(labelStyle.whiteSpace).toBe('nowrap');
-  expect(labelStyle.fontWeight).toBe('600');
+  expect(labelStyle.fontWeight).toBe('500');
   expect(labelStyle.opacity).toBe('1');
   expect(labelStyle.wordBreak).toBe('keep-all');
   expect(labelStyle.color).not.toBe('rgb(92, 92, 96)');
@@ -235,6 +234,7 @@ test('バーは44pxの操作領域内に22pxの展示レールとして表示す
   expect(tickCounts.major).toBeGreaterThanOrEqual(2);
   expect(tickCounts.major).toBeLessThanOrEqual(tickCounts.all);
   await expect(visual).toBeVisible();
+  await expect(page.locator('[data-timeline-relationship]')).toHaveCount(0);
 });
 
 test('iPhone幅では表示状態と地域列が固定され、1タップで詳細へ移動する', async ({ page }, testInfo) => {
@@ -288,7 +288,7 @@ test('先史と古代の主要ムーブメントを正しいモードへ表示�
   expect(domain).toEqual({ start: -750, end: 750, rounding: 250 });
   await expect(greek.locator('[data-follow-label]')).toHaveAttribute(
     'data-label-variant',
-    /full|short/,
+    /full|short|ellipsis/,
   );
   const coordinates = await greek.evaluate((element) => ({
     start: Number((element as HTMLElement).dataset.barStart),
@@ -604,14 +604,14 @@ test('閲覧モードは固定軸と一定寸法のノードでセマンティ�
   );
   const detailedNode = viewer.locator('[data-viewer-node]:visible').first();
   await expect(detailedNode.locator('.timeline-viewer-node__date')).toBeVisible();
-  await expect(
-    detailedNode.locator('.timeline-viewer-node__english-inline'),
-  ).toBeVisible();
+  await expect(detailedNode.locator('.timeline-viewer-node__english-inline')).toHaveCount(0);
+  await expect(viewer.locator('[data-viewer-relation]')).toHaveCount(0);
+  await expect(viewer.locator('.timeline-viewer-selection')).toHaveCount(0);
   const nodeFontSize = await detailedNode
     .locator('.timeline-viewer-node__name')
     .evaluate((element) => parseFloat(getComputedStyle(element).fontSize));
-  expect(nodeFontSize).toBeGreaterThanOrEqual(12);
-  expect(nodeFontSize).toBeLessThanOrEqual(18);
+  expect(nodeFontSize).toBeGreaterThanOrEqual(10);
+  expect(nodeFontSize).toBeLessThanOrEqual(14);
 });
 
 test('閲覧モードにaxeの重大なアクセシビリティ違反がない', async ({ page }) => {

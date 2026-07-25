@@ -2,7 +2,7 @@
 
 import Link from 'next/link';
 import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
-import type { Movement, RegionId, Relationship } from '@/lib/schema';
+import type { Movement, RegionId } from '@/lib/schema';
 import { CLASSIFICATION_LABELS, REGION_LABELS } from '@/lib/schema';
 import { LodControl } from '@/components/LodControl';
 import {
@@ -12,10 +12,6 @@ import {
 } from '@/components/TimelineViewerFrame';
 import {
   filterMovementsByLod,
-  getGroupMovements,
-  getMovementChildren,
-  getMovementGroup,
-  isMovementVisibleAtLod,
 } from '@/lib/movement-hierarchy';
 import { useLodState } from '@/lib/use-lod-state';
 import {
@@ -38,7 +34,6 @@ import type { TimelineViewerSemanticLevel } from '@/lib/timeline-viewer';
 
 type Props = {
   movements: Movement[];
-  relationships: Relationship[];
   activeRegions: RegionId[];
 };
 
@@ -48,22 +43,30 @@ const SURVEY_SUMMARY_H = 54;
 const SURVEY_BAR_H = 44;
 const DESKTOP_DETAIL_BAR_H = 44;
 const MOBILE_DETAIL_BAR_H = 44;
-const DESKTOP_BAR_GAP = 8;
-const MOBILE_BAR_GAP = 6;
-const DESKTOP_LANE_PAD_Y = 9;
-const MOBILE_LANE_PAD_Y = 8;
-const DESKTOP_MIN_LANE_H = 62;
-const MOBILE_MIN_LANE_H = 60;
+const DESKTOP_BAR_GAP = 2;
+const MOBILE_BAR_GAP = 2;
+const DESKTOP_LANE_PAD_Y = 3;
+const MOBILE_LANE_PAD_Y = 3;
+const DESKTOP_MIN_LANE_H = 50;
+const MOBILE_MIN_LANE_H = 50;
 const LABEL_INNER_PADDING = 8;
-const LABEL_TEXT_PADDING = 4;
+const LABEL_TEXT_PADDING = 16;
+const LABEL_META_GAP = 6;
 const DESKTOP_DETAIL_LABEL_FOOTPRINT = 140;
 const MOBILE_DETAIL_LABEL_FOOTPRINT = 120;
 
 type LabelGeometry = {
   element: HTMLElement;
+  textElement: HTMLElement;
   barStart: number;
   barEnd: number;
   labelWidth: number;
+  maximumWidth: number;
+  name: string;
+  shortLabel?: string;
+  nameWidth: number;
+  shortLabelWidth?: number;
+  dateWidth: number;
 };
 
 const SURVEY_PRIORITY = new Set([
@@ -89,14 +92,12 @@ const SURVEY_SUMMARIES = [
   {
     id: 'prehistoric-ritual',
     label: '先史の造形',
-    note: '像・洞窟画・祭祀',
     start: -40000,
     end: -3000,
   },
   {
     id: 'ancient-greek-classical',
     label: '古代の規範',
-    note: '比例・理想美・公共性',
     start: -3000,
     end: 500,
   },
@@ -110,7 +111,6 @@ const fmtYear = (year: number) => {
 
 export function HorizontalTimeline({
   movements,
-  relationships,
   activeRegions,
 }: Props) {
   const scrollRef = useRef<HTMLDivElement>(null);
@@ -127,10 +127,6 @@ export function HorizontalTimeline({
     active: false,
   });
   const [modeId, setModeId] = useState<TimelineModeId>('survey');
-  const [activeMovementId, setActiveMovementId] = useState<string | null>(null);
-  const [expandedMovementIds, setExpandedMovementIds] = useState<Set<string>>(
-    new Set(),
-  );
   const [isCompactTimeline, setIsCompactTimeline] = useState(false);
   const [isViewerMode, setIsViewerMode] = useState(false);
   const [viewerSemanticLevel, setViewerSemanticLevel] =
@@ -145,42 +141,8 @@ export function HorizontalTimeline({
         ? 'standard'
         : 'core';
   const effectiveLod = isViewerMode ? viewerLod : lod;
-  const lodMovements = useMemo(() => {
-    const visible = filterMovementsByLod(movements, effectiveLod);
-    const visibleIds = new Set(visible.map((movement) => movement.id));
-    const expanded = movements.filter((movement) => {
-      if (visibleIds.has(movement.id)) return false;
-      return [...expandedMovementIds].some((expandedId) => {
-        const group = getMovementGroup(expandedId, movements);
-        return (
-          movement.parentMovementId === expandedId ||
-          (group && movement.groupId === group.id)
-        );
-      });
-    });
-    const selected =
-      isViewerMode && activeMovementId
-        ? movements.find((movement) => movement.id === activeMovementId)
-        : undefined;
-    const retainedSelection =
-      selected && !visibleIds.has(selected.id) && !expanded.includes(selected)
-        ? [selected]
-        : [];
-    return [...visible, ...expanded, ...retainedSelection];
-  }, [
-    activeMovementId,
-    effectiveLod,
-    expandedMovementIds,
-    isViewerMode,
-    movements,
-  ]);
-  const baseVisibleIds = useMemo(
-    () =>
-      new Set(
-        filterMovementsByLod(movements, effectiveLod).map(
-          (movement) => movement.id,
-        ),
-      ),
+  const lodMovements = useMemo(
+    () => filterMovementsByLod(movements, effectiveLod),
     [effectiveLod, movements],
   );
   const modeMovements = useMemo(
@@ -338,34 +300,6 @@ export function HorizontalTimeline({
   const ticks = timelineTicks(displayMode, timelineWidth);
   const majorTickStride =
     mode.id === 'survey' ? 1 : Math.max(1, Math.ceil((ticks.length - 1) / 4));
-  const activeMovement =
-    modeMovements.find((movement) => movement.id === activeMovementId) ?? null;
-  const activeExpansionMembers = useMemo(() => {
-    if (!activeMovement) return [];
-    const children = getMovementChildren(activeMovement.id, movements);
-    const group = getMovementGroup(activeMovement.id, movements);
-    const groupMembers = group
-      ? getGroupMovements(group.id, movements).filter(
-          (movement) => movement.id !== activeMovement.id,
-        )
-      : [];
-    return [...children, ...groupMembers].filter(
-      (movement, index, all) =>
-        all.findIndex((candidate) => candidate.id === movement.id) === index &&
-        !isMovementVisibleAtLod(movement, effectiveLod),
-    );
-  }, [activeMovement, effectiveLod, movements]);
-  const relationshipCounts = useMemo(() => {
-    const counts = new Map<string, number>();
-    for (const relationship of relationships) {
-      counts.set(
-        relationship.from,
-        (counts.get(relationship.from) ?? 0) + 1,
-      );
-      counts.set(relationship.to, (counts.get(relationship.to) ?? 0) + 1);
-    }
-    return counts;
-  }, [relationships]);
   const viewerNodes = useMemo<TimelineViewerNode[]>(() => {
     const nodes: TimelineViewerNode[] = laneOffsets.flatMap((lane) =>
       lane.items.map(({ movement, left, width, row }) => ({
@@ -382,8 +316,6 @@ export function HorizontalTimeline({
           .map((region) => REGION_LABELS[region])
           .join('・'),
         classificationLabel: CLASSIFICATION_LABELS[movement.classification],
-        relationCount: relationshipCounts.get(movement.id) ?? 0,
-        summary: movement.summary,
         barStart: left,
         barEnd: left + width,
         centerY:
@@ -392,7 +324,6 @@ export function HorizontalTimeline({
           row * (barHeight + barGap) +
           barHeight / 2,
         priority: mode.id !== 'survey' || SURVEY_PRIORITY.has(movement.id),
-        selected: activeMovementId === movement.id,
       })),
     );
 
@@ -415,8 +346,6 @@ export function HorizontalTimeline({
             .map((region) => REGION_LABELS[region])
             .join('・'),
           classificationLabel: CLASSIFICATION_LABELS[movement.classification],
-          relationCount: relationshipCounts.get(movement.id) ?? 0,
-          summary: movement.summary,
           barStart: yearToTimelineX(
             summary.start,
             displayMode,
@@ -425,13 +354,11 @@ export function HorizontalTimeline({
           barEnd: yearToTimelineX(summary.end, displayMode, timelineWidth),
           centerY: headerHeight + SURVEY_SUMMARY_H / 2,
           priority: true,
-          selected: activeMovementId === movement.id,
         },
       ];
     });
     return [...summaryNodes, ...nodes];
   }, [
-    activeMovementId,
     barGap,
     barHeight,
     displayMode,
@@ -440,7 +367,6 @@ export function HorizontalTimeline({
     lanePaddingY,
     mode.id,
     movements,
-    relationshipCounts,
     timelineWidth,
   ]);
   const viewerRegions = useMemo<TimelineViewerRegion[]>(
@@ -464,19 +390,6 @@ export function HorizontalTimeline({
     ],
     [headerHeight, laneOffsets, mode.id],
   );
-  const viewerMovementIds = useMemo(
-    () => new Set(viewerNodes.map((node) => node.movementId)),
-    [viewerNodes],
-  );
-  const viewerRelations = useMemo(
-    () =>
-      relationships.filter(
-        (relationship) =>
-          viewerMovementIds.has(relationship.from) &&
-          viewerMovementIds.has(relationship.to),
-      ),
-    [relationships, viewerMovementIds],
-  );
 
   const scheduleTimelineLabelUpdate = () => {
     if (isViewerMode) return;
@@ -489,6 +402,52 @@ export function HorizontalTimeline({
       const viewportRight = viewportLeft + viewport.clientWidth;
 
       for (const geometry of labelGeometries.current) {
+        const visibleWidth = Math.max(
+          1,
+          Math.min(geometry.barEnd, viewportRight) -
+            Math.max(geometry.barStart, viewportLeft) -
+            LABEL_INNER_PADDING * 2,
+        );
+        const availableWidth = Math.min(geometry.maximumWidth, visibleWidth);
+        const availableNameWidth = Math.max(
+          1,
+          availableWidth -
+            geometry.dateWidth -
+            LABEL_META_GAP -
+            LABEL_TEXT_PADDING,
+        );
+        const choice = chooseTimelineLabel({
+          name: geometry.name,
+          shortLabel: geometry.shortLabel,
+          availableWidth: availableNameWidth,
+          nameWidth: geometry.nameWidth,
+          shortLabelWidth: geometry.shortLabelWidth,
+        });
+        const chosenWidth =
+          choice.variant === 'full'
+            ? geometry.nameWidth
+            : choice.variant === 'short'
+              ? geometry.shortLabelWidth ?? geometry.nameWidth
+              : Math.min(
+                  geometry.shortLabelWidth ?? geometry.nameWidth,
+                  availableNameWidth,
+                );
+        const resolvedLabelWidth = Math.max(
+          1,
+          Math.min(
+            chosenWidth +
+              geometry.dateWidth +
+              LABEL_META_GAP +
+              LABEL_TEXT_PADDING,
+            availableWidth,
+          ),
+        );
+        geometry.textElement.textContent = choice.label;
+        geometry.element.dataset.labelVariant = choice.variant;
+        geometry.element.style.maxWidth = `${availableWidth}px`;
+        geometry.element.style.width = `${resolvedLabelWidth}px`;
+        geometry.labelWidth = resolvedLabelWidth;
+
         const position = calculateFollowLabelX({
           barStart: geometry.barStart,
           barEnd: geometry.barEnd,
@@ -523,22 +482,20 @@ export function HorizontalTimeline({
     for (const element of labels) {
       const bar = element.closest<HTMLElement>('[data-timeline-bar]');
       const textElement = element.querySelector<HTMLElement>('[data-label-text]');
-      if (!bar || !textElement) continue;
+      const dateElement = element.querySelector<HTMLElement>('[data-label-date]');
+      if (!bar || !textElement || !dateElement) continue;
       const barStart = Number(bar.dataset.barStart);
       const barEnd = Number(bar.dataset.barEnd);
       const barAvailableWidth = Math.max(
         1,
         barEnd - barStart - LABEL_INNER_PADDING * 2,
       );
-      const availableWidth =
-        mode.id === 'survey'
-          ? barAvailableWidth
-          : Math.max(
-              barAvailableWidth,
-              isCompactTimeline
-                ? MOBILE_DETAIL_LABEL_FOOTPRINT
-                : DESKTOP_DETAIL_LABEL_FOOTPRINT,
-            );
+      const availableWidth = barAvailableWidth;
+      const dateWidth = dateElement.getBoundingClientRect().width;
+      const availableNameWidth = Math.max(
+        1,
+        availableWidth - dateWidth - LABEL_META_GAP - LABEL_TEXT_PADDING,
+      );
       const name = element.dataset.fullLabel ?? '';
       const shortLabel = element.dataset.shortLabel || undefined;
       const computedStyle = getComputedStyle(textElement);
@@ -552,7 +509,7 @@ export function HorizontalTimeline({
       const choice = chooseTimelineLabel({
         name,
         shortLabel,
-        availableWidth,
+        availableWidth: availableNameWidth,
         nameWidth,
         shortLabelWidth,
       });
@@ -565,17 +522,27 @@ export function HorizontalTimeline({
           ? nameWidth
           : choice.variant === 'short'
             ? shortLabelWidth ?? nameWidth
-            : Math.min(shortLabelWidth ?? nameWidth, availableWidth);
+            : Math.min(shortLabelWidth ?? nameWidth, availableNameWidth);
       const resolvedLabelWidth = Math.max(
         1,
-        Math.min(chosenWidth + LABEL_TEXT_PADDING, availableWidth),
+        Math.min(
+          chosenWidth + dateWidth + LABEL_META_GAP + LABEL_TEXT_PADDING,
+          availableWidth,
+        ),
       );
       element.style.width = `${resolvedLabelWidth}px`;
       nextGeometries.push({
         element,
+        textElement,
         barStart,
         barEnd,
         labelWidth: resolvedLabelWidth,
+        maximumWidth: availableWidth,
+        name,
+        shortLabel,
+        nameWidth,
+        shortLabelWidth,
+        dateWidth,
       });
     }
 
@@ -654,22 +621,12 @@ export function HorizontalTimeline({
   const selectMode = (nextMode: TimelineModeId) => {
     const nextModeDefinition = timelineModeById(nextMode);
     pendingJump.current = nextModeDefinition.focusYear;
-    setActiveMovementId(null);
     if (nextMode === modeId) {
       scrollToYear(nextModeDefinition.focusYear);
       return;
     }
     applyPurposeDefault(nextMode === 'survey' ? 'core' : 'standard');
     setModeId(nextMode);
-  };
-
-  const toggleExpansion = (id: string) => {
-    setExpandedMovementIds((current) => {
-      const next = new Set(current);
-      if (next.has(id)) next.delete(id);
-      else next.add(id);
-      return next;
-    });
   };
 
   const onPointerDown = (event: React.PointerEvent) => {
@@ -708,7 +665,6 @@ export function HorizontalTimeline({
         <LodControl
           value={lod}
           onChange={(next) => {
-            setExpandedMovementIds(new Set());
             setLod(next);
           }}
           counts={{
@@ -780,56 +736,6 @@ export function HorizontalTimeline({
         </div>
       </section>
 
-      {activeMovement && !isCompactTimeline && (
-        <div
-          className="border-x border-b hairline bg-raised px-3 py-3 sm:px-4"
-          role="status"
-          data-movement-inspector
-        >
-          <div className="grid gap-x-6 gap-y-2 text-xs sm:grid-cols-[minmax(180px,1.4fr)_1fr_1fr_1fr]">
-            <p>
-              <span className="block font-bold text-muted">正式名称</span>
-              <span className="mt-0.5 block text-sm font-medium text-ink">
-                {activeMovement.nameJa}
-              </span>
-            </p>
-            <p>
-              <span className="block font-bold text-muted">年代</span>
-              <span className="mt-0.5 block tabular-nums text-ink">
-                {fmtYear(activeMovement.dates.start)}〜
-                {activeMovement.dates.end === null ? '現在' : fmtYear(activeMovement.dates.end)}
-              </span>
-            </p>
-            <p>
-              <span className="block font-bold text-muted">地域</span>
-              <span className="mt-0.5 block text-ink">
-                {activeMovement.regionIds.map((region) => REGION_LABELS[region]).join('・')}
-              </span>
-            </p>
-            <p>
-              <span className="block font-bold text-muted">分類</span>
-              <span className="mt-0.5 block text-ink">
-                {CLASSIFICATION_LABELS[activeMovement.classification]}
-              </span>
-            </p>
-          </div>
-          {activeExpansionMembers.length > 0 && (
-            <button
-              type="button"
-              onClick={() => toggleExpansion(activeMovement.id)}
-              aria-expanded={expandedMovementIds.has(activeMovement.id)}
-              className="mt-3 min-h-11 border-l-2 border-accent px-3 text-left text-xs font-medium text-ink hover:bg-surface"
-              data-timeline-expand={activeMovement.id}
-            >
-              {expandedMovementIds.has(activeMovement.id) ? '内訳を閉じる' : '内訳を展開'}
-              <span className="ml-2 text-muted">
-                {activeExpansionMembers.map((movement) => movement.nameJa).join('・')}
-              </span>
-            </button>
-          )}
-        </div>
-      )}
-
       <TimelineViewerFrame
         active={isViewerMode}
         contentHeight={chartHeight}
@@ -839,10 +745,8 @@ export function HorizontalTimeline({
         timelineMode={displayMode}
         timelineWidth={timelineWidth}
         nodes={viewerNodes}
-        relations={viewerRelations}
         regions={viewerRegions}
         onClose={() => setIsViewerMode(false)}
-        onSelectNode={setActiveMovementId}
         onSemanticLevelChange={setViewerSemanticLevel}
       >
       <div className="timeline-shell timeline-chart mt-3 flex overflow-hidden">
@@ -985,7 +889,9 @@ export function HorizontalTimeline({
                       style={{ left: left + 4, width: Math.max(72, right - left - 8) }}
                     >
                       <span className="block truncate text-[11px] font-medium">{summary.label}</span>
-                      <span className="block truncate text-[9px] text-muted">{summary.note}</span>
+                      <span className="block shrink-0 text-[9px] tabular-nums text-muted">
+                        {fmtYear(summary.start)}〜{fmtYear(summary.end)}
+                      </span>
                     </Link>
                   );
                 })}
@@ -1002,7 +908,6 @@ export function HorizontalTimeline({
                 {lane.items.map(
                   ({ movement, left, width, row, clippedStart, clippedEnd }) => {
                   const isPriority = mode.id !== 'survey' || SURVEY_PRIORITY.has(movement.id);
-                  const isExpandedDetail = !baseVisibleIds.has(movement.id);
                   const accessibleLabel = `${movement.nameJa}。${fmtYear(movement.dates.start)}から${
                     movement.dates.end === null ? '現在' : fmtYear(movement.dates.end)
                   }。${movement.regionIds.map((region) => REGION_LABELS[region]).join('・')}。${
@@ -1018,30 +923,9 @@ export function HorizontalTimeline({
                       data-timeline-bar={movement.id}
                       data-clipped-start={clippedStart || undefined}
                       data-clipped-end={clippedEnd || undefined}
-                      data-hierarchy-level={isExpandedDetail ? 'child' : 'root'}
                       data-bar-start={left}
                       data-bar-end={left + width}
                       data-visual-width={width}
-                      data-active={activeMovementId === movement.id || undefined}
-                      onMouseEnter={(event) => {
-                        const focusedBar =
-                          event.currentTarget.ownerDocument.querySelector(
-                            '[data-timeline-bar]:focus',
-                          );
-                        if (!isCompactTimeline && focusedBar === null) {
-                          setActiveMovementId(movement.id);
-                        }
-                      }}
-                      onFocus={() => {
-                        if (!isCompactTimeline) {
-                          setActiveMovementId(movement.id);
-                        }
-                      }}
-                      onPointerDown={(event) => {
-                        if (event.pointerType === 'mouse') {
-                          setActiveMovementId(movement.id);
-                        }
-                      }}
                       className="timeline-bar group absolute text-left text-[11px] leading-tight focus-visible:z-20 active:translate-y-px"
                       style={{
                         left,
@@ -1060,7 +944,7 @@ export function HorizontalTimeline({
                           isPriority
                             ? 'timeline-bar-visual--priority'
                             : 'timeline-bar-visual--secondary'
-                        } ${isExpandedDetail ? 'timeline-bar-visual--child' : ''}`}
+                        }`}
                         aria-hidden="true"
                         data-timeline-bar-visual
                       >
@@ -1079,11 +963,20 @@ export function HorizontalTimeline({
                             data-label-text
                             className={
                               mode.id === 'survey'
-                                ? 'timeline-label-survey block w-full'
-                                : 'timeline-label-detail w-full'
+                                ? 'timeline-label-survey block min-w-0 flex-1'
+                                : 'timeline-label-detail min-w-0 flex-1'
                             }
                           >
                             {movement.nameJa}
+                          </span>
+                          <span
+                            data-label-date
+                            className="timeline-label-date shrink-0 tabular-nums"
+                          >
+                            {fmtYear(movement.dates.start)}〜
+                            {movement.dates.end === null
+                              ? '現在'
+                              : fmtYear(movement.dates.end)}
                           </span>
                         </span>
                         {clippedEnd && (
@@ -1105,7 +998,7 @@ export function HorizontalTimeline({
       <p className="mt-2 text-xs text-faint">
         <span className="sm:hidden">横にスワイプして移動。タップで詳細</span>
         <span className="hidden sm:inline">
-          横スクロール、または余白をドラッグして移動できます。バーはホバーまたはフォーカスで概要を表示し、クリックで詳細を開きます。
+          横スクロール、または余白をドラッグして移動できます。ラベルをクリックすると詳細を開きます。
         </span>
       </p>
 

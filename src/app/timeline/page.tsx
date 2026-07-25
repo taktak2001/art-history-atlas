@@ -1,5 +1,5 @@
 import type { Metadata } from 'next';
-import { movements, relationships, activeRegions } from '@/lib/dataset';
+import { movements, activeRegions } from '@/lib/dataset';
 import { HorizontalTimeline } from '@/components/HorizontalTimeline';
 
 export const metadata: Metadata = {
@@ -19,7 +19,6 @@ export default function TimelinePage() {
       <div className="mt-8">
         <HorizontalTimeline
           movements={movements}
-          relationships={relationships}
           activeRegions={activeRegions()}
         />
       </div>
