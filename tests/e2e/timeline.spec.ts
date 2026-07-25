@@ -1,4 +1,5 @@
 import { test, expect, type Page } from '@playwright/test';
+import AxeBuilder from '@axe-core/playwright';
 
 const modeButton = (page: Page, name: string) =>
   page.getByRole('group', { name: '表示モード' }).getByRole('button', { name, exact: true });
@@ -9,9 +10,14 @@ test('通史はコンパクトな俯瞰表示と1行ラベルを使う', async (
   const track = page.locator('[data-timeline-track]');
   await expect(track).toHaveAttribute('data-timeline-mode', 'survey');
   await expect(modeButton(page, '通史')).toHaveAttribute('aria-current', 'true');
-  await expect(page.getByRole('button', { name: '通史へ戻る' })).toHaveCount(0);
+  await expect(
+    page.locator('[data-timeline-status]').getByRole('button', { name: '通史' }),
+  ).toHaveCount(0);
   await expect(page.getByRole('navigation', { name: '時代ナビゲーション' })).toHaveCount(0);
   await expect(page.getByText('時代へ移動', { exact: true })).toHaveCount(0);
+  await expect(page.getByText('Level of detail', { exact: true })).toBeVisible();
+  await expect(page.getByText('Era', { exact: true })).toBeVisible();
+  await expect(page.getByText('表示中', { exact: true })).toHaveCount(0);
 
   const width = await track.evaluate((element) => element.getBoundingClientRect().width);
   if (testInfo.project.name === 'mobile') {
@@ -35,7 +41,70 @@ test('通史はコンパクトな俯瞰表示と1行ラベルを使う', async (
   expect(await surveyLabel.evaluate((element) => getComputedStyle(element).whiteSpace)).toBe('nowrap');
 });
 
-test('時代別モードは端末と密度に応じた幅と詳細目盛りを使う', async ({ page }, testInfo) => {
+test('時代別の表示範囲は時代名と年代だけを示し、通史はリンク状に戻る', async ({ page }) => {
+  await page.goto('/timeline/');
+  await modeButton(page, '近代').click();
+
+  const status = page.locator('[data-timeline-status]');
+  await expect(status).toContainText('近代');
+  await expect(status).toContainText('1700〜2000');
+  await expect(status).not.toContainText('表示中');
+  await expect(status).not.toContainText('同時代');
+
+  const back = status.getByRole('button', { name: '通史' });
+  await expect(back).toBeVisible();
+  expect(
+    await back.evaluate((element) => parseFloat(getComputedStyle(element).borderTopWidth)),
+  ).toBe(0);
+});
+
+test('バーと追従ラベルは薄いラベル型で、フォーカス時も細い枠を保つ', async ({ page }) => {
+  await page.goto('/timeline/');
+  await modeButton(page, '近代').click();
+
+  const bar = page.locator('[data-timeline-bar="impressionism"]').first();
+  const visual = bar.locator('[data-timeline-bar-visual]');
+  const label = bar.locator('[data-follow-label]');
+  const statusTitle = page.locator('.timeline-status__title');
+  const regionLabel = page.locator('[data-region-lane-label]').first();
+  const tickLabel = page.locator('.timeline-tick-label').first();
+
+  expect(await label.evaluate((element) => getComputedStyle(element).backgroundColor)).toBe(
+    'rgba(0, 0, 0, 0)',
+  );
+  const typography = await Promise.all([
+    label.evaluate((element) => {
+      const style = getComputedStyle(element);
+      return {
+        color: style.color,
+        fontWeight: Number(style.fontWeight),
+        paddingLeft: parseFloat(style.paddingLeft),
+      };
+    }),
+    statusTitle.evaluate((element) => Number(getComputedStyle(element).fontWeight)),
+    regionLabel.evaluate((element) => Number(getComputedStyle(element).fontWeight)),
+    tickLabel.evaluate((element) => Number(getComputedStyle(element).fontWeight)),
+  ]);
+  expect(typography[0]).toEqual({
+    color: 'rgb(28, 28, 30)',
+    fontWeight: 500,
+    paddingLeft: 1,
+  });
+  expect(typography[1]).toBe(600);
+  expect(typography[2]).toBe(500);
+  expect(typography[3]).toBe(400);
+  const normalBorder = await visual.evaluate((element) =>
+    parseFloat(getComputedStyle(element).borderTopWidth),
+  );
+  await bar.focus();
+  const selectedBorder = await visual.evaluate((element) =>
+    parseFloat(getComputedStyle(element).borderTopWidth),
+  );
+  expect(normalBorder).toBe(1);
+  expect(selectedBorder).toBe(1);
+});
+
+test('時代別モードは端末と密度に応じた幅と自動フィット目盛りを使う', async ({ page }, testInfo) => {
   await page.goto('/timeline/');
 
   const mobile = testInfo.project.name === 'mobile';
@@ -94,7 +163,7 @@ test('近代では対象範囲、使用レーン、クリップ表示だけを�
   expect(emptyLanes).toBe(0);
 });
 
-test('ラベルは短縮名と年代を1行で表示し、詳細ページへ直接リンクする', async ({ page }, testInfo) => {
+test('詳細ラベルは名称と年代だけの1行表示で、PCでも直接詳細へ遷移する', async ({ page }, testInfo) => {
   test.skip(testInfo.project.name !== 'desktop', 'desktop project only');
   await page.goto('/timeline/');
   await modeButton(page, '現代').click();
@@ -102,24 +171,24 @@ test('ラベルは短縮名と年代を1行で表示し、詳細ページへ直�
   const conceptual = page.locator('[data-timeline-bar="conceptual-art"]').first();
   await conceptual.focus();
   await expect(page.locator('[data-movement-inspector]')).toHaveCount(0);
-  await expect(conceptual).toHaveAttribute(
-    'href',
-    /\/movements\/conceptual-art\/$/,
-  );
-  await expect(conceptual.locator('[data-label-text]')).toContainText(
-    'コンセプチュアル',
-  );
-  await expect(conceptual.locator('[data-label-date]')).toHaveText('1965〜1975');
+  await expect(conceptual).toHaveAttribute('href', '/movements/conceptual-art/');
+  await expect(conceptual.locator('[data-label-date]')).toContainText('1965〜1975');
 
   const labelStyle = await conceptual.locator('.timeline-label-detail').evaluate((element) => {
     const style = getComputedStyle(element);
     return {
       whiteSpace: style.whiteSpace,
-      textOverflow: style.textOverflow,
+      fontWeight: style.fontWeight,
+      color: style.color,
+      opacity: style.opacity,
+      wordBreak: style.wordBreak,
     };
   });
   expect(labelStyle.whiteSpace).toBe('nowrap');
-  expect(labelStyle.textOverflow).toBe('ellipsis');
+  expect(labelStyle.fontWeight).toBe('500');
+  expect(labelStyle.opacity).toBe('1');
+  expect(labelStyle.wordBreak).toBe('keep-all');
+  expect(labelStyle.color).not.toBe('rgb(92, 92, 96)');
   expect(
     await conceptual
       .locator('[data-timeline-hit-area]')
@@ -127,9 +196,7 @@ test('ラベルは短縮名と年代を1行で表示し、詳細ページへ直�
   ).toBeGreaterThanOrEqual(44);
 });
 
-test('バーは44pxの操作領域内に薄い角丸ラベルとして表示する', async ({
-  page,
-}, testInfo) => {
+test('バーは44pxの操作領域内に22pxの展示レールとして表示する', async ({ page }) => {
   await page.goto('/timeline/');
   await modeButton(page, '近代').click();
 
@@ -147,15 +214,11 @@ test('バーは44pxの操作領域内に薄い角丸ラベルとして表示す�
       targetHeight: element.getBoundingClientRect().height,
       visualHeight: visualElement.getBoundingClientRect().height,
       visualBorderTop: getComputedStyle(visualElement).borderTopWidth,
-      visualRadius: getComputedStyle(visualElement).borderRadius,
-      visualBackground: getComputedStyle(visualElement).backgroundColor,
     };
   });
   expect(metrics.targetHeight).toBeGreaterThanOrEqual(44);
   expect(metrics.visualHeight).toBe(22);
   expect(metrics.visualBorderTop).toBe('1px');
-  expect(metrics.visualRadius).toBe('3px');
-  expect(metrics.visualBackground).not.toBe('rgba(0, 0, 0, 0)');
   expect(await label.evaluate((element) => getComputedStyle(element).textAlign)).toBe(
     'center',
   );
@@ -169,25 +232,9 @@ test('バーは44pxの操作領域内に薄い角丸ラベルとして表示す�
       .length,
   }));
   expect(tickCounts.major).toBeGreaterThanOrEqual(2);
-  expect(tickCounts.major).toBeLessThan(tickCounts.all);
-  await expect(page.locator('[data-timeline-relationship]')).toHaveCount(0);
+  expect(tickCounts.major).toBeLessThanOrEqual(tickCounts.all);
   await expect(visual).toBeVisible();
-  const neoclassicismName = page
-    .locator('[data-timeline-bar="neoclassicism"]')
-    .first()
-    .locator('[data-label-text]');
-  expect(
-    await neoclassicismName.evaluate(
-      (element) => element.scrollWidth <= element.clientWidth,
-    ),
-  ).toBe(true);
-  await page.screenshot({
-    path:
-      testInfo.project.name === 'mobile'
-        ? 'docs/screenshots/timeline-label-strips-iphone.png'
-        : 'docs/screenshots/timeline-label-strips-desktop.png',
-    fullPage: false,
-  });
+  await expect(page.locator('[data-timeline-relationship]')).toHaveCount(0);
 });
 
 test('iPhone幅では表示状態と地域列が固定され、1タップで詳細へ移動する', async ({ page }, testInfo) => {
@@ -233,13 +280,23 @@ test('先史と古代の主要ムーブメントを正しいモードへ表示�
   const trackWidth = await page
     .locator('[data-timeline-track]')
     .evaluate((element) => element.getBoundingClientRect().width);
+  const domain = await page.locator('[data-timeline-track]').evaluate((element) => ({
+    start: Number((element as HTMLElement).dataset.scaleStart),
+    end: Number((element as HTMLElement).dataset.scaleEnd),
+    rounding: Number((element as HTMLElement).dataset.scaleRounding),
+  }));
+  expect(domain).toEqual({ start: -750, end: 750, rounding: 250 });
+  await expect(greek.locator('[data-follow-label]')).toHaveAttribute(
+    'data-label-variant',
+    /full|short|ellipsis/,
+  );
   const coordinates = await greek.evaluate((element) => ({
     start: Number((element as HTMLElement).dataset.barStart),
     end: Number((element as HTMLElement).dataset.barEnd),
     width: element.getBoundingClientRect().width,
   }));
-  expect(coordinates.start).toBeCloseTo((2520 / 3500) * trackWidth, 1);
-  expect(coordinates.end).toBeCloseTo((2677 / 3500) * trackWidth, 1);
+  expect(coordinates.start).toBeCloseTo((270 / 1500) * trackWidth, 1);
+  expect(coordinates.end).toBeCloseTo((427 / 1500) * trackWidth, 1);
   expect(coordinates.width).toBeCloseTo(coordinates.end - coordinates.start, 1);
 });
 
@@ -307,10 +364,7 @@ test('先史美術の追従ラベルは正式名称か短縮名を維持する',
   await expect(bar).toHaveAttribute('title', /先史美術/);
 });
 
-test('ダークモードとPWA standalone設定を維持する', async ({
-  page,
-  request,
-}, testInfo) => {
+test('ダークモードとPWA standalone設定を維持する', async ({ page, request }) => {
   await page.addInitScript(() => localStorage.setItem('aha-theme', 'dark'));
   await page.goto('/timeline/');
   await modeButton(page, '中世').click();
@@ -319,10 +373,256 @@ test('ダークモードとPWA standalone設定を維持する', async ({
   const manifest = await request.get('/manifest.webmanifest');
   expect(manifest.ok()).toBeTruthy();
   expect((await manifest.json()).display).toBe('standalone');
+});
+
+test('閲覧モードは全画面へ入り、倍率操作・全体表示・終了後の復帰に対応する', async ({
+  page,
+}) => {
+  await page.goto('/timeline/');
+  await modeButton(page, '近代').click();
+
+  const trigger = page.getByRole('button', {
+    name: 'タイムラインを全画面で表示',
+  });
+  const normalStage = page.locator('[data-timeline-viewer-stage]');
+  await expect(trigger).toBeVisible();
+  expect(
+    await trigger.evaluate((element) => element.getBoundingClientRect().height),
+  ).toBeGreaterThanOrEqual(44);
+  expect(await normalStage.evaluate((element) => getComputedStyle(element).touchAction)).not.toBe(
+    'none',
+  );
+
+  await trigger.click();
+  const viewer = page.locator('[data-timeline-viewer="active"]');
+  const stage = viewer.locator('[data-timeline-viewer-stage]');
+  await expect(viewer).toHaveAttribute('role', 'dialog');
+  await expect(viewer).toHaveAttribute('aria-modal', 'true');
+  await expect(stage).toBeFocused();
+  await expect
+    .poll(() =>
+      viewer.evaluate((element) => {
+        const rect = element.getBoundingClientRect();
+        return {
+          width: Math.round(rect.width),
+          height: Math.round(rect.height),
+        };
+      }),
+    )
+    .toEqual({
+      width: await page.evaluate(() => window.innerWidth),
+      height: await page.evaluate(() => window.innerHeight),
+    });
+  expect(await stage.evaluate((element) => getComputedStyle(element).touchAction)).toBe('none');
+
+  await viewer.getByRole('button', { name: '拡大' }).click();
+  await expect
+    .poll(async () => Number((await viewer.getAttribute('data-viewer-scale')) ?? 0))
+    .toBeGreaterThan(1);
+  await viewer.getByRole('button', { name: '全体表示へ戻す' }).click();
+  await expect
+    .poll(async () => Number((await viewer.getAttribute('data-viewer-scale')) ?? 0))
+    .toBeGreaterThan(0);
+
+  await stage.press('Escape');
+  await expect(page.locator('[data-timeline-viewer="active"]')).toHaveCount(0);
+  await expect(trigger).toBeFocused();
+  await expect(modeButton(page, '近代')).toHaveAttribute('aria-current', 'true');
+});
+
+test('閲覧モードはマウスパン・ダブルクリック・キーボード操作を共有する', async ({
+  page,
+}, testInfo) => {
+  test.skip(testInfo.project.name !== 'desktop', 'desktop project only');
+  await page.goto('/timeline/');
+  await page.getByRole('button', { name: 'タイムラインを全画面で表示' }).click();
+
+  const viewer = page.locator('[data-timeline-viewer="active"]');
+  const stage = viewer.locator('[data-timeline-viewer-stage]');
+  const beforeX = Number(await viewer.getAttribute('data-viewer-x'));
+  await stage.hover({ position: { x: 620, y: 420 } });
+  await page.mouse.down();
+  await page.mouse.move(500, 350, { steps: 4 });
+  await page.mouse.up();
+  await expect
+    .poll(async () => Number((await viewer.getAttribute('data-viewer-x')) ?? 0))
+    .not.toBe(beforeX);
+
+  await stage.dispatchEvent('dblclick', { clientX: 720, clientY: 520 });
+  await expect(viewer).toHaveAttribute('data-viewer-scale', '1.75');
+  await stage.press('0');
+  await expect
+    .poll(async () => Number((await viewer.getAttribute('data-viewer-scale')) ?? 0))
+    .toBeLessThanOrEqual(1);
+  await stage.press('+');
+  await expect
+    .poll(async () => Number((await viewer.getAttribute('data-viewer-scale')) ?? 0))
+    .toBeGreaterThan(0);
+});
+
+test('iPhone幅の閲覧モードは2本指の中点を保ってピンチズームする', async ({
+  page,
+}, testInfo) => {
+  test.skip(testInfo.project.name !== 'mobile', 'mobile project only');
+  await page.goto('/timeline/');
+  await page.getByRole('button', { name: 'タイムラインを全画面で表示' }).tap();
+
+  const viewer = page.locator('[data-timeline-viewer="active"]');
+  const stage = viewer.locator('[data-timeline-viewer-stage]');
+  await stage.evaluate((element) => {
+    const emit = (
+      type: string,
+      pointerId: number,
+      clientX: number,
+      isPrimary = false,
+    ) => {
+      element.dispatchEvent(
+        new PointerEvent(type, {
+          bubbles: true,
+          cancelable: true,
+          pointerId,
+          pointerType: 'touch',
+          clientX,
+          clientY: 380,
+          isPrimary,
+        }),
+      );
+    };
+    emit('pointerdown', 11, 130, true);
+    emit('pointerdown', 12, 250);
+    emit('pointermove', 11, 90, true);
+    emit('pointermove', 12, 290);
+  });
+  await expect
+    .poll(async () => Number((await viewer.getAttribute('data-viewer-scale')) ?? 0))
+    .toBeGreaterThan(1);
+  await stage.evaluate((element) => {
+    for (const [pointerId, clientX] of [
+      [11, 90],
+      [12, 290],
+    ]) {
+      element.dispatchEvent(
+        new PointerEvent('pointerup', {
+          bubbles: true,
+          cancelable: true,
+          pointerId,
+          pointerType: 'touch',
+          clientX,
+          clientY: 380,
+        }),
+      );
+    }
+  });
+
+  await page.setViewportSize({ width: 844, height: 390 });
+  await expect(viewer).toBeVisible();
+  await viewer.getByRole('button', { name: '全体表示へ戻す' }).tap();
+  await expect
+    .poll(async () => Number((await viewer.getAttribute('data-viewer-scale')) ?? 0))
+    .toBeGreaterThan(0);
+});
+
+test('閲覧モードは固定軸と一定寸法のノードでセマンティックズームする', async ({
+  page,
+}, testInfo) => {
+  await page.goto('/timeline/');
+  await modeButton(page, '近代').click();
+  await page.getByRole('button', { name: 'タイムラインを全画面で表示' }).click();
+
+  const viewer = page.locator('[data-timeline-viewer="active"]');
+  const stage = viewer.locator('[data-timeline-viewer-stage]');
+  const timeAxis = viewer.locator('.timeline-viewer-time-axis');
+  const regionAxis = viewer.locator('.timeline-viewer-region-axis');
+  const origin = viewer.locator('.timeline-viewer-axis-origin');
+  const firstNode = viewer.locator('[data-viewer-node]:visible').first();
+  const fixedBefore = await Promise.all([
+    timeAxis.boundingBox(),
+    regionAxis.boundingBox(),
+    origin.boundingBox(),
+    firstNode.boundingBox(),
+  ]);
+
   if (testInfo.project.name === 'desktop') {
-    await page.screenshot({
-      path: 'docs/screenshots/timeline-label-strips-dark-desktop.png',
-      fullPage: false,
+    await stage.hover({ position: { x: 650, y: 420 } });
+    await page.mouse.down();
+    await page.mouse.move(520, 350, { steps: 4 });
+    await page.mouse.up();
+  } else {
+    await stage.dispatchEvent('pointerdown', {
+      pointerId: 21,
+      pointerType: 'touch',
+      clientX: 240,
+      clientY: 380,
+      isPrimary: true,
+    });
+    await stage.dispatchEvent('pointermove', {
+      pointerId: 21,
+      pointerType: 'touch',
+      clientX: 190,
+      clientY: 340,
+      isPrimary: true,
+    });
+    await stage.dispatchEvent('pointerup', {
+      pointerId: 21,
+      pointerType: 'touch',
+      clientX: 190,
+      clientY: 340,
+      isPrimary: true,
     });
   }
+
+  for (let index = 0; index < 4; index += 1) {
+    const beforeScale = Number(await viewer.getAttribute('data-viewer-scale'));
+    await viewer.getByRole('button', { name: '拡大' }).click();
+    await expect
+      .poll(async () => Number((await viewer.getAttribute('data-viewer-scale')) ?? 0))
+      .toBeGreaterThan(beforeScale);
+  }
+
+  const maximumScale = testInfo.project.name === 'mobile' ? 3 : 4;
+  await expect
+    .poll(async () => Number((await viewer.getAttribute('data-viewer-scale')) ?? 0))
+    .toBeLessThanOrEqual(maximumScale);
+  await expect(viewer).toHaveAttribute('data-semantic-level', /contextual|detailed/);
+
+  const fixedAfter = await Promise.all([
+    timeAxis.boundingBox(),
+    regionAxis.boundingBox(),
+    origin.boundingBox(),
+    viewer.locator('[data-viewer-node]:visible').first().boundingBox(),
+  ]);
+  expect(fixedAfter[0]?.height).toBe(fixedBefore[0]?.height);
+  expect(fixedAfter[1]?.width).toBe(fixedBefore[1]?.width);
+  expect(fixedAfter[2]).toEqual(fixedBefore[2]);
+
+  const nodeBox = fixedAfter[3];
+  expect(nodeBox?.height).toBeLessThanOrEqual(
+    testInfo.project.name === 'mobile' ? 60 : 68,
+  );
+  expect(nodeBox?.width).toBeLessThanOrEqual(
+    testInfo.project.name === 'mobile' ? 180 : 220,
+  );
+  const detailedNode = viewer.locator('[data-viewer-node]:visible').first();
+  await expect(detailedNode.locator('.timeline-viewer-node__date')).toBeVisible();
+  await expect(detailedNode.locator('.timeline-viewer-node__english-inline')).toHaveCount(0);
+  await expect(viewer.locator('[data-viewer-relation]')).toHaveCount(0);
+  await expect(viewer.locator('.timeline-viewer-selection')).toHaveCount(0);
+  const nodeFontSize = await detailedNode
+    .locator('.timeline-viewer-node__name')
+    .evaluate((element) => parseFloat(getComputedStyle(element).fontSize));
+  expect(nodeFontSize).toBeGreaterThanOrEqual(10);
+  expect(nodeFontSize).toBeLessThanOrEqual(14);
+});
+
+test('閲覧モードにaxeの重大なアクセシビリティ違反がない', async ({ page }) => {
+  await page.goto('/timeline/');
+  await page.getByRole('button', { name: 'タイムラインを全画面で表示' }).click();
+  const results = await new AxeBuilder({ page })
+    .include('[data-timeline-viewer="active"]')
+    .analyze();
+  expect(
+    results.violations.filter((violation) =>
+      ['critical', 'serious'].includes(violation.impact ?? ''),
+    ),
+  ).toEqual([]);
 });

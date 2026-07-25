@@ -1,5 +1,5 @@
 /*
- * 美術史アトラス Service Worker
+ * Art History Atlas Service Worker
  *
  * 方針:
  *  - バージョン付きキャッシュ名。activate時に古いキャッシュを削除し、更新時に残らないようにする。
@@ -11,7 +11,7 @@
  * GitHub Pages のサブパス配下（/art-history-atlas）でも動くよう、
  * 自身の登録スコープから BASE を導出する（ルート配信・サブパス配信の双方に対応）。
  */
-const VERSION = 'v2';
+const VERSION = 'v3';
 const SHELL_CACHE = `aha-shell-${VERSION}`;
 const PAGES_CACHE = `aha-pages-${VERSION}`;
 const ASSETS_CACHE = `aha-assets-${VERSION}`;

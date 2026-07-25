@@ -4,8 +4,12 @@ test('ホームのファーストビューに3つの探索導線を表示する'
   await page.goto('/');
 
   const hero = page.locator('[data-home-hero]');
-  await expect(page).toHaveTitle(/美術史アトラス/);
-  await expect(page.getByRole('heading', { level: 1 })).toHaveText('美術史アトラス');
+  await expect(page).toHaveTitle('Art History Atlas');
+  const title = page.getByRole('heading', {
+    level: 1,
+    name: 'Art History Atlas',
+  });
+  await expect(title).toHaveText('ART HISTORY ATLAS');
   await expect(page.getByText('発生・継承・転換から読む美術史。')).toBeVisible();
 
   const navigation = page.getByRole('navigation', { name: '主要な探索方法' });
@@ -40,6 +44,24 @@ test('ホームのファーストビューに3つの探索導線を表示する'
   expect(geometry.height).toBeGreaterThanOrEqual(260);
   expect(geometry.height).toBeLessThanOrEqual(geometry.width < 640 ? 340 : 330);
   expect(geometry.taglineHeight).toBeLessThanOrEqual(geometry.taglineLineHeight * 2 + 1);
+
+  const titleTypography = await title.evaluate((element) => {
+    const styles = getComputedStyle(element);
+    return {
+      fontSize: Number.parseFloat(styles.fontSize),
+      letterSpacing: Number.parseFloat(styles.letterSpacing),
+      hasHorizontalOverflow: element.scrollWidth > element.clientWidth + 1,
+    };
+  });
+  if ((page.viewportSize()?.width ?? 1280) < 640) {
+    expect(titleTypography.fontSize).toBeGreaterThanOrEqual(32);
+    expect(titleTypography.fontSize).toBeLessThanOrEqual(34);
+  } else {
+    expect(titleTypography.fontSize).toBeGreaterThanOrEqual(40);
+    expect(titleTypography.fontSize).toBeLessThanOrEqual(56);
+  }
+  expect(titleTypography.letterSpacing).toBeGreaterThan(0);
+  expect(titleTypography.hasHorizontalOverflow).toBe(false);
 
   const nextSectionTop = await page.getByRole('heading', { level: 2, name: 'Explore by Era' }).evaluate(
     (element) => element.getBoundingClientRect().top,
@@ -98,7 +120,9 @@ test('ホームのセクション見出しは英語と短い日本語説明で�
 test('ヘッダーは英字3行ロゴと均衡した操作領域を持つ', async ({ page }) => {
   await page.goto('/');
 
-  const wordmark = page.getByRole('link', { name: 'ART HISTORY ATLAS', exact: true });
+  const wordmark = page
+    .getByRole('banner')
+    .getByRole('link', { name: 'Art History Atlas', exact: true });
   await expect(wordmark).toBeVisible();
   await expect(wordmark.locator('.site-wordmark__line')).toHaveCount(3);
   await expect(wordmark.locator('.site-wordmark__line').nth(0)).toHaveText('ART');
@@ -116,4 +140,44 @@ test('ヘッダーは英字3行ロゴと均衡した操作領域を持つ', asyn
       expect(box?.height).toBeGreaterThanOrEqual(44);
     }
   }
+});
+
+test('正式名称をmetadata・読み上げ・構造化データで統一する', async ({ page }) => {
+  await page.goto('/');
+
+  await expect(page.locator('meta[name="application-name"]')).toHaveAttribute(
+    'content',
+    'Art History Atlas',
+  );
+  await expect(page.locator('meta[name="apple-mobile-web-app-title"]')).toHaveAttribute(
+    'content',
+    'Art History Atlas',
+  );
+  await expect(page.locator('meta[property="og:title"]')).toHaveAttribute(
+    'content',
+    'Art History Atlas',
+  );
+  await expect(page.locator('meta[property="og:site_name"]')).toHaveAttribute(
+    'content',
+    'Art History Atlas',
+  );
+  await expect(page.locator('meta[name="twitter:title"]')).toHaveAttribute(
+    'content',
+    'Art History Atlas',
+  );
+
+  const structuredData = JSON.parse(
+    (await page.locator('script[type="application/ld+json"]').textContent()) ?? '{}',
+  );
+  expect(structuredData.name).toBe('Art History Atlas');
+  expect(structuredData.alternateName).toBe('ART HISTORY ATLAS');
+
+  await expect(
+    page.locator('footer').getByRole('link', { name: 'Art History Atlas', exact: true }),
+  ).toContainText('ART HISTORY ATLAS');
+  const retiredJapaneseName = ['美術史', 'アトラス'].join('');
+  await expect(page.locator('body')).not.toContainText(retiredJapaneseName);
+
+  await page.goto('/network/');
+  await expect(page).toHaveTitle('関係ネットワーク | Art History Atlas');
 });

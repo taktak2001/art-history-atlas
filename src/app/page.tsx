@@ -76,8 +76,8 @@ export default function HomePage() {
       {/* 1. 主要な探索方法 */}
       <section className="home-hero border-b hairline" data-home-hero>
         <div>
-          <h1 className="home-hero__title">
-            美術史アトラス
+          <h1 className="home-hero__title" aria-label="Art History Atlas">
+            ART HISTORY ATLAS
           </h1>
           <p className="home-hero__tagline">
             発生・継承・転換から読む美術史。

@@ -43,6 +43,17 @@ test('iPhone幅で作品グリッドが横あふれしない', async ({ page }) 
   expect(scrollW).toBeLessThanOrEqual(clientW + 1);
 });
 
+test('iPhone幅でもゴシック美術の概要が文の途中で切れない', async ({ page }) => {
+  await page.setViewportSize({ width: 390, height: 844 });
+  await page.goto('/movements/gothic/');
+
+  const summary = page.locator('[data-hero-summary]');
+  await expect(summary).toHaveText(
+    '大聖堂建築を中心に展開した中世盛期の様式。尖頭アーチ・リブ・飛梁の構造革新が高く明るい内部空間を可能にし、ステンドグラスの光が神学的意味を担った。',
+  );
+  await expect(summary).not.toContainText('…');
+});
+
 for (const movement of [
   { slug: 'prehistoric-ritual', title: '先史美術' },
   { slug: 'italian-renaissance', title: 'イタリア・ルネサンス' },
@@ -77,4 +88,50 @@ test('ミニ目次から代表作品の章へ移動できる', async ({ page }) 
     .click();
   await expect(page).toHaveURL(/#works$/);
   await expect(page.getByRole('heading', { name: '代表作品', exact: true })).toBeVisible();
+});
+
+test('02章は解釈ラベルを置かず、章・サブ見出し・本文の3階層で表示する', async ({
+  page,
+}) => {
+  await page.goto('/movements/italian-renaissance/');
+
+  const chapter = page.locator('#relation');
+  const sectionTitle = chapter.getByRole('heading', {
+    level: 2,
+    name: '何が新しかったか',
+  });
+  const changedTitle = chapter.getByRole('heading', {
+    level: 3,
+    name: '転換したこと',
+  });
+  const inheritedTitle = chapter.getByRole('heading', {
+    level: 3,
+    name: '継承したこと',
+  });
+
+  await expect(sectionTitle).toBeVisible();
+  await expect(changedTitle).toBeVisible();
+  await expect(inheritedTitle).toBeVisible();
+  await expect(chapter.getByText('解釈', { exact: true })).toHaveCount(0);
+
+  const typography = await chapter.evaluate((element) => {
+    const section = element.querySelector('h2');
+    const subsection = element.querySelector('h3');
+    const body = element.querySelector<HTMLElement>('.detail-body');
+    return {
+      sectionFamily: section ? getComputedStyle(section).fontFamily : '',
+      subsectionFamily: subsection ? getComputedStyle(subsection).fontFamily : '',
+      bodyFamily: body ? getComputedStyle(body).fontFamily : '',
+      sectionSize: section ? Number.parseFloat(getComputedStyle(section).fontSize) : 0,
+      subsectionSize: subsection
+        ? Number.parseFloat(getComputedStyle(subsection).fontSize)
+        : 0,
+      bodySize: body ? Number.parseFloat(getComputedStyle(body).fontSize) : 0,
+    };
+  });
+
+  expect(typography.sectionFamily).toBe(typography.subsectionFamily);
+  expect(typography.subsectionFamily).not.toBe(typography.bodyFamily);
+  expect(typography.sectionSize).toBeGreaterThan(typography.subsectionSize);
+  expect(typography.subsectionSize).toBeGreaterThan(typography.bodySize);
 });

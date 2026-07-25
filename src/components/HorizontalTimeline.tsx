@@ -5,7 +5,14 @@ import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import type { Movement, RegionId } from '@/lib/schema';
 import { CLASSIFICATION_LABELS, REGION_LABELS } from '@/lib/schema';
 import { LodControl } from '@/components/LodControl';
-import { filterMovementsByLod } from '@/lib/movement-hierarchy';
+import {
+  TimelineViewerFrame,
+  type TimelineViewerNode,
+  type TimelineViewerRegion,
+} from '@/components/TimelineViewerFrame';
+import {
+  filterMovementsByLod,
+} from '@/lib/movement-hierarchy';
 import { useLodState } from '@/lib/use-lod-state';
 import {
   TIMELINE_ERA_BANDS,
@@ -14,6 +21,7 @@ import {
   calculateFollowLabelX,
   chooseTimelineLabel,
   clipMovementToMode,
+  fitTimelineModeToMovements,
   movementOverlapsMode,
   timelineBarVisualWidth,
   timelineModeById,
@@ -22,6 +30,7 @@ import {
   yearToTimelineX,
   type TimelineModeId,
 } from '@/lib/timeline-presentation';
+import type { TimelineViewerSemanticLevel } from '@/lib/timeline-viewer';
 
 type Props = {
   movements: Movement[];
@@ -43,12 +52,21 @@ const MOBILE_MIN_LANE_H = 50;
 const LABEL_INNER_PADDING = 8;
 const LABEL_TEXT_PADDING = 16;
 const LABEL_META_GAP = 6;
+const DESKTOP_DETAIL_LABEL_FOOTPRINT = 140;
+const MOBILE_DETAIL_LABEL_FOOTPRINT = 120;
 
 type LabelGeometry = {
   element: HTMLElement;
+  textElement: HTMLElement;
   barStart: number;
   barEnd: number;
   labelWidth: number;
+  maximumWidth: number;
+  name: string;
+  shortLabel?: string;
+  nameWidth: number;
+  shortLabelWidth?: number;
+  dateWidth: number;
 };
 
 const SURVEY_PRIORITY = new Set([
@@ -70,18 +88,39 @@ const SURVEY_PRIORITY = new Set([
   'mono-ha',
 ]);
 
+const SURVEY_SUMMARIES = [
+  {
+    id: 'prehistoric-ritual',
+    label: '先史の造形',
+    start: -40000,
+    end: -3000,
+  },
+  {
+    id: 'ancient-greek-classical',
+    label: '古代の規範',
+    start: -3000,
+    end: 500,
+  },
+] as const;
+
 const fmtYear = (year: number) => {
   if (year === TIMELINE_NOW) return '現在';
   if (year === 0) return '紀元境界';
   return year < 0 ? `前${Math.abs(year).toLocaleString('ja-JP')}` : `${year}`;
 };
 
-export function HorizontalTimeline({ movements, activeRegions }: Props) {
+export function HorizontalTimeline({
+  movements,
+  activeRegions,
+}: Props) {
   const scrollRef = useRef<HTMLDivElement>(null);
   const trackRef = useRef<HTMLDivElement>(null);
   const pendingJump = useRef<number | null>(null);
   const labelAnimationFrame = useRef<number | null>(null);
   const labelGeometries = useRef<LabelGeometry[]>([]);
+  const viewerTriggerRef = useRef<HTMLButtonElement>(null);
+  const viewerScrollLeft = useRef(0);
+  const wasViewerMode = useRef(false);
   const drag = useRef<{ startX: number; scrollLeft: number; active: boolean }>({
     startX: 0,
     scrollLeft: 0,
@@ -89,20 +128,35 @@ export function HorizontalTimeline({ movements, activeRegions }: Props) {
   });
   const [modeId, setModeId] = useState<TimelineModeId>('survey');
   const [isCompactTimeline, setIsCompactTimeline] = useState(false);
+  const [isViewerMode, setIsViewerMode] = useState(false);
+  const [viewerSemanticLevel, setViewerSemanticLevel] =
+    useState<TimelineViewerSemanticLevel>('standard');
   const { lod, setLod, applyPurposeDefault } = useLodState('core');
 
   const mode = timelineModeById(modeId);
+  const viewerLod =
+    viewerSemanticLevel === 'detailed'
+      ? 'detailed'
+      : viewerSemanticLevel === 'contextual'
+        ? 'standard'
+        : 'core';
+  const effectiveLod = isViewerMode ? viewerLod : lod;
   const lodMovements = useMemo(
-    () => filterMovementsByLod(movements, lod),
-    [lod, movements],
+    () => filterMovementsByLod(movements, effectiveLod),
+    [effectiveLod, movements],
   );
   const modeMovements = useMemo(
     () => lodMovements.filter((movement) => movementOverlapsMode(movement, mode)),
     [lodMovements, mode],
   );
+  const displayMode = useMemo(
+    () => fitTimelineModeToMovements(mode, modeMovements),
+    [mode, modeMovements],
+  );
   const timelineWidth = useMemo(
-    () => timelineWidthForMode(mode, modeMovements.length, isCompactTimeline),
-    [isCompactTimeline, mode, modeMovements.length],
+    () =>
+      timelineWidthForMode(displayMode, modeMovements.length, isCompactTimeline),
+    [displayMode, isCompactTimeline, modeMovements.length],
   );
   const headerHeight = isCompactTimeline ? MOBILE_HEADER_H : DESKTOP_HEADER_H;
   const barHeight =
@@ -118,6 +172,7 @@ export function HorizontalTimeline({ movements, activeRegions }: Props) {
   const minimumLaneHeight = isCompactTimeline
     ? MOBILE_MIN_LANE_H
     : DESKTOP_MIN_LANE_H;
+  const regionColumnWidth = isCompactTimeline ? 80 : 144;
 
   useEffect(() => {
     const coarsePointer = window.matchMedia(
@@ -151,8 +206,16 @@ export function HorizontalTimeline({ movements, activeRegions }: Props) {
           .filter((movement) => movement.regionIds.includes(region))
           .map((movement) => {
             const clipped = clipMovementToMode(movement, mode);
-            const startX = yearToTimelineX(clipped.start, mode, timelineWidth);
-            const endX = yearToTimelineX(clipped.end, mode, timelineWidth);
+            const startX = yearToTimelineX(
+              clipped.start,
+              displayMode,
+              timelineWidth,
+            );
+            const endX = yearToTimelineX(
+              clipped.end,
+              displayMode,
+              timelineWidth,
+            );
             const width = timelineBarVisualWidth(startX, endX);
             return {
               movement,
@@ -178,7 +241,16 @@ export function HorizontalTimeline({ movements, activeRegions }: Props) {
             row = rowEnds.length;
             rowEnds.push(0);
           }
-          rowEnds[row] = item.left + item.width;
+          const labelFootprint =
+            mode.id === 'survey'
+              ? item.width
+              : Math.max(
+                  item.width,
+                  isCompactTimeline
+                    ? MOBILE_DETAIL_LABEL_FOOTPRINT
+                    : DESKTOP_DETAIL_LABEL_FOOTPRINT,
+                );
+          rowEnds[row] = item.left + labelFootprint;
           return { ...item, row };
         });
 
@@ -198,9 +270,11 @@ export function HorizontalTimeline({ movements, activeRegions }: Props) {
     activeRegions,
     plottedMovements,
     mode,
+    displayMode,
     timelineWidth,
     barHeight,
     barGap,
+    isCompactTimeline,
     lanePaddingY,
     minimumLaneHeight,
   ]);
@@ -223,10 +297,102 @@ export function HorizontalTimeline({ movements, activeRegions }: Props) {
   const visibleEraBands = TIMELINE_ERA_BANDS.filter(
     (era) => era.start < mode.end && era.end > mode.start,
   );
-  const ticks = timelineTicks(mode);
+  const ticks = timelineTicks(displayMode, timelineWidth);
   const majorTickStride =
     mode.id === 'survey' ? 1 : Math.max(1, Math.ceil((ticks.length - 1) / 4));
+  const viewerNodes = useMemo<TimelineViewerNode[]>(() => {
+    const nodes: TimelineViewerNode[] = laneOffsets.flatMap((lane) =>
+      lane.items.map(({ movement, left, width, row }) => ({
+        key: `${lane.region}-${movement.id}`,
+        movementId: movement.id,
+        href: `/movements/${movement.id}/`,
+        nameJa: movement.nameJa,
+        nameEn: movement.nameEn,
+        shortLabel: movement.shortLabel,
+        dateLabel: `${fmtYear(movement.dates.start)}〜${
+          movement.dates.end === null ? '現在' : fmtYear(movement.dates.end)
+        }`,
+        regionLabel: movement.regionIds
+          .map((region) => REGION_LABELS[region])
+          .join('・'),
+        classificationLabel: CLASSIFICATION_LABELS[movement.classification],
+        barStart: left,
+        barEnd: left + width,
+        centerY:
+          lane.top +
+          lanePaddingY +
+          row * (barHeight + barGap) +
+          barHeight / 2,
+        priority: mode.id !== 'survey' || SURVEY_PRIORITY.has(movement.id),
+      })),
+    );
+
+    if (mode.id !== 'survey') return nodes;
+    const summaryNodes = SURVEY_SUMMARIES.flatMap((summary) => {
+      const movement = movements.find((candidate) => candidate.id === summary.id);
+      if (!movement) return [];
+      return [
+        {
+          key: `origin-${summary.id}`,
+          movementId: movement.id,
+          href: `/movements/${movement.id}/`,
+          nameJa: summary.label,
+          nameEn: movement.nameEn,
+          shortLabel: movement.shortLabel,
+          dateLabel: `${fmtYear(movement.dates.start)}〜${
+            movement.dates.end === null ? '現在' : fmtYear(movement.dates.end)
+          }`,
+          regionLabel: movement.regionIds
+            .map((region) => REGION_LABELS[region])
+            .join('・'),
+          classificationLabel: CLASSIFICATION_LABELS[movement.classification],
+          barStart: yearToTimelineX(
+            summary.start,
+            displayMode,
+            timelineWidth,
+          ),
+          barEnd: yearToTimelineX(summary.end, displayMode, timelineWidth),
+          centerY: headerHeight + SURVEY_SUMMARY_H / 2,
+          priority: true,
+        },
+      ];
+    });
+    return [...summaryNodes, ...nodes];
+  }, [
+    barGap,
+    barHeight,
+    displayMode,
+    headerHeight,
+    laneOffsets,
+    lanePaddingY,
+    mode.id,
+    movements,
+    timelineWidth,
+  ]);
+  const viewerRegions = useMemo<TimelineViewerRegion[]>(
+    () => [
+      ...(mode.id === 'survey'
+        ? [
+            {
+              id: 'origin',
+              label: '起点',
+              top: headerHeight,
+              height: SURVEY_SUMMARY_H,
+            },
+          ]
+        : []),
+      ...laneOffsets.map((lane) => ({
+        id: lane.region,
+        label: REGION_LABELS[lane.region],
+        top: lane.top,
+        height: lane.height,
+      })),
+    ],
+    [headerHeight, laneOffsets, mode.id],
+  );
+
   const scheduleTimelineLabelUpdate = () => {
+    if (isViewerMode) return;
     if (labelAnimationFrame.current !== null) return;
     labelAnimationFrame.current = requestAnimationFrame(() => {
       labelAnimationFrame.current = null;
@@ -236,6 +402,52 @@ export function HorizontalTimeline({ movements, activeRegions }: Props) {
       const viewportRight = viewportLeft + viewport.clientWidth;
 
       for (const geometry of labelGeometries.current) {
+        const visibleWidth = Math.max(
+          1,
+          Math.min(geometry.barEnd, viewportRight) -
+            Math.max(geometry.barStart, viewportLeft) -
+            LABEL_INNER_PADDING * 2,
+        );
+        const availableWidth = Math.min(geometry.maximumWidth, visibleWidth);
+        const availableNameWidth = Math.max(
+          1,
+          availableWidth -
+            geometry.dateWidth -
+            LABEL_META_GAP -
+            LABEL_TEXT_PADDING,
+        );
+        const choice = chooseTimelineLabel({
+          name: geometry.name,
+          shortLabel: geometry.shortLabel,
+          availableWidth: availableNameWidth,
+          nameWidth: geometry.nameWidth,
+          shortLabelWidth: geometry.shortLabelWidth,
+        });
+        const chosenWidth =
+          choice.variant === 'full'
+            ? geometry.nameWidth
+            : choice.variant === 'short'
+              ? geometry.shortLabelWidth ?? geometry.nameWidth
+              : Math.min(
+                  geometry.shortLabelWidth ?? geometry.nameWidth,
+                  availableNameWidth,
+                );
+        const resolvedLabelWidth = Math.max(
+          1,
+          Math.min(
+            chosenWidth +
+              geometry.dateWidth +
+              LABEL_META_GAP +
+              LABEL_TEXT_PADDING,
+            availableWidth,
+          ),
+        );
+        geometry.textElement.textContent = choice.label;
+        geometry.element.dataset.labelVariant = choice.variant;
+        geometry.element.style.maxWidth = `${availableWidth}px`;
+        geometry.element.style.width = `${resolvedLabelWidth}px`;
+        geometry.labelWidth = resolvedLabelWidth;
+
         const position = calculateFollowLabelX({
           barStart: geometry.barStart,
           barEnd: geometry.barEnd,
@@ -254,6 +466,10 @@ export function HorizontalTimeline({ movements, activeRegions }: Props) {
   };
 
   useLayoutEffect(() => {
+    if (isViewerMode) {
+      labelGeometries.current = [];
+      return;
+    }
     const track = trackRef.current;
     const viewport = scrollRef.current;
     if (!track || !viewport) return;
@@ -270,9 +486,15 @@ export function HorizontalTimeline({ movements, activeRegions }: Props) {
       if (!bar || !textElement || !dateElement) continue;
       const barStart = Number(bar.dataset.barStart);
       const barEnd = Number(bar.dataset.barEnd);
-      const availableWidth = Math.max(
+      const barAvailableWidth = Math.max(
         1,
         barEnd - barStart - LABEL_INNER_PADDING * 2,
+      );
+      const availableWidth = barAvailableWidth;
+      const dateWidth = dateElement.getBoundingClientRect().width;
+      const availableNameWidth = Math.max(
+        1,
+        availableWidth - dateWidth - LABEL_META_GAP - LABEL_TEXT_PADDING,
       );
       const name = element.dataset.fullLabel ?? '';
       const shortLabel = element.dataset.shortLabel || undefined;
@@ -284,13 +506,6 @@ export function HorizontalTimeline({ movements, activeRegions }: Props) {
       const shortLabelWidth = shortLabel
         ? context?.measureText(shortLabel).width
         : undefined;
-      const dateWidth =
-        context?.measureText(dateElement.textContent ?? '').width ??
-        dateElement.scrollWidth;
-      const availableNameWidth = Math.max(
-        1,
-        availableWidth - dateWidth - LABEL_META_GAP - LABEL_TEXT_PADDING,
-      );
       const choice = chooseTimelineLabel({
         name,
         shortLabel,
@@ -318,9 +533,16 @@ export function HorizontalTimeline({ movements, activeRegions }: Props) {
       element.style.width = `${resolvedLabelWidth}px`;
       nextGeometries.push({
         element,
+        textElement,
         barStart,
         barEnd,
         labelWidth: resolvedLabelWidth,
+        maximumWidth: availableWidth,
+        name,
+        shortLabel,
+        nameWidth,
+        shortLabelWidth,
+        dateWidth,
       });
     }
 
@@ -342,14 +564,42 @@ export function HorizontalTimeline({ movements, activeRegions }: Props) {
     };
     // Geometry is rebuilt when the rendered mode, width, or lane layout changes.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [isCompactTimeline, laneOffsets, mode.id, timelineWidth]);
+  }, [
+    displayMode.end,
+    displayMode.start,
+    isCompactTimeline,
+    isViewerMode,
+    laneOffsets,
+    mode.id,
+    timelineWidth,
+  ]);
+
+  useLayoutEffect(() => {
+    const viewport = scrollRef.current;
+    if (isViewerMode) {
+      viewport?.scrollTo({ left: 0, behavior: 'auto' });
+    } else if (wasViewerMode.current) {
+      viewport?.scrollTo({
+        left: viewerScrollLeft.current,
+        behavior: 'auto',
+      });
+      window.requestAnimationFrame(() => {
+        viewerTriggerRef.current?.focus({ preventScroll: true });
+        scheduleTimelineLabelUpdate();
+      });
+    }
+    wasViewerMode.current = isViewerMode;
+    // Viewer mode temporarily replaces native scrolling with a transformed canvas.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isViewerMode]);
 
   const scrollToYear = (year: number, behavior: ScrollBehavior = 'smooth') => {
     const element = scrollRef.current;
     if (!element) return;
     const left = Math.max(
       0,
-      yearToTimelineX(year, mode, timelineWidth) - element.clientWidth * 0.18,
+      yearToTimelineX(year, displayMode, timelineWidth) -
+        element.clientWidth * 0.18,
     );
     element.scrollTo({ left, behavior });
   };
@@ -380,6 +630,7 @@ export function HorizontalTimeline({ movements, activeRegions }: Props) {
   };
 
   const onPointerDown = (event: React.PointerEvent) => {
+    if (isViewerMode) return;
     const element = scrollRef.current;
     if (!element || event.pointerType !== 'mouse') return;
     if ((event.target as HTMLElement).closest('a,button')) return;
@@ -392,6 +643,7 @@ export function HorizontalTimeline({ movements, activeRegions }: Props) {
   };
 
   const onPointerMove = (event: React.PointerEvent) => {
+    if (isViewerMode) return;
     if (!drag.current.active || !scrollRef.current) return;
     scrollRef.current.scrollLeft =
       drag.current.scrollLeft - (event.clientX - drag.current.startX);
@@ -401,9 +653,15 @@ export function HorizontalTimeline({ movements, activeRegions }: Props) {
     drag.current.active = false;
   };
 
+  const openViewer = () => {
+    viewerScrollLeft.current = scrollRef.current?.scrollLeft ?? 0;
+    setViewerSemanticLevel('standard');
+    setIsViewerMode(true);
+  };
+
   return (
     <div style={{ paddingBottom: 'calc(env(safe-area-inset-bottom) + 16px)' }}>
-      <div className="space-y-5 border-y hairline py-4">
+      <div className="timeline-controls">
         <LodControl
           value={lod}
           onChange={(next) => {
@@ -414,12 +672,12 @@ export function HorizontalTimeline({ movements, activeRegions }: Props) {
             standard: filterMovementsByLod(movements, 'standard').length,
             detailed: filterMovementsByLod(movements, 'detailed').length,
           }}
-          compact
+          catalogue
         />
-        <div>
-          <p className="mb-2 text-xs font-bold text-ink">表示モード</p>
+        <div className="timeline-era-control">
+          <p className="timeline-control-caption">Era</p>
           <div
-            className="scroll-x flex gap-1.5 pb-1 sm:grid sm:grid-cols-7 sm:overflow-visible sm:pb-0"
+            className="timeline-era-options scroll-x"
             role="group"
             aria-label="表示モード"
           >
@@ -429,11 +687,7 @@ export function HorizontalTimeline({ movements, activeRegions }: Props) {
                 type="button"
                 onClick={() => selectMode(item.id)}
                 aria-current={item.id === mode.id ? 'true' : undefined}
-                className={`min-h-11 min-w-[72px] shrink-0 rounded-sm border px-3 py-2 text-sm font-medium transition-colors active:translate-y-px sm:min-w-0 ${
-                  item.id === mode.id
-                    ? 'border-ink border-b-[3px] border-b-accent bg-ink text-paper'
-                    : 'hairline bg-raised text-muted hover:border-ink hover:text-ink'
-                }`}
+                className="timeline-era-option"
               >
                 {item.label}
               </button>
@@ -444,36 +698,58 @@ export function HorizontalTimeline({ movements, activeRegions }: Props) {
       </div>
 
       <section
-        className="sticky top-[69px] z-30 mt-3 max-h-[120px] border-y hairline bg-paper/95 px-3 py-2 backdrop-blur sm:static sm:mt-4 sm:max-h-none sm:bg-surface sm:px-4 sm:py-4"
+        className="timeline-status sticky top-[69px] z-30 mt-3 bg-paper/95 backdrop-blur sm:static sm:mt-4 sm:bg-transparent"
         aria-label="現在の表示範囲"
         data-timeline-status
       >
         <div className="flex min-h-11 items-center justify-between gap-4">
           <div aria-live="polite">
-            <p className="hidden text-[11px] font-bold tracking-[0.08em] text-muted sm:block">表示中</p>
             <p className="flex flex-wrap items-baseline gap-x-3">
-              <span className="font-serif text-xl text-ink">{mode.label}</span>
-              <span className="text-xs tabular-nums text-muted">
-                {fmtYear(mode.start)}〜{mode.end === TIMELINE_NOW ? '現在' : fmtYear(mode.end)}
+              <span className="timeline-status__title">{mode.label}</span>
+              <span className="timeline-status__range">
+                {fmtYear(displayMode.start)}〜
+                {displayMode.end === TIMELINE_NOW ? '現在' : fmtYear(displayMode.end)}
               </span>
             </p>
           </div>
-          {mode.id !== 'survey' && (
+          <div className="timeline-status__actions">
+            {mode.id !== 'survey' && (
+              <button
+                type="button"
+                onClick={() => selectMode('survey')}
+                className="timeline-back-link"
+              >
+                <span aria-hidden="true">←</span> 通史
+              </button>
+            )}
             <button
+              ref={viewerTriggerRef}
               type="button"
-              onClick={() => selectMode('survey')}
-              className="min-h-11 shrink-0 px-2 text-xs font-medium text-ink underline decoration-hairline underline-offset-4 hover:decoration-ink active:translate-y-px sm:rounded-sm sm:border sm:bg-raised sm:px-3 sm:no-underline"
+              onClick={openViewer}
+              className="timeline-viewer-toggle"
+              aria-label="タイムラインを全画面で表示"
+              aria-haspopup="dialog"
             >
-              通史へ戻る
+              <span aria-hidden="true">⛶</span>
             </button>
-          )}
+          </div>
         </div>
-        <p className="mt-0.5 line-clamp-2 text-xs leading-relaxed text-muted sm:mt-1 sm:text-sm">
-          {mode.description}
-        </p>
       </section>
 
-      <div className="timeline-shell mt-3 flex overflow-hidden">
+      <TimelineViewerFrame
+        active={isViewerMode}
+        contentHeight={chartHeight}
+        contentOriginX={regionColumnWidth}
+        contentOriginY={headerHeight}
+        initialScrollLeft={viewerScrollLeft.current}
+        timelineMode={displayMode}
+        timelineWidth={timelineWidth}
+        nodes={viewerNodes}
+        regions={viewerRegions}
+        onClose={() => setIsViewerMode(false)}
+        onSemanticLevelChange={setViewerSemanticLevel}
+      >
+      <div className="timeline-shell timeline-chart mt-3 flex overflow-hidden">
         <div
           className="timeline-region-column sticky left-0 z-20 w-20 shrink-0 sm:w-36"
           data-region-column
@@ -523,6 +799,9 @@ export function HorizontalTimeline({ movements, activeRegions }: Props) {
             data-timeline-mode={mode.id}
             data-timeline-lod={lod}
             data-lane-count={laneLayouts.length}
+            data-scale-start={displayMode.start}
+            data-scale-end={displayMode.end}
+            data-scale-rounding={displayMode.tickStep}
             style={{ width: timelineWidth, height: chartHeight }}
           >
             <div
@@ -532,12 +811,12 @@ export function HorizontalTimeline({ movements, activeRegions }: Props) {
               {visibleEraBands.map((era) => {
                 const left = yearToTimelineX(
                   Math.max(era.start, mode.start),
-                  mode,
+                  displayMode,
                   timelineWidth,
                 );
                 const right = yearToTimelineX(
                   Math.min(era.end, mode.end),
-                  mode,
+                  displayMode,
                   timelineWidth,
                 );
                 return (
@@ -565,14 +844,16 @@ export function HorizontalTimeline({ movements, activeRegions }: Props) {
                   className={`timeline-gridline absolute bottom-0 top-7 ${
                     isMajorTick ? 'timeline-gridline--major' : 'timeline-gridline--minor'
                   }`}
-                  style={{ left: yearToTimelineX(tick, mode, timelineWidth) }}
+                  style={{
+                    left: yearToTimelineX(tick, displayMode, timelineWidth),
+                  }}
                   aria-hidden="true"
                 >
                   <span
                     className={`timeline-tick-label absolute top-0 whitespace-nowrap px-1 text-[10px] tabular-nums ${
-                      tick === mode.start
+                      tick === displayMode.start
                         ? ''
-                        : tick === mode.end
+                        : tick === displayMode.end
                           ? '-translate-x-full'
                           : '-translate-x-1/2'
                     }`}
@@ -588,22 +869,17 @@ export function HorizontalTimeline({ movements, activeRegions }: Props) {
                 className="timeline-origin-lane absolute inset-x-0"
                 style={{ top: headerHeight, height: SURVEY_SUMMARY_H }}
               >
-                {[
-                  {
-                    id: 'prehistoric-ritual',
-                    label: '先史の造形',
-                    start: -40000,
-                    end: -3000,
-                  },
-                  {
-                    id: 'ancient-greek-classical',
-                    label: '古代の規範',
-                    start: -3000,
-                    end: 500,
-                  },
-                ].map((summary) => {
-                  const left = yearToTimelineX(summary.start, mode, timelineWidth);
-                  const right = yearToTimelineX(summary.end, mode, timelineWidth);
+                {SURVEY_SUMMARIES.map((summary) => {
+                  const left = yearToTimelineX(
+                    summary.start,
+                    displayMode,
+                    timelineWidth,
+                  );
+                  const right = yearToTimelineX(
+                    summary.end,
+                    displayMode,
+                    timelineWidth,
+                  );
                   return (
                     <Link
                       key={summary.id}
@@ -612,8 +888,8 @@ export function HorizontalTimeline({ movements, activeRegions }: Props) {
                       className="timeline-origin-rail absolute top-[5px] flex min-h-11 items-center overflow-hidden px-2 leading-tight text-ink active:translate-y-px"
                       style={{ left: left + 4, width: Math.max(72, right - left - 8) }}
                     >
-                      <span className="truncate text-[10px] font-medium">{summary.label}</span>
-                      <span className="shrink-0 text-[9px] tabular-nums text-muted">
+                      <span className="block truncate text-[11px] font-medium">{summary.label}</span>
+                      <span className="block shrink-0 text-[9px] tabular-nums text-muted">
                         {fmtYear(summary.start)}〜{fmtYear(summary.end)}
                       </span>
                     </Link>
@@ -681,21 +957,21 @@ export function HorizontalTimeline({ movements, activeRegions }: Props) {
                           data-follow-label
                           data-full-label={movement.nameJa}
                           data-short-label={movement.shortLabel}
-                          className="timeline-bar-label pointer-events-none absolute inset-y-0 left-0 flex items-center overflow-hidden px-1"
+                          className="timeline-follow-label pointer-events-none absolute inset-y-0 left-0 flex items-center overflow-hidden px-px"
                         >
                           <span
                             data-label-text
                             className={
                               mode.id === 'survey'
-                                ? 'timeline-label-name timeline-label-survey'
-                                : 'timeline-label-name timeline-label-detail'
+                                ? 'timeline-label-survey block min-w-0 flex-1'
+                                : 'timeline-label-detail min-w-0 flex-1'
                             }
                           >
                             {movement.nameJa}
                           </span>
                           <span
                             data-label-date
-                            className="timeline-label-date"
+                            className="timeline-label-date shrink-0 tabular-nums"
                           >
                             {fmtYear(movement.dates.start)}〜
                             {movement.dates.end === null
@@ -717,11 +993,12 @@ export function HorizontalTimeline({ movements, activeRegions }: Props) {
           </div>
         </div>
       </div>
+      </TimelineViewerFrame>
 
       <p className="mt-2 text-xs text-faint">
         <span className="sm:hidden">横にスワイプして移動。タップで詳細</span>
         <span className="hidden sm:inline">
-          横スクロール、または余白をドラッグして移動できます。ラベルを選ぶと詳細ページを開きます。
+          横スクロール、または余白をドラッグして移動できます。ラベルをクリックすると詳細を開きます。
         </span>
       </p>
 

@@ -5,6 +5,7 @@ import {
   formatYear,
   formatDateRange,
   getMovement,
+  movements,
   relationships,
 } from '@/lib/dataset';
 import {
@@ -29,10 +30,15 @@ import {
   RELATION_LINE_STYLE,
 } from '@/lib/network-presentation';
 import {
+  RELATIONSHIP_DEFINITIONS,
+  RELATION_KINDS,
+} from '@/lib/relationship-definitions';
+import {
   TIMELINE_MODES,
   calculateFollowLabelX,
   chooseTimelineLabel,
   clipMovementToMode,
+  fitTimelineModeToMovements,
   movementOverlapsMode,
   timelineBarVisualWidth,
   timelineModeById,
@@ -157,27 +163,51 @@ describe('年代フォーマット', () => {
 });
 
 describe('詳細ページの導入要旨', () => {
-  it('既存データから80〜120字の要旨を作る', () => {
-    const movement = getMovement('italian-renaissance')!;
-    const summary = buildHeroSummary(movement.summary, movement.coreIdea);
+  it('全ムーブメントで編集済みの短い概要を省略せず表示する', () => {
+    expect(movements).toHaveLength(30);
 
-    expect(summary.length).toBeGreaterThanOrEqual(80);
-    expect(summary.length).toBeLessThanOrEqual(120);
-    expect(summary.startsWith(movement.summary)).toBe(true);
+    for (const movement of movements) {
+      const summary = buildHeroSummary(movement.summary);
+
+      expect(summary).toBe(movement.summary.replaceAll('—', '-').replaceAll('–', '-'));
+      expect(summary).toMatch(/[。！？]$/);
+      expect(summary).not.toContain('…');
+      expect(summary.length).toBeLessThanOrEqual(90);
+    }
   });
 
-  it('長文は120字以内で自然に切る', () => {
-    const summary = buildHeroSummary(
-      'これは導入要旨です。'.repeat(20),
-      '補足の中心思想です。',
-    );
+  it('ゴシック美術の概要を自然な文末で終える', () => {
+    const movement = getMovement('gothic')!;
+    const summary = buildHeroSummary(movement.summary);
 
-    expect(summary.length).toBeLessThanOrEqual(120);
-    expect(summary.length).toBeGreaterThanOrEqual(80);
+    expect(summary).toBe(
+      '大聖堂建築を中心に展開した中世盛期の様式。尖頭アーチ・リブ・飛梁の構造革新が高く明るい内部空間を可能にし、ステンドグラスの光が神学的意味を担った。',
+    );
   });
 });
 
 describe('関係ネットワークの表示設定', () => {
+  it('9種類すべてに共通の完全な関係定義を持つ', () => {
+    expect(RELATION_KINDS).toHaveLength(9);
+    expect(Object.keys(RELATIONSHIP_DEFINITIONS)).toEqual(RELATION_KINDS);
+
+    for (const kind of RELATION_KINDS) {
+      const definition = RELATIONSHIP_DEFINITIONS[kind];
+      expect(definition.label).toBeTruthy();
+      expect(definition.shortDefinition).toBeTruthy();
+      expect(definition.fullDefinition).toBeTruthy();
+      expect(definition.criteria.length).toBeGreaterThan(0);
+      expect(definition.exclusions.length).toBeGreaterThan(0);
+      expect(definition.examples.length).toBeGreaterThan(0);
+      expect(definition.cautions.length).toBeGreaterThan(0);
+      expect(definition.sourceTarget.source).toBeTruthy();
+      expect(definition.sourceTarget.target).toBeTruthy();
+      expect(definition.visualEncoding.arrow).toBe(
+        RELATION_LINE_STYLE[kind].arrow,
+      );
+    }
+  });
+
   it('9種類すべてに線種を定義する', () => {
     expect(Object.keys(RELATION_LINE_STYLE)).toHaveLength(9);
     expect(RELATION_LINE_STYLE.succession.dasharray).toBeUndefined();
@@ -295,6 +325,39 @@ describe('横型タイムラインの表示設定', () => {
     expect(yearToTimelineX(-3000, ancient, 700)).toBe(0);
     expect(yearToTimelineX(-480, ancient, 700)).toBeCloseTo(504);
     expect(yearToTimelineX(500, ancient, 700)).toBe(700);
+  });
+
+  it('古代の描画範囲を表示データへ合わせ、前後余白を250年単位で丸める', () => {
+    const ancient = timelineModeById('ancient');
+    const fitted = fitTimelineModeToMovements(ancient, [
+      getMovement('ancient-greek-classical')!,
+      getMovement('early-christian-byzantine')!,
+    ]);
+
+    expect(fitted).toMatchObject({
+      start: -750,
+      end: 750,
+      tickStep: 250,
+    });
+  });
+
+  it('時代別の描画範囲には最低200年と10%以上の余白を確保する', () => {
+    const modern = timelineModeById('modern');
+    const fitted = fitTimelineModeToMovements(modern, [
+      getMovement('impressionism')!,
+    ]);
+
+    expect(fitted.end - fitted.start).toBeGreaterThanOrEqual(200);
+    expect(fitted.start).toBeLessThan(1860);
+    expect(fitted.end).toBeGreaterThan(1890);
+    expect([100, 250, 500]).toContain(fitted.tickStep);
+  });
+
+  it('通史の非線形スケール設定は自動フィットで変更しない', () => {
+    const survey = timelineModeById('survey');
+    expect(
+      fitTimelineModeToMovements(survey, [getMovement('impressionism')!]),
+    ).toBe(survey);
   });
 
   it('目盛りとバー開始年は同じ座標になる', () => {

@@ -17,7 +17,10 @@ export default function TimelinePage() {
         同時代の動きを詳しく比較できます。
       </p>
       <div className="mt-8">
-        <HorizontalTimeline movements={movements} activeRegions={activeRegions()} />
+        <HorizontalTimeline
+          movements={movements}
+          activeRegions={activeRegions()}
+        />
       </div>
     </div>
   );

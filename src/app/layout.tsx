@@ -7,20 +7,47 @@ import { ServiceWorkerRegister } from '@/components/ServiceWorkerRegister';
 // Next.js は metadata の manifest / icons に basePath を自動付与しないため、
 // GitHub Pages のサブパスに合わせて明示的に前置する。
 const base = process.env.NEXT_PUBLIC_BASE_PATH ?? '';
+const siteName = 'Art History Atlas';
+const siteOrigin = 'https://taktak2001.github.io';
+const siteUrl = 'https://taktak2001.github.io/art-history-atlas/';
+const siteDescription =
+  '先史から現代までの美術の思想・様式・運動・流派を、時系列・地域・相互影響の観点から体系的に学ぶPWA。様式名の暗記ではなく、社会・思想・技術・制度と視覚表現の相互作用を理解するための学習ツール。';
 
 export const metadata: Metadata = {
+  metadataBase: new URL(siteOrigin),
   title: {
-    default: '美術史アトラス｜Art History Atlas',
-    template: '%s｜美術史アトラス',
+    default: siteName,
+    template: `%s | ${siteName}`,
   },
-  description:
-    '先史から現代までの美術の思想・様式・運動・流派を、時系列・地域・相互影響の観点から体系的に学ぶPWA。様式名の暗記ではなく、社会・思想・技術・制度と視覚表現の相互作用を理解するための学習ツール。',
-  applicationName: '美術史アトラス',
+  description: siteDescription,
+  applicationName: siteName,
   manifest: `${base}/manifest.webmanifest`,
   appleWebApp: {
     capable: true,
     statusBarStyle: 'default',
-    title: '美術史アトラス',
+    title: siteName,
+  },
+  openGraph: {
+    type: 'website',
+    locale: 'ja_JP',
+    url: siteUrl,
+    title: siteName,
+    siteName,
+    description: siteDescription,
+    images: [
+      {
+        url: `${base}/icons/icon-512.png`,
+        width: 512,
+        height: 512,
+        alt: siteName,
+      },
+    ],
+  },
+  twitter: {
+    card: 'summary',
+    title: siteName,
+    description: siteDescription,
+    images: [`${base}/icons/icon-512.png`],
   },
   icons: {
     icon: [{ url: `${base}/icons/icon-192.png`, sizes: '192x192', type: 'image/png' }],
@@ -51,11 +78,28 @@ const themeScript = `
 })();
 `;
 
+const structuredData = {
+  '@context': 'https://schema.org',
+  '@type': 'WebApplication',
+  name: siteName,
+  alternateName: 'ART HISTORY ATLAS',
+  url: siteUrl,
+  applicationCategory: 'EducationalApplication',
+  operatingSystem: 'Any',
+  inLanguage: 'ja',
+  isAccessibleForFree: true,
+  description: siteDescription,
+};
+
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
     <html lang="ja" suppressHydrationWarning>
       <head>
         <script dangerouslySetInnerHTML={{ __html: themeScript }} />
+        <script
+          type="application/ld+json"
+          dangerouslySetInnerHTML={{ __html: JSON.stringify(structuredData) }}
+        />
       </head>
       <body className="min-h-screen bg-paper text-ink antialiased">
         <a href="#main" className="skip-link">
