@@ -94,27 +94,32 @@ test('近代では対象範囲、使用レーン、クリップ表示だけを�
   expect(emptyLanes).toBe(0);
 });
 
-test('詳細ラベルは2行まで表示し、PCのフォーカスで正式情報を示す', async ({ page }, testInfo) => {
+test('ラベルは短縮名と年代を1行で表示し、詳細ページへ直接リンクする', async ({ page }, testInfo) => {
   test.skip(testInfo.project.name !== 'desktop', 'desktop project only');
   await page.goto('/timeline/');
   await modeButton(page, '現代').click();
 
   const conceptual = page.locator('[data-timeline-bar="conceptual-art"]').first();
   await conceptual.focus();
-  const inspector = page.locator('[data-movement-inspector]');
-  await expect(inspector).toContainText('コンセプチュアル・アート');
-  await expect(inspector).toContainText('方法論・理論');
-  await expect(inspector).toContainText('国際的');
+  await expect(page.locator('[data-movement-inspector]')).toHaveCount(0);
+  await expect(conceptual).toHaveAttribute(
+    'href',
+    /\/movements\/conceptual-art\/$/,
+  );
+  await expect(conceptual.locator('[data-label-text]')).toContainText(
+    'コンセプチュアル',
+  );
+  await expect(conceptual.locator('[data-label-date]')).toHaveText('1965〜1975');
 
   const labelStyle = await conceptual.locator('.timeline-label-detail').evaluate((element) => {
     const style = getComputedStyle(element);
     return {
       whiteSpace: style.whiteSpace,
-      lineClamp: style.getPropertyValue('-webkit-line-clamp'),
+      textOverflow: style.textOverflow,
     };
   });
-  expect(labelStyle.whiteSpace).toBe('normal');
-  expect(labelStyle.lineClamp).toBe('2');
+  expect(labelStyle.whiteSpace).toBe('nowrap');
+  expect(labelStyle.textOverflow).toBe('ellipsis');
   expect(
     await conceptual
       .locator('[data-timeline-hit-area]')
@@ -122,7 +127,9 @@ test('詳細ラベルは2行まで表示し、PCのフォーカスで正式情�
   ).toBeGreaterThanOrEqual(44);
 });
 
-test('バーは44pxの操作領域内に22pxの展示レールとして表示する', async ({ page }) => {
+test('バーは44pxの操作領域内に薄い角丸ラベルとして表示する', async ({
+  page,
+}, testInfo) => {
   await page.goto('/timeline/');
   await modeButton(page, '近代').click();
 
@@ -140,11 +147,15 @@ test('バーは44pxの操作領域内に22pxの展示レールとして表示す
       targetHeight: element.getBoundingClientRect().height,
       visualHeight: visualElement.getBoundingClientRect().height,
       visualBorderTop: getComputedStyle(visualElement).borderTopWidth,
+      visualRadius: getComputedStyle(visualElement).borderRadius,
+      visualBackground: getComputedStyle(visualElement).backgroundColor,
     };
   });
   expect(metrics.targetHeight).toBeGreaterThanOrEqual(44);
   expect(metrics.visualHeight).toBe(22);
-  expect(metrics.visualBorderTop).toBe('0px');
+  expect(metrics.visualBorderTop).toBe('1px');
+  expect(metrics.visualRadius).toBe('3px');
+  expect(metrics.visualBackground).not.toBe('rgba(0, 0, 0, 0)');
   expect(await label.evaluate((element) => getComputedStyle(element).textAlign)).toBe(
     'center',
   );
@@ -159,7 +170,24 @@ test('バーは44pxの操作領域内に22pxの展示レールとして表示す
   }));
   expect(tickCounts.major).toBeGreaterThanOrEqual(2);
   expect(tickCounts.major).toBeLessThan(tickCounts.all);
+  await expect(page.locator('[data-timeline-relationship]')).toHaveCount(0);
   await expect(visual).toBeVisible();
+  const neoclassicismName = page
+    .locator('[data-timeline-bar="neoclassicism"]')
+    .first()
+    .locator('[data-label-text]');
+  expect(
+    await neoclassicismName.evaluate(
+      (element) => element.scrollWidth <= element.clientWidth,
+    ),
+  ).toBe(true);
+  await page.screenshot({
+    path:
+      testInfo.project.name === 'mobile'
+        ? 'docs/screenshots/timeline-label-strips-iphone.png'
+        : 'docs/screenshots/timeline-label-strips-desktop.png',
+    fullPage: false,
+  });
 });
 
 test('iPhone幅では表示状態と地域列が固定され、1タップで詳細へ移動する', async ({ page }, testInfo) => {
@@ -279,7 +307,10 @@ test('先史美術の追従ラベルは正式名称か短縮名を維持する',
   await expect(bar).toHaveAttribute('title', /先史美術/);
 });
 
-test('ダークモードとPWA standalone設定を維持する', async ({ page, request }) => {
+test('ダークモードとPWA standalone設定を維持する', async ({
+  page,
+  request,
+}, testInfo) => {
   await page.addInitScript(() => localStorage.setItem('aha-theme', 'dark'));
   await page.goto('/timeline/');
   await modeButton(page, '中世').click();
@@ -288,4 +319,10 @@ test('ダークモードとPWA standalone設定を維持する', async ({ page, 
   const manifest = await request.get('/manifest.webmanifest');
   expect(manifest.ok()).toBeTruthy();
   expect((await manifest.json()).display).toBe('standalone');
+  if (testInfo.project.name === 'desktop') {
+    await page.screenshot({
+      path: 'docs/screenshots/timeline-label-strips-dark-desktop.png',
+      fullPage: false,
+    });
+  }
 });
