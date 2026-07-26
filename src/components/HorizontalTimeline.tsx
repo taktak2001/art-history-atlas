@@ -302,7 +302,7 @@ export function HorizontalTimeline({
     mode.id === 'survey' ? 1 : Math.max(1, Math.ceil((ticks.length - 1) / 4));
   const viewerNodes = useMemo<TimelineViewerNode[]>(() => {
     const nodes: TimelineViewerNode[] = laneOffsets.flatMap((lane) =>
-      lane.items.map(({ movement, left, width, row }) => ({
+      lane.items.map(({ movement, left, width }) => ({
         key: `${lane.region}-${movement.id}`,
         movementId: movement.id,
         href: `/movements/${movement.id}/`,
@@ -318,11 +318,7 @@ export function HorizontalTimeline({
         classificationLabel: CLASSIFICATION_LABELS[movement.classification],
         barStart: left,
         barEnd: left + width,
-        centerY:
-          lane.top +
-          lanePaddingY +
-          row * (barHeight + barGap) +
-          barHeight / 2,
+        regionId: lane.region,
         priority: mode.id !== 'survey' || SURVEY_PRIORITY.has(movement.id),
       })),
     );
@@ -352,19 +348,15 @@ export function HorizontalTimeline({
             timelineWidth,
           ),
           barEnd: yearToTimelineX(summary.end, displayMode, timelineWidth),
-          centerY: headerHeight + SURVEY_SUMMARY_H / 2,
+          regionId: 'origin',
           priority: true,
         },
       ];
     });
     return [...summaryNodes, ...nodes];
   }, [
-    barGap,
-    barHeight,
     displayMode,
-    headerHeight,
     laneOffsets,
-    lanePaddingY,
     mode.id,
     movements,
     timelineWidth,

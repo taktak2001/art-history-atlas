@@ -1,12 +1,15 @@
 import { describe, expect, it } from 'vitest';
 import {
+  assignTimelineViewerTracks,
   clampTimelineViewerScale,
   fitTimelineViewer,
   fitTimelineViewerRect,
   panTimelineViewer,
   semanticTimelineTicks,
   timelineViewerMaxScale,
+  timelineViewerRegionHeight,
   timelineViewerSemanticLevel,
+  timelineViewerTrackCenter,
   TIMELINE_VIEWER_MAX_SCALE,
   TIMELINE_VIEWER_MOBILE_MAX_SCALE,
   TIMELINE_VIEWER_MIN_SCALE,
@@ -123,5 +126,58 @@ describe('timeline viewer geometry', () => {
     expect(viewerLabelVariant(0.8, true)).toBe('short');
     expect(viewerLabelVariant(1.1, true)).toBe('full');
     expect(viewerLabelVariant(0.6, false)).toBe('full');
+  });
+
+  it('同一地域で横方向に衝突するラベルを縦トラックへ積む', () => {
+    const placements = assignTimelineViewerTracks([
+      { key: 'impressionism', regionId: 'france', x: 100, width: 152 },
+      { key: 'symbolism', regionId: 'france', x: 160, width: 152 },
+      {
+        key: 'post-impressionism',
+        regionId: 'france',
+        x: 230,
+        width: 152,
+      },
+      { key: 'romanticism', regionId: 'germany', x: 160, width: 152 },
+    ]);
+
+    expect(placements.map(({ key, track }) => [key, track])).toEqual([
+      ['impressionism', 0],
+      ['symbolism', 1],
+      ['post-impressionism', 2],
+      ['romanticism', 0],
+    ]);
+  });
+
+  it('十分な横間隔があるラベルは同じトラックへ置く', () => {
+    const placements = assignTimelineViewerTracks([
+      { key: 'a', regionId: 'france', x: 100, width: 100 },
+      { key: 'b', regionId: 'france', x: 210, width: 100 },
+    ]);
+
+    expect(placements.map(({ track }) => track)).toEqual([0, 0]);
+  });
+
+  it('5段目以降を集約対象として返す', () => {
+    const placements = assignTimelineViewerTracks(
+      Array.from({ length: 5 }, (_, index) => ({
+        key: `movement-${index}`,
+        regionId: 'france',
+        x: 100,
+        width: 152,
+      })),
+    );
+
+    expect(placements.map(({ track }) => track)).toEqual([0, 1, 2, 3, null]);
+  });
+
+  it('トラック数に応じて地域高と中心位置を調整する', () => {
+    expect(timelineViewerRegionHeight(1)).toBe(80);
+    expect(timelineViewerRegionHeight(2)).toBe(120);
+    expect(timelineViewerRegionHeight(3)).toBe(160);
+    expect(timelineViewerRegionHeight(4)).toBe(160);
+    expect(timelineViewerTrackCenter(0, 1)).toBe(40);
+    expect(timelineViewerTrackCenter(0, 3)).toBe(40);
+    expect(timelineViewerTrackCenter(2, 3)).toBe(120);
   });
 });

@@ -29,6 +29,17 @@ export type TimelineViewerSemanticLevel =
   | 'contextual'
   | 'detailed';
 
+export type TimelineViewerCollisionItem = {
+  key: string;
+  regionId: string;
+  x: number;
+  width: number;
+};
+
+export type TimelineViewerTrackPlacement = TimelineViewerCollisionItem & {
+  track: number | null;
+};
+
 export const TIMELINE_VIEWER_MIN_SCALE = 0.6;
 export const TIMELINE_VIEWER_MAX_SCALE = 4;
 export const TIMELINE_VIEWER_MOBILE_MAX_SCALE = 3;
@@ -43,6 +54,9 @@ export const TIMELINE_VIEWER_SEMANTIC_THRESHOLDS = {
   contextual: 1.8,
   detailed: 3,
 } as const;
+export const TIMELINE_VIEWER_LABEL_GAP = 10;
+export const TIMELINE_VIEWER_MAX_TRACKS = 4;
+export const TIMELINE_VIEWER_TRACK_PITCH = 40;
 
 const TIMELINE_VIEWER_TICK_STEPS = [
   10, 25, 50, 100, 250, 500, 1000, 2500, 5000, 10000,
@@ -110,6 +124,79 @@ export function timelineViewerSemanticLevel(
     return 'contextual';
   }
   return 'detailed';
+}
+
+/**
+ * Places fixed-size labels into the first available vertical track.
+ * Coordinates are screen-space pixels, so zoom changes the number of tracks
+ * while horizontal pan keeps the chronological X position intact.
+ */
+export function assignTimelineViewerTracks(
+  items: TimelineViewerCollisionItem[],
+  gap = TIMELINE_VIEWER_LABEL_GAP,
+  maximumTracks = TIMELINE_VIEWER_MAX_TRACKS,
+): TimelineViewerTrackPlacement[] {
+  const placements = new Map<string, TimelineViewerTrackPlacement>();
+  const grouped = new Map<string, TimelineViewerCollisionItem[]>();
+
+  for (const item of items) {
+    const regionItems = grouped.get(item.regionId) ?? [];
+    regionItems.push(item);
+    grouped.set(item.regionId, regionItems);
+  }
+
+  for (const regionItems of grouped.values()) {
+    const trackEnds: number[] = [];
+    const sortedItems = [...regionItems].sort(
+      (a, b) => a.x - b.x || b.width - a.width || a.key.localeCompare(b.key),
+    );
+
+    for (const item of sortedItems) {
+      let track = trackEnds.findIndex((end) => item.x >= end + gap);
+      if (track === -1 && trackEnds.length < maximumTracks) {
+        track = trackEnds.length;
+        trackEnds.push(Number.NEGATIVE_INFINITY);
+      }
+
+      if (track === -1) {
+        placements.set(item.key, { ...item, track: null });
+        continue;
+      }
+
+      trackEnds[track] = item.x + item.width;
+      placements.set(item.key, { ...item, track });
+    }
+  }
+
+  return items.map(
+    (item) =>
+      placements.get(item.key) ?? {
+        ...item,
+        track: null,
+      },
+  );
+}
+
+export function timelineViewerRegionHeight(trackCount: number) {
+  if (trackCount <= 1) return 80;
+  if (trackCount === 2) return 120;
+  return 160;
+}
+
+export function timelineViewerTrackCenter(
+  track: number,
+  trackCount: number,
+  regionHeight = timelineViewerRegionHeight(trackCount),
+) {
+  const visibleTrackCount = Math.max(
+    1,
+    Math.min(trackCount, TIMELINE_VIEWER_MAX_TRACKS),
+  );
+  const occupiedHeight = (visibleTrackCount - 1) * TIMELINE_VIEWER_TRACK_PITCH;
+  return (
+    (regionHeight - occupiedHeight) / 2 +
+    Math.min(track, visibleTrackCount - 1) * TIMELINE_VIEWER_TRACK_PITCH
+  );
 }
 
 export function fitTimelineViewer(

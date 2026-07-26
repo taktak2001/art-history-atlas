@@ -62,8 +62,19 @@ test('横型タイムラインを時代別に切り替え、対象年代だけ�
     'true',
   );
   await expect(page.getByRole('region', { name: '現在の表示範囲' })).toContainText('通史');
-  await expect(page.getByText('先史の造形')).toBeVisible();
-  await expect(page.getByText('古代の規範')).toBeVisible();
+  const surveyTimeline = page.getByRole('group', {
+    name: /通史の横型タイムライン/,
+  });
+  await expect(
+    surveyTimeline.locator('.timeline-origin-rail').filter({
+      hasText: '先史の造形',
+    }),
+  ).toHaveCount(1);
+  await expect(
+    surveyTimeline.locator('.timeline-origin-rail').filter({
+      hasText: '古代の規範',
+    }),
+  ).toHaveCount(1);
   const surveyWidth = await page
     .getByRole('group', { name: /通史の横型タイムライン/ })
     .locator('[data-timeline-track]')
