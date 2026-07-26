@@ -899,12 +899,71 @@ test('閲覧モードは年代位置を保ち、地域反復と省略項目を�
   await viewer.getByRole('button', { name: '拡大' }).click();
   const overflow = viewer.locator('button.timeline-viewer-overflow:visible').first();
   await expect(overflow).toBeVisible();
-  await expect(overflow).toHaveText(/^＋\d+$/);
+  await expect(overflow).toHaveText(/^他\d+件$/);
   await overflow.click();
   await expect(overflow).toBeHidden();
 });
 
-test('軽量キャプション型タイムラインの比較スクリーンショットを保存する', async ({
+test('展示ボードの年代階層と上下終端を明示する', async ({
+  page,
+}, testInfo) => {
+  await page.goto('/timeline/');
+  await page.getByRole('button', { name: 'タイムラインを全画面で表示' }).click();
+
+  const viewer = page.locator('[data-timeline-viewer="active"]');
+  const board = viewer.locator('[data-viewer-board]');
+  await expect(board).toBeVisible();
+  const boardStyle = await board.evaluate((element) => {
+    const style = getComputedStyle(element);
+    return {
+      borderTop: parseFloat(style.borderTopWidth),
+      borderBottom: parseFloat(style.borderBottomWidth),
+    };
+  });
+  expect(boardStyle.borderTop).toBeGreaterThanOrEqual(2);
+  expect(boardStyle.borderBottom).toBeGreaterThanOrEqual(2);
+
+  await expect(
+    viewer
+      .locator(
+        '[data-viewer-gridline][data-tick-strength="century"]:visible',
+      )
+      .first(),
+  ).toBeVisible();
+  await expect(
+    viewer.locator('[data-viewer-region-id="origin"][data-origin-band="true"]'),
+  ).toBeVisible();
+
+  const priorityLabel = viewer
+    .locator('[data-viewer-node][data-priority="true"]:visible')
+    .first();
+  const labelStyle = await priorityLabel
+    .locator('.timeline-viewer-node__surface')
+    .evaluate((element) => {
+      const style = getComputedStyle(element);
+      return {
+        height: element.getBoundingClientRect().height,
+        radius: parseFloat(style.borderRadius),
+        weight: Number(
+          getComputedStyle(
+            element.querySelector('.timeline-viewer-node__name') ??
+              element.querySelector('.timeline-viewer-node__short')!,
+          ).fontWeight,
+        ),
+        underline: getComputedStyle(element, '::after').content,
+      };
+    });
+  expect(labelStyle.height).toBeLessThanOrEqual(34);
+  expect(labelStyle.radius).toBeGreaterThanOrEqual(4);
+  expect(labelStyle.weight).toBeGreaterThanOrEqual(600);
+  expect(labelStyle.underline).not.toBe('none');
+
+  if (testInfo.project.name === 'desktop') {
+    await expect(viewer.locator('.timeline-viewer-position > span')).toBeVisible();
+  }
+});
+
+test('展示年表型タイムラインの比較スクリーンショットを保存する', async ({
   page,
 }, testInfo) => {
   await page.goto('/timeline/');
@@ -914,7 +973,7 @@ test('軽量キャプション型タイムラインの比較スクリーンシ�
   const viewer = page.locator('[data-timeline-viewer="active"]');
   if (testInfo.project.name === 'mobile') {
     await page.screenshot({
-      path: 'docs/screenshots/timeline-viewer-caption-rails-iphone-100.png',
+      path: 'docs/screenshots/timeline-viewer-exhibition-board-iphone-100.png',
       fullPage: false,
     });
     return;
@@ -927,7 +986,7 @@ test('軽量キャプション型タイムラインの比較スクリーンシ�
     .poll(async () => Number(await viewer.getAttribute('data-viewer-scale')))
     .toBeCloseTo(1.56, 2);
   await page.screenshot({
-    path: 'docs/screenshots/timeline-viewer-caption-rails-desktop-156.png',
+    path: 'docs/screenshots/timeline-viewer-exhibition-board-desktop-156.png',
     fullPage: false,
   });
 
@@ -941,7 +1000,7 @@ test('軽量キャプション型タイムラインの比較スクリーンシ�
     .poll(async () => Number(await viewer.getAttribute('data-viewer-scale')))
     .toBeCloseTo(2.44, 2);
   await page.screenshot({
-    path: 'docs/screenshots/timeline-viewer-caption-rails-dark-desktop-244.png',
+    path: 'docs/screenshots/timeline-viewer-exhibition-board-dark-desktop-244.png',
     fullPage: false,
   });
 });

@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 import {
   assignTimelineViewerTracks,
   clampTimelineViewerScale,
+  constrainTimelineViewerVerticalPan,
   fitTimelineViewer,
   fitTimelineViewerRect,
   panTimelineViewer,
@@ -55,6 +56,41 @@ describe('timeline viewer geometry', () => {
         { x: 36, y: -24 },
       ),
     ).toEqual({ x: -84, y: 56, scale: 1.25 });
+  });
+
+  it('短い展示年表は上端へ揃えて無限余白を作らない', () => {
+    expect(
+      constrainTimelineViewerVerticalPan(
+        { x: -84, y: 480, scale: 1.25 },
+        80,
+        360,
+        844,
+        50,
+        62,
+      ),
+    ).toEqual({ x: -84, y: -18, scale: 1.25 });
+  });
+
+  it('長い展示年表の縦パンを上下の終端内へ制限する', () => {
+    const top = constrainTimelineViewerVerticalPan(
+      { x: 0, y: 800, scale: 1 },
+      80,
+      1200,
+      844,
+      50,
+      62,
+    );
+    const bottom = constrainTimelineViewerVerticalPan(
+      { x: 0, y: -1600, scale: 1 },
+      80,
+      1200,
+      844,
+      50,
+      62,
+    );
+
+    expect(top.y).toBe(-18);
+    expect(bottom.y).toBe(-510);
   });
 
   it('年代座標を画面座標へ変換してもUI寸法を含めない', () => {
@@ -175,12 +211,12 @@ describe('timeline viewer geometry', () => {
   });
 
   it('トラック数に応じて地域高と中心位置を調整する', () => {
-    expect(timelineViewerRegionHeight(1)).toBe(60);
-    expect(timelineViewerRegionHeight(2)).toBe(90);
-    expect(timelineViewerRegionHeight(3)).toBe(118);
-    expect(timelineViewerRegionHeight(4)).toBe(146);
-    expect(timelineViewerTrackCenter(0, 1)).toBe(30);
-    expect(timelineViewerTrackCenter(0, 3)).toBe(23);
-    expect(timelineViewerTrackCenter(2, 3)).toBe(95);
+    expect(timelineViewerRegionHeight(1)).toBe(68);
+    expect(timelineViewerRegionHeight(2)).toBe(102);
+    expect(timelineViewerRegionHeight(3)).toBe(136);
+    expect(timelineViewerRegionHeight(4)).toBe(168);
+    expect(timelineViewerTrackCenter(0, 1)).toBe(34);
+    expect(timelineViewerTrackCenter(0, 3)).toBe(28);
+    expect(timelineViewerTrackCenter(2, 3)).toBe(108);
   });
 });
