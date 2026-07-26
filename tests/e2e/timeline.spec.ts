@@ -696,7 +696,11 @@ test('閲覧モードは実年代の期間線と固定寸法の名称ラベル�
   await page.getByRole('button', { name: 'タイムラインを全画面で表示' }).click();
 
   const viewer = page.locator('[data-timeline-viewer="active"]');
-  const node = viewer.locator('[data-movement-id="early-christian-byzantine"]:visible').first();
+  const node = viewer
+    .locator(
+      '[data-viewer-node][data-movement-id="early-christian-byzantine"]:visible',
+    )
+    .first();
   await expect(node).toBeVisible();
   const viewerKey = await node.getAttribute('data-viewer-key');
   expect(viewerKey).toBeTruthy();
@@ -737,6 +741,10 @@ test('閲覧モードは実年代の期間線と固定寸法の名称ラベル�
   expect(
     dimensions[1].y - (dimensions[0].y + dimensions[0].height),
   ).toBeLessThanOrEqual(7);
+  const periodConnector = await period.evaluate((element) =>
+    getComputedStyle(element, '::before').content,
+  );
+  expect(periodConnector).toBe('none');
   await expect(viewer.locator('[data-viewer-relation]')).toHaveCount(0);
   await expect(viewer.locator('[data-movement-inspector]')).toHaveCount(0);
 });
@@ -766,7 +774,7 @@ test('閲覧モードのラベルは内容幅で、地域レーンと操作帯�
       renaissance: widthFor('italian-renaissance'),
     };
   });
-  expect(labelWidths.baroque).toBeGreaterThanOrEqual(88);
+  expect(labelWidths.baroque).toBeGreaterThanOrEqual(72);
   expect(labelWidths.baroque).toBeLessThanOrEqual(120);
   expect(labelWidths.neoclassicism).toBeGreaterThan(labelWidths.baroque);
   expect(labelWidths.renaissance).toBeGreaterThan(labelWidths.neoclassicism);
@@ -799,7 +807,8 @@ test('閲覧モードのラベルは内容幅で、地域レーンと操作帯�
   const idleOpacity = await controls.evaluate((element) =>
     parseFloat(getComputedStyle(element).opacity),
   );
-  expect(idleOpacity).toBeLessThanOrEqual(0.5);
+  expect(idleOpacity).toBeGreaterThanOrEqual(0.68);
+  expect(idleOpacity).toBeLessThanOrEqual(0.75);
   await viewer.locator('[data-timeline-viewer-stage]').dispatchEvent('pointerdown', {
     pointerId: 77,
     pointerType: 'mouse',
@@ -808,6 +817,91 @@ test('閲覧モードのラベルは内容幅で、地域レーンと操作帯�
     isPrimary: true,
   });
   await expect(viewer).not.toHaveAttribute('data-controls-idle', 'true');
+});
+
+test('閲覧モードは年代位置を保ち、地域反復と省略項目を静かに示す', async ({
+  page,
+}, testInfo) => {
+  await page.goto('/timeline/');
+  await modeButton(page, '近代').click();
+  await page.getByRole('button', { name: 'タイムラインを全画面で表示' }).click();
+
+  const viewer = page.locator('[data-timeline-viewer="active"]');
+  await viewer.getByRole('button', { name: '全体表示へ戻す' }).click();
+  const nodeLayer = viewer.locator('.timeline-viewer-node-layer');
+  const maskImage = await nodeLayer.evaluate(
+    (element) =>
+      getComputedStyle(element).maskImage ||
+      getComputedStyle(element).webkitMaskImage,
+  );
+  expect(maskImage).toContain('linear-gradient');
+
+  const romanticism = viewer.locator(
+    '[data-viewer-node][data-movement-id="romanticism"]:visible',
+  );
+  await expect(romanticism.first()).toBeVisible();
+  expect(await romanticism.count()).toBeGreaterThan(1);
+  await expect(
+    viewer
+      .locator(
+        '[data-viewer-node][data-movement-id="romanticism"][data-secondary-occurrence="true"]:visible',
+      )
+      .first(),
+  ).toBeVisible();
+
+  await romanticism.first().hover();
+  await expect
+    .poll(() =>
+      romanticism.evaluateAll((elements) =>
+        elements.every(
+          (element) =>
+            (element as HTMLElement).dataset.peerHighlighted === 'true',
+        ),
+      ),
+    )
+    .toBe(true);
+  const romanticismPeriods = viewer.locator(
+    '[data-viewer-period][data-movement-id="romanticism"]:visible',
+  );
+  await expect
+    .poll(() =>
+      romanticismPeriods.evaluateAll((elements) =>
+        elements.every(
+          (element) =>
+            (element as HTMLElement).dataset.peerHighlighted === 'true',
+        ),
+      ),
+    )
+    .toBe(true);
+
+  const chronologicalOffsets = await viewer
+    .locator('[data-viewer-node][data-viewer-visible="true"]:visible')
+    .evaluateAll((elements) =>
+      elements.map((element) => {
+        const node = element as HTMLElement;
+        return Math.abs(
+          node.getBoundingClientRect().x - Number(node.dataset.viewerStartX),
+        );
+      }),
+  );
+  expect(Math.max(...chronologicalOffsets)).toBeLessThanOrEqual(1);
+
+  if (testInfo.project.name !== 'desktop') return;
+  await viewer
+    .locator('[data-viewer-node][data-region-id="france"]')
+    .evaluateAll((elements) => {
+      elements.slice(0, 5).forEach((element) => {
+        const node = element as HTMLElement;
+        node.dataset.barStart = '220';
+        node.dataset.barEnd = '300';
+      });
+    });
+  await viewer.getByRole('button', { name: '拡大' }).click();
+  const overflow = viewer.locator('button.timeline-viewer-overflow:visible').first();
+  await expect(overflow).toBeVisible();
+  await expect(overflow).toHaveText(/^＋\d+$/);
+  await overflow.click();
+  await expect(overflow).toBeHidden();
 });
 
 test('軽量キャプション型タイムラインの比較スクリーンショットを保存する', async ({

@@ -47,6 +47,7 @@ export type TimelineViewerNode = {
   barStart: number;
   barEnd: number;
   regionId: string;
+  secondaryOccurrence: boolean;
   priority: boolean;
 };
 
@@ -160,6 +161,9 @@ export function TimelineViewerFrame({
   const [semanticLevel, setSemanticLevel] =
     useState<TimelineViewerSemanticLevel>('standard');
   const [controlsIdle, setControlsIdle] = useState(false);
+  const [expandedRegionIds, setExpandedRegionIds] = useState<Set<string>>(
+    () => new Set(),
+  );
   const [axisTicks, setAxisTicks] = useState(() =>
     semanticTimelineTicks(timelineMode, timelineWidth, 1),
   );
@@ -259,7 +263,7 @@ export function TimelineViewerFrame({
         // Keep the caption and duration rail on the same chronological start.
         // A label near the right edge may be partially clipped until the user
         // pans, but it must not detach from the movement's actual start year.
-        const x = Math.max(startScreen.x, contentLeft);
+        const x = startScreen.x;
         return [
           {
             key: node.dataset.viewerKey ?? '',
@@ -269,18 +273,35 @@ export function TimelineViewerFrame({
           },
         ];
       });
-      const placements = assignTimelineViewerTracks(collisionItems);
+      const placements = regions.flatMap((region) =>
+        assignTimelineViewerTracks(
+          collisionItems.filter((item) => item.regionId === region.id),
+          undefined,
+          expandedRegionIds.has(region.id)
+            ? Number.MAX_SAFE_INTEGER
+            : undefined,
+        ),
+      );
       const placementByKey = new Map(
         placements.map((placement) => [placement.key, placement]),
       );
       const trackCounts = new Map<string, number>();
       const overflowCounts = new Map<string, number>();
+      const overflowPositions = new Map<string, number>();
 
       for (const placement of placements) {
         if (placement.track === null) {
           overflowCounts.set(
             placement.regionId,
             (overflowCounts.get(placement.regionId) ?? 0) + 1,
+          );
+          overflowPositions.set(
+            placement.regionId,
+            Math.max(
+              overflowPositions.get(placement.regionId) ??
+                Number.NEGATIVE_INFINITY,
+              placement.x + placement.width,
+            ),
           );
           continue;
         }
@@ -339,8 +360,15 @@ export function TimelineViewerFrame({
         const overflow = overflowElements.get(region.id);
         const overflowCount = overflowCounts.get(region.id) ?? 0;
         if (overflow) {
-          overflow.textContent = overflowCount > 0 ? `ほか${overflowCount}件` : '';
-          overflow.style.transform = `translate3d(${contentRight - 76}px, ${
+          overflow.textContent = overflowCount > 0 ? `＋${overflowCount}` : '';
+          const overflowX = Math.min(
+            contentRight - 42,
+            Math.max(
+              contentLeft,
+              overflowPositions.get(region.id) ?? contentRight - 42,
+            ),
+          );
+          overflow.style.transform = `translate3d(${overflowX}px, ${
             layout.top + layout.height - 28
           }px, 0)`;
           overflow.style.visibility =
@@ -397,7 +425,28 @@ export function TimelineViewerFrame({
         }
       }
     },
-    [contentOriginX, contentOriginY, regions, timelineMode, timelineWidth],
+    [
+      contentOriginX,
+      contentOriginY,
+      expandedRegionIds,
+      regions,
+      timelineMode,
+      timelineWidth,
+    ],
+  );
+
+  const setMovementPeersHighlighted = useCallback(
+    (movementId: string, highlighted: boolean) => {
+      const selector = `[data-movement-id="${CSS.escape(movementId)}"]`;
+      for (const element of [
+        ...(nodeLayerRef.current?.querySelectorAll<HTMLElement>(selector) ?? []),
+        ...(railLayerRef.current?.querySelectorAll<HTMLElement>(selector) ?? []),
+      ]) {
+        if (highlighted) element.dataset.peerHighlighted = 'true';
+        else delete element.dataset.peerHighlighted;
+      }
+    },
+    [],
   );
 
   const scheduleFixedLayers = useCallback(
@@ -961,7 +1010,7 @@ export function TimelineViewerFrame({
               onClick={fitContent}
               aria-label="全体表示へ戻す"
             >
-              Fit
+              全体
             </button>
           </div>
 
@@ -1024,6 +1073,10 @@ export function TimelineViewerFrame({
                 key={node.key}
                 className="timeline-viewer-period"
                 data-viewer-period={node.key}
+                data-movement-id={node.movementId}
+                data-secondary-occurrence={
+                  node.secondaryOccurrence || undefined
+                }
                 data-priority={node.priority || undefined}
               />
             ))}
@@ -1035,11 +1088,19 @@ export function TimelineViewerFrame({
             data-viewer-node-layer
           >
             {regions.map((region) => (
-              <span
+              <button
                 key={region.id}
+                type="button"
                 className="timeline-viewer-overflow"
                 data-viewer-overflow={region.id}
-                aria-hidden="true"
+                aria-label={`${region.label}の省略項目を展開`}
+                onClick={() =>
+                  setExpandedRegionIds((current) => {
+                    const next = new Set(current);
+                    next.add(region.id);
+                    return next;
+                  })
+                }
               />
             ))}
             {nodes.map((node) => (
@@ -1054,7 +1115,22 @@ export function TimelineViewerFrame({
                 data-region-id={node.regionId}
                 data-bar-start={node.barStart}
                 data-bar-end={node.barEnd}
+                data-secondary-occurrence={
+                  node.secondaryOccurrence || undefined
+                }
                 data-priority={node.priority || undefined}
+                onPointerEnter={() =>
+                  setMovementPeersHighlighted(node.movementId, true)
+                }
+                onPointerLeave={() =>
+                  setMovementPeersHighlighted(node.movementId, false)
+                }
+                onFocus={() =>
+                  setMovementPeersHighlighted(node.movementId, true)
+                }
+                onBlur={() =>
+                  setMovementPeersHighlighted(node.movementId, false)
+                }
                 aria-label={`${node.nameJa}。${node.dateLabel}。${node.regionLabel}。${node.classificationLabel}。${node.priority ? '基本項目' : '充実・詳細項目'}`}
                 title={`${node.nameJa} (${node.nameEn})`}
               >
