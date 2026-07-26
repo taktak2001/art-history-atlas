@@ -69,3 +69,10 @@
 - 画像 60点到達 + CC-BY（3D/建築/日本現代）の帰属付き収録。
 - 全ムーブメント2機関出典化。
 - 学習コース / 年代横断比較（中期）。詳細 `TODO.md`。
+
+## 追加機能: 関係ネットワークの deep-link フォーカス（2026-07-26）
+
+- 詳細ページ → `/network/?focus=<id>` で対象ノードを選択・中央寄せ・1ホップ強調して到達。URLが選択状態の単一の真実（reload/共有/戻るに対応、無効idは静かに除去）。
+- 実装は `window.history` ベース（`useLodState` と同方針）で静的export/basePathを保つ。`src/lib/network.ts` に純粋関数を分離し単体テスト化。
+- 検証: unit 146件 / E2E 226件成功・12 skipped / 本番ビルド成功。作業ブランチ `claude/art-history-atlas-o632td`（現行 `main` a914298 基点）。
+- 既知の運用リスク: Codex と並行作業で `main` の進行が速い。ブランチ/PR取り違えに注意。

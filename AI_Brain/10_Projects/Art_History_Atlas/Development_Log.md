@@ -63,3 +63,28 @@ Phase 2 現在の件数: movements 30 / artists **64** / works **75**（画像41
   - テスト/品質ゲート再実行: 100%（unit 53件、E2E+a11y 36件、本番ビルド成功）。
   - PR/デプロイ: PR作成済み。`main` マージ後に自動デプロイ。
 - 数値は目安。正確な現況は `Project_Status.md` と `git log main..claude/phase2-content-images` を参照。
+
+## セッション: 2026-07-26 — 関係ネットワークのフォーカス deep-link
+
+### 背景・マルチエージェント衝突の事実
+
+- 前回セッションで `claude/phase2-content-images` 上に focus 機能を統合していたが、その後 Codex が `main` を **93コミット**進行させた（PR #37/#38 ほか多数マージ、NetworkGraph をドラッグパン/集約/`selectedNodeId`/`focusedEdgeId` を持つ大幅再設計へ更新）。旧統合は陳腐化。
+- 対応: rebase による大量衝突を避け、**現行 `main`（a914298）を基点に focus 機能を作り直した**。作業ブランチは指定の `claude/art-history-atlas-o632td`。
+
+### 実装（現行 main のアーキテクチャに適合）
+
+- URLは Next Router ではなく `window.history` + `window.location` で操作（`useLodState` と同方針）。静的export/GitHub Pages basePath を保ち、Suspense 境界を不要にする。
+- `src/lib/network.ts`: `parseFocus`（id検証、typo/空はnull）/ `buildFocusQuery`（`lod` など他クエリを保持して focus のみ set/delete）。純粋関数・単体テスト対象。
+- `NetworkGraph.tsx`: URL `?focus=` を選択状態の単一の真実に。初回マウント・`popstate`（戻る/進む）で復元、選択変更をURLへ反映（reload/共有可）、選択解除は focus のみ除去。deep-link先が現在のLODで隠れていても必ず表示・中央寄せし、到達時に一度だけキーボードフォーカスを移す。無効な focus は静かにURLから除去（エラーなし・全体表示）。sr-only の aria-live で選択を通知。
+- 詳細ページの「関係ネットワーク」ボタン2箇所を `/network/?focus=${movement.id}` へ。
+- 既存の double-tap テストのURLアサーションのみ緩和（選択が `?focus=` に反映されるが `/network/` に留まり詳細ページへは遷移しない、という意図は保持）。
+
+### 検証（すべて成功）
+
+- `npx tsc --noEmit` / `npm run lint`（0件）/ `npm test`（**unit 146件**、うち network-focus 8件）。
+- `npm run build:e2e` + Playwright: 全 **226件成功 / 12 skipped**（network-focus は desktop/mobile 12件）。
+- `npm run build`（本番 basePath 付き静的ビルド）成功、`validate:data` 成功（ムーブメント30/作家64/作品75/関係46/出典58）。
+
+### 注意（ユーザーへ要共有）
+
+- **Codex と Claude Code が同一リポジトリで並行作業**しており `main` の進行が速い。ブランチ/PRの取り違え・上書きリスクがあるため、担当範囲かブランチの分離を推奨。
