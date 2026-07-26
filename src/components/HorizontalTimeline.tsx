@@ -320,6 +320,7 @@ export function HorizontalTimeline({
         barStart: left,
         barEnd: left + width,
         regionId: lane.region,
+        secondaryOccurrence: lane.region !== movement.regionIds[0],
         priority:
           movement.visibilityLevel === 'core' &&
           (mode.id !== 'survey' || SURVEY_PRIORITY.has(movement.id)),
@@ -352,6 +353,7 @@ export function HorizontalTimeline({
           ),
           barEnd: yearToTimelineX(summary.end, displayMode, timelineWidth),
           regionId: 'origin',
+          secondaryOccurrence: false,
           priority: true,
         },
       ];
