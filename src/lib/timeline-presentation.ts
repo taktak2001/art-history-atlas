@@ -349,6 +349,13 @@ export type TimelineLabelChoice = {
   variant: 'full' | 'short' | 'ellipsis';
 };
 
+export function timelineJapaneseShortLabel(shortLabel?: string) {
+  if (!shortLabel) return undefined;
+  return /[\u3040-\u30ff\u3400-\u9fff]/u.test(shortLabel)
+    ? shortLabel
+    : undefined;
+}
+
 export function chooseTimelineLabel({
   name,
   shortLabel,
@@ -356,14 +363,18 @@ export function chooseTimelineLabel({
   nameWidth,
   shortLabelWidth,
 }: TimelineLabelChoiceInput): TimelineLabelChoice {
+  const japaneseShortLabel = timelineJapaneseShortLabel(shortLabel);
   if (nameWidth <= availableWidth) {
     return { label: name, variant: 'full' };
   }
-  if (shortLabel && (shortLabelWidth ?? Number.POSITIVE_INFINITY) <= availableWidth) {
-    return { label: shortLabel, variant: 'short' };
+  if (
+    japaneseShortLabel &&
+    (shortLabelWidth ?? Number.POSITIVE_INFINITY) <= availableWidth
+  ) {
+    return { label: japaneseShortLabel, variant: 'short' };
   }
   return {
-    label: shortLabel ?? name,
+    label: japaneseShortLabel ?? name,
     variant: 'ellipsis',
   };
 }

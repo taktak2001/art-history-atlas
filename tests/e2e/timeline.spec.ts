@@ -92,6 +92,9 @@ test('通史はコンパクトな俯瞰表示と日本語名・年代の2段ラ�
   ).toBeGreaterThan(
     await surveyLabel.evaluate((element) => element.getBoundingClientRect().y),
   );
+  await expect(
+    page.locator('[data-timeline-bar="light-and-space"]'),
+  ).not.toContainText('Light and Space');
 });
 
 test('時代別の表示範囲は時代名と年代だけを示し、通史はリンク状に戻る', async ({ page }) => {

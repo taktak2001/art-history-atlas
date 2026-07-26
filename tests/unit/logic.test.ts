@@ -459,5 +459,17 @@ describe('横型タイムラインの追従ラベル', () => {
         shortLabelWidth: 170,
       }),
     ).toMatchObject({ variant: 'ellipsis' });
+    expect(
+      chooseTimelineLabel({
+        name: 'ライト・アンド・スペース',
+        shortLabel: 'Light and Space',
+        availableWidth: 120,
+        nameWidth: 190,
+        shortLabelWidth: 100,
+      }),
+    ).toMatchObject({
+      label: 'ライト・アンド・スペース',
+      variant: 'ellipsis',
+    });
   });
 });

@@ -30,6 +30,7 @@ import {
   clipMovementToMode,
   fitTimelineModeToMovements,
   movementOverlapsMode,
+  timelineJapaneseShortLabel,
   timelineBarVisualWidth,
   timelineModeById,
   timelineTicks,
@@ -315,7 +316,7 @@ export function HorizontalTimeline({
         movementId: movement.id,
         href: `/movements/${movement.id}/`,
         nameJa: movement.nameJa,
-        shortLabel: movement.shortLabel,
+        shortLabel: timelineJapaneseShortLabel(movement.shortLabel),
         dateLabel: `${fmtYear(movement.dates.start)}〜${
           movement.dates.end === null ? '現在' : fmtYear(movement.dates.end)
         }`,
@@ -344,7 +345,7 @@ export function HorizontalTimeline({
           movementId: movement.id,
           href: `/movements/${movement.id}/`,
           nameJa: summary.label,
-          shortLabel: movement.shortLabel,
+          shortLabel: timelineJapaneseShortLabel(movement.shortLabel),
           dateLabel: `${fmtYear(movement.dates.start)}〜${
             movement.dates.end === null ? '現在' : fmtYear(movement.dates.end)
           }`,
@@ -966,7 +967,9 @@ export function HorizontalTimeline({
                         <span
                           data-follow-label
                           data-full-label={movement.nameJa}
-                          data-short-label={movement.shortLabel}
+                          data-short-label={timelineJapaneseShortLabel(
+                            movement.shortLabel,
+                          )}
                           className="timeline-follow-label pointer-events-none absolute inset-y-0 left-0 flex flex-col items-center justify-center overflow-hidden px-px"
                         >
                           <span
