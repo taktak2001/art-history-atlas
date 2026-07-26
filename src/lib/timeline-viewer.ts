@@ -50,13 +50,13 @@ export const TIMELINE_VIEWER_EDGE_PADDING = 20;
 export const TIMELINE_VIEWER_CONTROL_INSET = 72;
 export const TIMELINE_VIEWER_DOUBLE_TAP_SCALE = 1.75;
 export const TIMELINE_VIEWER_SEMANTIC_THRESHOLDS = {
-  standard: 1,
-  contextual: 1.8,
+  standard: 1.25,
+  contextual: 2,
   detailed: 3,
 } as const;
 export const TIMELINE_VIEWER_LABEL_GAP = 10;
 export const TIMELINE_VIEWER_MAX_TRACKS = 4;
-export const TIMELINE_VIEWER_TRACK_PITCH = 40;
+export const TIMELINE_VIEWER_TRACK_PITCH = 38;
 
 const TIMELINE_VIEWER_TICK_STEPS = [
   10, 25, 50, 100, 250, 500, 1000, 2500, 5000, 10000,
@@ -178,8 +178,9 @@ export function assignTimelineViewerTracks(
 }
 
 export function timelineViewerRegionHeight(trackCount: number) {
-  if (trackCount <= 1) return 80;
-  if (trackCount === 2) return 120;
+  if (trackCount <= 1) return 64;
+  if (trackCount === 2) return 96;
+  if (trackCount === 3) return 128;
   return 160;
 }
 
@@ -293,5 +294,8 @@ export function viewerLabelVariant(
   scale: number,
   hasShortLabel: boolean,
 ): 'full' | 'short' {
-  return scale >= 1 || !hasShortLabel ? 'full' : 'short';
+  return scale >= TIMELINE_VIEWER_SEMANTIC_THRESHOLDS.standard ||
+    !hasShortLabel
+    ? 'full'
+    : 'short';
 }

@@ -135,9 +135,10 @@ export function HorizontalTimeline({
 
   const mode = timelineModeById(modeId);
   const viewerLod =
-    viewerSemanticLevel === 'detailed'
+    viewerSemanticLevel === 'detailed' ||
+    viewerSemanticLevel === 'contextual'
       ? 'detailed'
-      : viewerSemanticLevel === 'contextual'
+      : viewerSemanticLevel === 'standard'
         ? 'standard'
         : 'core';
   const effectiveLod = isViewerMode ? viewerLod : lod;
@@ -319,7 +320,9 @@ export function HorizontalTimeline({
         barStart: left,
         barEnd: left + width,
         regionId: lane.region,
-        priority: mode.id !== 'survey' || SURVEY_PRIORITY.has(movement.id),
+        priority:
+          movement.visibilityLevel === 'core' &&
+          (mode.id !== 'survey' || SURVEY_PRIORITY.has(movement.id)),
       })),
     );
 

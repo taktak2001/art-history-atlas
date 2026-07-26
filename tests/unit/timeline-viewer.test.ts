@@ -106,9 +106,11 @@ describe('timeline viewer geometry', () => {
 
   it('倍率を4段階のセマンティック表示へ対応させる', () => {
     expect(timelineViewerSemanticLevel(0.8)).toBe('overview');
-    expect(timelineViewerSemanticLevel(1)).toBe('standard');
-    expect(timelineViewerSemanticLevel(1.79)).toBe('standard');
-    expect(timelineViewerSemanticLevel(1.8)).toBe('contextual');
+    expect(timelineViewerSemanticLevel(1)).toBe('overview');
+    expect(timelineViewerSemanticLevel(1.24)).toBe('overview');
+    expect(timelineViewerSemanticLevel(1.25)).toBe('standard');
+    expect(timelineViewerSemanticLevel(1.99)).toBe('standard');
+    expect(timelineViewerSemanticLevel(2)).toBe('contextual');
     expect(timelineViewerSemanticLevel(3)).toBe('detailed');
   });
 
@@ -124,7 +126,8 @@ describe('timeline viewer geometry', () => {
 
   it('縮小時は短縮名、拡大時は正式名称を選ぶ', () => {
     expect(viewerLabelVariant(0.8, true)).toBe('short');
-    expect(viewerLabelVariant(1.1, true)).toBe('full');
+    expect(viewerLabelVariant(1.1, true)).toBe('short');
+    expect(viewerLabelVariant(1.25, true)).toBe('full');
     expect(viewerLabelVariant(0.6, false)).toBe('full');
   });
 
@@ -172,12 +175,12 @@ describe('timeline viewer geometry', () => {
   });
 
   it('トラック数に応じて地域高と中心位置を調整する', () => {
-    expect(timelineViewerRegionHeight(1)).toBe(80);
-    expect(timelineViewerRegionHeight(2)).toBe(120);
-    expect(timelineViewerRegionHeight(3)).toBe(160);
+    expect(timelineViewerRegionHeight(1)).toBe(64);
+    expect(timelineViewerRegionHeight(2)).toBe(96);
+    expect(timelineViewerRegionHeight(3)).toBe(128);
     expect(timelineViewerRegionHeight(4)).toBe(160);
-    expect(timelineViewerTrackCenter(0, 1)).toBe(40);
-    expect(timelineViewerTrackCenter(0, 3)).toBe(40);
-    expect(timelineViewerTrackCenter(2, 3)).toBe(120);
+    expect(timelineViewerTrackCenter(0, 1)).toBe(32);
+    expect(timelineViewerTrackCenter(0, 3)).toBe(26);
+    expect(timelineViewerTrackCenter(2, 3)).toBe(102);
   });
 });

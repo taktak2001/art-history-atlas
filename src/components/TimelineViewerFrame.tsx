@@ -92,7 +92,7 @@ const IDENTITY_TRANSFORM: TimelineViewerTransform = {
 const DOUBLE_TAP_DELAY = 320;
 const DRAG_THRESHOLD = 5;
 const AXIS_EDGE_PADDING = 10;
-const LABEL_START_INSET = 6;
+const CONTROLS_IDLE_DELAY = 2500;
 
 const pointerCenter = (points: TimelineViewerPoint[]) => ({
   x: points.reduce((sum, point) => sum + point.x, 0) / points.length,
@@ -106,12 +106,12 @@ const pointerDistance = (points: TimelineViewerPoint[]) =>
 
 const viewerAxisMetrics = (viewportWidth: number): AxisMetrics => {
   if (viewportWidth <= 639) {
-    return { regionWidth: 104, timeHeight: 52, controlBottom: 68 };
+    return { regionWidth: 102, timeHeight: 50, controlBottom: 62 };
   }
   if (viewportWidth <= 1023) {
-    return { regionWidth: 124, timeHeight: 54, controlBottom: 68 };
+    return { regionWidth: 120, timeHeight: 50, controlBottom: 62 };
   }
-  return { regionWidth: 152, timeHeight: 56, controlBottom: 68 };
+  return { regionWidth: 144, timeHeight: 52, controlBottom: 62 };
 };
 
 const formatViewerYear = (year: number) => {
@@ -152,12 +152,14 @@ export function TimelineViewerFrame({
   const fitModeRef = useRef(false);
   const clickResetTimerRef = useRef<number | null>(null);
   const fixedLayerFrameRef = useRef<number | null>(null);
+  const controlsIdleTimerRef = useRef<number | null>(null);
   const pendingFixedTransformRef =
     useRef<TimelineViewerTransform>(IDENTITY_TRANSFORM);
   const semanticLevelRef = useRef<TimelineViewerSemanticLevel>('standard');
   const tickSignatureRef = useRef('');
   const [semanticLevel, setSemanticLevel] =
     useState<TimelineViewerSemanticLevel>('standard');
+  const [controlsIdle, setControlsIdle] = useState(false);
   const [axisTicks, setAxisTicks] = useState(() =>
     semanticTimelineTicks(timelineMode, timelineWidth, 1),
   );
@@ -254,11 +256,10 @@ export function TimelineViewerFrame({
         }
 
         const nodeWidth = node.offsetWidth;
-        const maximumX = Math.max(contentLeft, contentRight - nodeWidth);
-        const x = Math.min(
-          Math.max(startScreen.x + LABEL_START_INSET, contentLeft),
-          maximumX,
-        );
+        // Keep the caption and duration rail on the same chronological start.
+        // A label near the right edge may be partially clipped until the user
+        // pans, but it must not detach from the movement's actual start year.
+        const x = Math.max(startScreen.x, contentLeft);
         return [
           {
             key: node.dataset.viewerKey ?? '',
@@ -383,7 +384,12 @@ export function TimelineViewerFrame({
         node.style.visibility = visible ? 'visible' : 'hidden';
         node.dataset.viewerTrack = String(placement.track);
         if (period) {
-          const periodY = trackCenterY + node.offsetHeight / 2 - 2;
+          const surfaceHeight =
+            node.querySelector<HTMLElement>('.timeline-viewer-node__surface')
+              ?.offsetHeight ?? 34;
+          const surfaceBottom =
+            trackCenterY - surfaceHeight / 2 + surfaceHeight;
+          const periodY = surfaceBottom + 5;
           period.style.width = `${Math.max(1, periodRight - periodLeft)}px`;
           period.style.transform = `translate3d(${periodLeft}px, ${periodY}px, 0)`;
           period.style.visibility =
@@ -406,8 +412,20 @@ export function TimelineViewerFrame({
     [updateFixedLayers],
   );
 
+  const wakeControls = useCallback(() => {
+    setControlsIdle(false);
+    if (controlsIdleTimerRef.current !== null) {
+      window.clearTimeout(controlsIdleTimerRef.current);
+    }
+    controlsIdleTimerRef.current = window.setTimeout(() => {
+      setControlsIdle(true);
+      controlsIdleTimerRef.current = null;
+    }, CONTROLS_IDLE_DELAY);
+  }, []);
+
   const applyTransform = useCallback(
     (next: TimelineViewerTransform) => {
+      wakeControls();
       transformRef.current = next;
       const canvas = canvasRef.current;
       const root = rootRef.current;
@@ -433,7 +451,7 @@ export function TimelineViewerFrame({
       }
       scheduleFixedLayers(next);
     },
-    [onSemanticLevelChange, scheduleFixedLayers],
+    [onSemanticLevelChange, scheduleFixedLayers, wakeControls],
   );
 
   const fitContent = useCallback(() => {
@@ -630,6 +648,11 @@ export function TimelineViewerFrame({
         window.cancelAnimationFrame(fixedLayerFrameRef.current);
         fixedLayerFrameRef.current = null;
       }
+      if (controlsIdleTimerRef.current !== null) {
+        window.clearTimeout(controlsIdleTimerRef.current);
+        controlsIdleTimerRef.current = null;
+      }
+      setControlsIdle(false);
     };
   }, [active]);
 
@@ -662,6 +685,7 @@ export function TimelineViewerFrame({
 
   const handlePointerDown = (event: PointerEvent<HTMLDivElement>) => {
     if (!active) return;
+    wakeControls();
     if (
       (event.target as HTMLElement).closest(
         '[data-viewer-controls],[data-viewer-node-layer]',
@@ -800,6 +824,7 @@ export function TimelineViewerFrame({
 
   const handleWheel = (event: WheelEvent<HTMLDivElement>) => {
     if (!active) return;
+    wakeControls();
     if (event.ctrlKey || event.metaKey) {
       event.preventDefault();
       const factor = Math.exp(-event.deltaY * 0.002);
@@ -896,6 +921,7 @@ export function TimelineViewerFrame({
       aria-label={active ? '横型タイムライン閲覧モード' : undefined}
       data-timeline-viewer={active ? 'active' : 'inactive'}
       data-semantic-level={active ? semanticLevel : undefined}
+      data-controls-idle={active && controlsIdle ? 'true' : undefined}
       onKeyDown={handleKeyDown}
     >
       {active && (
@@ -904,6 +930,7 @@ export function TimelineViewerFrame({
             className="timeline-viewer-controls"
             aria-label="閲覧モード操作"
             data-viewer-controls
+            data-idle={controlsIdle || undefined}
           >
             <button
               type="button"
@@ -1028,7 +1055,7 @@ export function TimelineViewerFrame({
                 data-bar-start={node.barStart}
                 data-bar-end={node.barEnd}
                 data-priority={node.priority || undefined}
-                aria-label={`${node.nameJa}。${node.dateLabel}。${node.regionLabel}。${node.classificationLabel}`}
+                aria-label={`${node.nameJa}。${node.dateLabel}。${node.regionLabel}。${node.classificationLabel}。${node.priority ? '基本項目' : '充実・詳細項目'}`}
                 title={`${node.nameJa} (${node.nameEn})`}
               >
                 <span className="timeline-viewer-node__surface">
