@@ -43,7 +43,6 @@ export type TimelineViewerNode = {
   movementId: string;
   href: string;
   nameJa: string;
-  nameEn: string;
   shortLabel?: string;
   dateLabel: string;
   regionLabel: string;
@@ -1370,7 +1369,13 @@ export function TimelineViewerFrame({
                       : undefined
                   }
                 >
-                  {region.label}
+                  {region.id !== 'origin' && (
+                    <span
+                      className="timeline-viewer-region-dot"
+                      aria-hidden="true"
+                    />
+                  )}
+                  <span>{region.label}</span>
                 </span>
               ))}
             </div>
@@ -1503,7 +1508,7 @@ export function TimelineViewerFrame({
                     setMovementPeersHighlighted(node.movementId, false)
                   }
                   aria-label={`${node.nameJa}。${node.dateLabel}。${node.regionLabel}。${node.classificationLabel}。${node.priority ? '基本項目' : '充実・詳細項目'}`}
-                  title={`${node.nameJa} (${node.nameEn})`}
+                  title={`${node.nameJa} ${node.dateLabel}`}
                 >
                   <span className="timeline-viewer-node__surface">
                     <span className="timeline-viewer-node__short">
@@ -1514,7 +1519,9 @@ export function TimelineViewerFrame({
                     </span>
                     <span className="timeline-viewer-node__formal">
                       {node.nameJa}
-                      <span lang="en">（{node.nameEn}）</span>
+                    </span>
+                    <span className="timeline-viewer-node__date">
+                      {node.dateLabel}
                     </span>
                   </span>
                 </Link>

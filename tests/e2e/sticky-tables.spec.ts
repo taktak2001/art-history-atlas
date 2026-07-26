@@ -117,11 +117,29 @@ test('比較対象の削除を短くアニメーションし、残る対象の�
   );
   const gothicChip = page.locator('[data-compare-chip="gothic"]');
 
+  await gothicChip.evaluate((element) => {
+    const root = document.documentElement;
+    root.removeAttribute('data-observed-compare-exit');
+    const observer = new MutationObserver(() => {
+      if (element.getAttribute('data-exiting') === 'true') {
+        root.setAttribute('data-observed-compare-exit', 'true');
+        observer.disconnect();
+      }
+    });
+    observer.observe(element, {
+      attributes: true,
+      attributeFilter: ['data-exiting'],
+    });
+  });
+
   await gothicChip
     .getByRole('button', { name: 'ゴシック美術を比較から外す' })
     .click();
 
-  await expect(gothicChip).toHaveAttribute('data-exiting', 'true');
+  await expect(page.locator('html')).toHaveAttribute(
+    'data-observed-compare-exit',
+    'true',
+  );
   await expect(gothicChip).toHaveCount(0);
 
   const accentAfter = await baroqueChip.evaluate((element) =>

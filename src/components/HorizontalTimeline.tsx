@@ -59,7 +59,6 @@ const DESKTOP_MIN_LANE_H = 50;
 const MOBILE_MIN_LANE_H = 50;
 const LABEL_INNER_PADDING = 8;
 const LABEL_TEXT_PADDING = 16;
-const LABEL_META_GAP = 6;
 const DESKTOP_DETAIL_LABEL_FOOTPRINT = 140;
 const MOBILE_DETAIL_LABEL_FOOTPRINT = 120;
 
@@ -316,7 +315,6 @@ export function HorizontalTimeline({
         movementId: movement.id,
         href: `/movements/${movement.id}/`,
         nameJa: movement.nameJa,
-        nameEn: movement.nameEn,
         shortLabel: movement.shortLabel,
         dateLabel: `${fmtYear(movement.dates.start)}〜${
           movement.dates.end === null ? '現在' : fmtYear(movement.dates.end)
@@ -346,7 +344,6 @@ export function HorizontalTimeline({
           movementId: movement.id,
           href: `/movements/${movement.id}/`,
           nameJa: summary.label,
-          nameEn: movement.nameEn,
           shortLabel: movement.shortLabel,
           dateLabel: `${fmtYear(movement.dates.start)}〜${
             movement.dates.end === null ? '現在' : fmtYear(movement.dates.end)
@@ -419,10 +416,7 @@ export function HorizontalTimeline({
         const availableWidth = Math.min(geometry.maximumWidth, visibleWidth);
         const availableNameWidth = Math.max(
           1,
-          availableWidth -
-            geometry.dateWidth -
-            LABEL_META_GAP -
-            LABEL_TEXT_PADDING,
+          availableWidth - LABEL_TEXT_PADDING,
         );
         const choice = chooseTimelineLabel({
           name: geometry.name,
@@ -443,10 +437,7 @@ export function HorizontalTimeline({
         const resolvedLabelWidth = Math.max(
           1,
           Math.min(
-            chosenWidth +
-              geometry.dateWidth +
-              LABEL_META_GAP +
-              LABEL_TEXT_PADDING,
+            Math.max(chosenWidth, geometry.dateWidth) + LABEL_TEXT_PADDING,
             availableWidth,
           ),
         );
@@ -502,7 +493,7 @@ export function HorizontalTimeline({
       const dateWidth = dateElement.getBoundingClientRect().width;
       const availableNameWidth = Math.max(
         1,
-        availableWidth - dateWidth - LABEL_META_GAP - LABEL_TEXT_PADDING,
+        availableWidth - LABEL_TEXT_PADDING,
       );
       const name = element.dataset.fullLabel ?? '';
       const shortLabel = element.dataset.shortLabel || undefined;
@@ -534,7 +525,7 @@ export function HorizontalTimeline({
       const resolvedLabelWidth = Math.max(
         1,
         Math.min(
-          chosenWidth + dateWidth + LABEL_META_GAP + LABEL_TEXT_PADDING,
+          Math.max(chosenWidth, dateWidth) + LABEL_TEXT_PADDING,
           availableWidth,
         ),
       );
@@ -789,7 +780,8 @@ export function HorizontalTimeline({
                 } as CSSProperties
               }
             >
-              {REGION_LABELS[lane.region]}
+              <span className="timeline-region-dot" aria-hidden="true" />
+              <span>{REGION_LABELS[lane.region]}</span>
             </div>
           ))}
         </div>
@@ -975,7 +967,7 @@ export function HorizontalTimeline({
                           data-follow-label
                           data-full-label={movement.nameJa}
                           data-short-label={movement.shortLabel}
-                          className="timeline-follow-label pointer-events-none absolute inset-y-0 left-0 flex items-center overflow-hidden px-px"
+                          className="timeline-follow-label pointer-events-none absolute inset-y-0 left-0 flex flex-col items-center justify-center overflow-hidden px-px"
                         >
                           <span
                             data-label-text
