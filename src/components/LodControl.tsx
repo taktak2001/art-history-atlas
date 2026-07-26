@@ -62,9 +62,9 @@ export function LodControl({
             ? 'lod-control__exhibition-options'
             : catalogue
             ? 'lod-control__catalogue-options'
-            : `inline-grid grid-cols-3 overflow-hidden rounded-sm border hairline bg-raised ${
-                compact ? 'lod-control__options' : 'min-w-[264px]'
-              }`
+            : compact
+            ? 'lod-control__options'
+            : 'inline-grid min-w-[264px] grid-cols-3 overflow-hidden rounded-sm border hairline bg-raised'
         }
         role="group"
         aria-label="表示する範囲"
@@ -90,9 +90,11 @@ export function LodControl({
                   }`
                 : catalogue
                 ? 'lod-control__catalogue-option'
-                : `min-h-11 text-sm font-medium transition-colors active:translate-y-px ${
-                    compact ? 'px-2 py-1.5' : 'px-3 py-2'
-                  } ${
+                : compact
+                ? `lod-control__option ${
+                    value === level ? 'lod-control__option--selected' : ''
+                  }`
+                : `min-h-11 px-3 py-2 text-sm font-medium transition-colors active:translate-y-px ${
                     index > 0 ? 'border-l hairline' : ''
                   } ${
                     value === level
@@ -111,6 +113,8 @@ export function LodControl({
                     ? 'lod-control__exhibition-count'
                     : catalogue
                     ? 'lod-control__catalogue-count'
+                    : compact
+                    ? 'lod-control__count'
                     : 'ml-1 text-[10px] tabular-nums'
                 }
               >
