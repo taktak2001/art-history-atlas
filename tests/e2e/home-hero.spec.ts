@@ -29,7 +29,16 @@ test('ホームのファーストビューに3つの探索導線を表示する'
 
   const geometry = await hero.evaluate((element) => {
     const rect = element.getBoundingClientRect();
+    const title = element.querySelector<HTMLElement>('.home-hero__title');
     const tagline = element.querySelector<HTMLElement>('.home-hero__tagline');
+    const actions = element.querySelector<HTMLElement>('.home-hero__actions');
+    const firstAction = element.querySelector<HTMLElement>('.home-hero__cta');
+    const firstActionTitle = firstAction?.querySelector<HTMLElement>(
+      '.home-hero__cta-title',
+    );
+    const firstActionDescription = firstAction?.querySelector<HTMLElement>(
+      '.home-hero__cta-description',
+    );
     const taglineStyles = tagline ? getComputedStyle(tagline) : null;
     return {
       bottom: rect.bottom,
@@ -38,12 +47,24 @@ test('ホームのファーストビューに3つの探索導線を表示する'
       viewportHeight: window.innerHeight,
       taglineHeight: tagline?.getBoundingClientRect().height ?? 0,
       taglineLineHeight: taglineStyles ? Number.parseFloat(taglineStyles.lineHeight) : 0,
+      titleToTagline:
+        (tagline?.getBoundingClientRect().top ?? 0) -
+        (title?.getBoundingClientRect().bottom ?? 0),
+      taglineToActions:
+        (actions?.getBoundingClientRect().top ?? 0) -
+        (tagline?.getBoundingClientRect().bottom ?? 0),
+      actionTitleToDescription:
+        (firstActionDescription?.getBoundingClientRect().top ?? 0) -
+        (firstActionTitle?.getBoundingClientRect().bottom ?? 0),
     };
   });
   expect(geometry.bottom).toBeLessThanOrEqual(geometry.viewportHeight + 1);
-  expect(geometry.height).toBeGreaterThanOrEqual(260);
-  expect(geometry.height).toBeLessThanOrEqual(geometry.width < 640 ? 340 : 330);
+  expect(geometry.height).toBeGreaterThanOrEqual(280);
+  expect(geometry.height).toBeLessThanOrEqual(geometry.width < 640 ? 390 : 360);
   expect(geometry.taglineHeight).toBeLessThanOrEqual(geometry.taglineLineHeight * 2 + 1);
+  expect(geometry.titleToTagline).toBeGreaterThanOrEqual(11);
+  expect(geometry.taglineToActions).toBeGreaterThanOrEqual(23);
+  expect(geometry.actionTitleToDescription).toBeGreaterThanOrEqual(5);
 
   const titleTypography = await title.evaluate((element) => {
     const styles = getComputedStyle(element);
@@ -54,8 +75,8 @@ test('ホームのファーストビューに3つの探索導線を表示する'
     };
   });
   if ((page.viewportSize()?.width ?? 1280) < 640) {
-    expect(titleTypography.fontSize).toBeGreaterThanOrEqual(32);
-    expect(titleTypography.fontSize).toBeLessThanOrEqual(34);
+    expect(titleTypography.fontSize).toBeGreaterThanOrEqual(30);
+    expect(titleTypography.fontSize).toBeLessThanOrEqual(32);
   } else {
     expect(titleTypography.fontSize).toBeGreaterThanOrEqual(40);
     expect(titleTypography.fontSize).toBeLessThanOrEqual(56);
