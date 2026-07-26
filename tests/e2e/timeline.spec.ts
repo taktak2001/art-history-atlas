@@ -517,6 +517,92 @@ test('閲覧モードはマウスパン・ダブルクリック・キーボー�
     .toBeGreaterThan(0);
 });
 
+test('パン中は再レイアウトせずcompositor transformだけを更新する', async ({
+  page,
+}, testInfo) => {
+  test.skip(testInfo.project.name !== 'desktop', 'desktop project only');
+  await page.goto('/timeline/');
+  await page.getByRole('button', { name: 'タイムラインを全画面で表示' }).click();
+
+  const viewer = page.locator('[data-timeline-viewer="active"]');
+  const stage = viewer.locator('[data-timeline-viewer-stage]');
+  await expect
+    .poll(async () =>
+      Number((await viewer.getAttribute('data-viewer-layout-passes')) ?? 0),
+    )
+    .toBeGreaterThan(0);
+  await page.waitForTimeout(160);
+  const layoutPasses = Number(
+    (await viewer.getAttribute('data-viewer-layout-passes')) ?? 0,
+  );
+  const compositorFrames = Number(
+    (await viewer.getAttribute('data-viewer-compositor-frames')) ?? 0,
+  );
+
+  await stage.evaluate((element) => {
+    const emit = (type: string, clientX: number, clientY: number) => {
+      element.dispatchEvent(
+        new PointerEvent(type, {
+          bubbles: true,
+          cancelable: true,
+          pointerId: 61,
+          pointerType: 'mouse',
+          clientX,
+          clientY,
+          isPrimary: true,
+        }),
+      );
+    };
+    emit('pointerdown', 760, 440);
+    for (let step = 0; step < 24; step += 1) {
+      emit('pointermove', 760 - step * 8, 440 - step * 2);
+    }
+  });
+  await expect(viewer).toHaveAttribute('data-viewer-interacting', 'true');
+  expect(
+    Number((await viewer.getAttribute('data-viewer-layout-passes')) ?? 0),
+  ).toBe(layoutPasses);
+  await expect
+    .poll(
+      async () =>
+        Number(
+          (await viewer.getAttribute('data-viewer-compositor-frames')) ?? 0,
+        ) - compositorFrames,
+    )
+    .toBeGreaterThan(0);
+  const interactionFrames =
+    Number((await viewer.getAttribute('data-viewer-compositor-frames')) ?? 0) -
+    compositorFrames;
+  expect(interactionFrames).toBeLessThanOrEqual(2);
+
+  const compositeLayer = viewer.locator('.timeline-viewer-node-content');
+  const compositeStyles = await compositeLayer.evaluate((element) => {
+    const style = getComputedStyle(element);
+    return {
+      contain: style.contain,
+      transform: style.transform,
+      willChange: style.willChange,
+    };
+  });
+  expect(compositeStyles.contain).toContain('layout');
+  expect(compositeStyles.transform).not.toBe('none');
+  expect(compositeStyles.willChange).toContain('transform');
+
+  await stage.dispatchEvent('pointerup', {
+    pointerId: 61,
+    pointerType: 'mouse',
+    clientX: 576,
+    clientY: 394,
+    isPrimary: true,
+  });
+  await expect(viewer).not.toHaveAttribute('data-viewer-interacting');
+  await expect
+    .poll(async () =>
+      Number((await viewer.getAttribute('data-viewer-layout-passes')) ?? 0),
+    )
+    .toBeGreaterThan(layoutPasses);
+});
+
 test('iPhone幅の閲覧モードは2本指の中点を保ってピンチズームする', async ({
   page,
 }, testInfo) => {

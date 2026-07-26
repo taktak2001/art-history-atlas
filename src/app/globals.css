@@ -1117,6 +1117,20 @@ html.dark .relation-badge {
   touch-action: none;
 }
 
+.timeline-viewer-time-track,
+.timeline-viewer-region-track,
+.timeline-viewer-board-content,
+.timeline-viewer-rail-content,
+.timeline-viewer-node-content {
+  position: absolute;
+  inset: 0;
+  backface-visibility: hidden;
+  contain: layout style;
+  transform: translate3d(0, 0, 0);
+  transform-origin: 0 0;
+  will-change: transform;
+}
+
 .timeline-viewer-time-tick {
   position: absolute;
   bottom: 0.55rem;
@@ -1232,7 +1246,14 @@ html.dark .relation-badge {
 .timeline-viewer-node-layer {
   position: absolute;
   inset: 0;
+  contain: layout paint;
   overflow: hidden;
+  pointer-events: none;
+}
+
+.timeline-viewer-rail-content,
+.timeline-viewer-board-content,
+.timeline-viewer-node-content {
   pointer-events: none;
 }
 
@@ -1345,6 +1366,31 @@ html.dark .relation-badge {
   text-decoration: none;
   pointer-events: auto;
   transform: translate3d(-200vw, -200vh, 0);
+}
+
+.timeline-viewer-frame--active[data-viewer-interacting='true']
+  .timeline-viewer-board {
+  box-shadow: none;
+}
+
+.timeline-viewer-frame--active[data-viewer-interacting='true']
+  .timeline-viewer-period,
+.timeline-viewer-frame--active[data-viewer-interacting='true']
+  .timeline-viewer-overflow,
+.timeline-viewer-frame--active[data-viewer-interacting='true']
+  .timeline-viewer-node__surface::after {
+  opacity: 0;
+}
+
+.timeline-viewer-frame--active[data-viewer-interacting='true']
+  .timeline-viewer-node__surface {
+  box-shadow: none;
+  transition: none;
+}
+
+.timeline-viewer-frame--active[data-viewer-interacting='true']
+  .timeline-viewer-time-tick:not([data-tick-strength='century']) {
+  opacity: 0.28;
 }
 
 .timeline-viewer-node__surface {

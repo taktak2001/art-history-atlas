@@ -6,11 +6,13 @@ import {
   fitTimelineViewer,
   fitTimelineViewerRect,
   panTimelineViewer,
+  relativeTimelineViewerCompositeTransform,
   semanticTimelineTicks,
   timelineViewerMaxScale,
   timelineViewerRegionHeight,
   timelineViewerSemanticLevel,
   timelineViewerTrackCenter,
+  timelineViewerVirtualNodeKeys,
   TIMELINE_VIEWER_MAX_SCALE,
   TIMELINE_VIEWER_MOBILE_MAX_SCALE,
   TIMELINE_VIEWER_MIN_SCALE,
@@ -56,6 +58,36 @@ describe('timeline viewer geometry', () => {
         { x: 36, y: -24 },
       ),
     ).toEqual({ x: -84, y: 56, scale: 1.25 });
+  });
+
+  it('操作中のscreen差分を単一のcompositor transformへ変換する', () => {
+    expect(
+      relativeTimelineViewerCompositeTransform(
+        { x: -200, y: -40, scale: 1 },
+        { x: -420, y: -92, scale: 2 },
+      ),
+    ).toEqual({ x: -20, y: -52, scaleX: 2 });
+  });
+
+  it('表示領域の前後1画面だけを仮想描画対象にする', () => {
+    const nodes = [
+      { key: 'far-left', barStart: -2400, barEnd: -2200 },
+      { key: 'left-buffer', barStart: -800, barEnd: -700 },
+      { key: 'visible', barStart: 200, barEnd: 300 },
+      { key: 'right-buffer', barStart: 1200, barEnd: 1300 },
+      { key: 'far-right', barStart: 2600, barEnd: 2800 },
+    ];
+
+    expect(
+      timelineViewerVirtualNodeKeys(
+        nodes,
+        { x: 0, y: 0, scale: 1 },
+        0,
+        100,
+        1100,
+        1000,
+      ),
+    ).toEqual(['left-buffer', 'visible', 'right-buffer']);
   });
 
   it('短い展示年表は上端へ揃えて無限余白を作らない', () => {

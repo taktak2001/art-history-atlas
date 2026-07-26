@@ -22,7 +22,9 @@ import {
   constrainTimelineViewerVerticalPan,
   fitTimelineViewerRect,
   panTimelineViewer,
+  relativeTimelineViewerCompositeTransform,
   semanticTimelineTicks,
+  timelineViewerVirtualNodeKeys,
   timelineViewerRegionHeight,
   timelineViewerMaxScale,
   timelineViewerSemanticLevel,
@@ -146,9 +148,14 @@ export function TimelineViewerFrame({
   const stageRef = useRef<HTMLDivElement>(null);
   const canvasRef = useRef<HTMLDivElement>(null);
   const railLayerRef = useRef<HTMLDivElement>(null);
+  const boardContentRef = useRef<HTMLDivElement>(null);
+  const railContentRef = useRef<HTMLDivElement>(null);
   const nodeLayerRef = useRef<HTMLDivElement>(null);
+  const nodeContentRef = useRef<HTMLDivElement>(null);
   const timeAxisRef = useRef<HTMLDivElement>(null);
+  const timeTrackRef = useRef<HTMLDivElement>(null);
   const regionAxisRef = useRef<HTMLDivElement>(null);
+  const regionTrackRef = useRef<HTMLDivElement>(null);
   const scaleOutputRef = useRef<HTMLOutputElement>(null);
   const transformRef = useRef<TimelineViewerTransform>(IDENTITY_TRANSFORM);
   const pointersRef = useRef(new Map<number, TimelineViewerPoint>());
@@ -161,11 +168,23 @@ export function TimelineViewerFrame({
   const fitModeRef = useRef(false);
   const clickResetTimerRef = useRef<number | null>(null);
   const fixedLayerFrameRef = useRef<number | null>(null);
+  const interactionFrameRef = useRef<number | null>(null);
   const controlsIdleTimerRef = useRef<number | null>(null);
+  const wheelSettleTimerRef = useRef<number | null>(null);
   const pendingFixedTransformRef =
+    useRef<TimelineViewerTransform>(IDENTITY_TRANSFORM);
+  const pendingInteractionTransformRef =
+    useRef<TimelineViewerTransform>(IDENTITY_TRANSFORM);
+  const settledTransformRef =
     useRef<TimelineViewerTransform>(IDENTITY_TRANSFORM);
   const semanticLevelRef = useRef<TimelineViewerSemanticLevel>('standard');
   const tickSignatureRef = useRef('');
+  const virtualSignatureRef = useRef('');
+  const viewportRef = useRef({
+    width: 1024,
+    height: 768,
+    metrics: viewerAxisMetrics(1024),
+  });
   const verticalBoundsRef = useRef({
     offsetY: regions[0]?.top ?? contentOriginY,
     height: regions.reduce(
@@ -181,9 +200,15 @@ export function TimelineViewerFrame({
   const [expandedRegionIds, setExpandedRegionIds] = useState<Set<string>>(
     () => new Set(),
   );
+  const [virtualNodeKeys, setVirtualNodeKeys] = useState<Set<string>>(
+    () => new Set(nodes.map((node) => node.key)),
+  );
   const [axisTicks, setAxisTicks] = useState(() =>
     semanticTimelineTicks(timelineMode, timelineWidth, 1),
   );
+  const renderedNodes = active
+    ? nodes.filter((node) => virtualNodeKeys.has(node.key))
+    : nodes;
 
   const updateFixedLayers = useCallback(
     (transform: TimelineViewerTransform) => {
@@ -194,6 +219,24 @@ export function TimelineViewerFrame({
       if (!stage || !root || !railLayer || !nodeLayer) return;
 
       const metrics = viewerAxisMetrics(stage.clientWidth);
+      viewportRef.current = {
+        width: stage.clientWidth,
+        height: stage.clientHeight,
+        metrics,
+      };
+      for (const layer of [
+        boardContentRef.current,
+        railContentRef.current,
+        nodeContentRef.current,
+        timeTrackRef.current,
+        regionTrackRef.current,
+      ]) {
+        layer?.style.removeProperty('transform');
+      }
+      delete root.dataset.viewerInteracting;
+      root.dataset.viewerLayoutPasses = String(
+        Number(root.dataset.viewerLayoutPasses ?? 0) + 1,
+      );
       root.style.setProperty(
         '--timeline-viewer-region-axis-width',
         `${metrics.regionWidth}px`,
@@ -202,6 +245,7 @@ export function TimelineViewerFrame({
         '--timeline-viewer-time-axis-height',
         `${metrics.timeHeight}px`,
       );
+      const horizontalBuffer = stage.clientWidth;
 
       const nextTicks = semanticTimelineTicks(
         timelineMode,
@@ -225,8 +269,10 @@ export function TimelineViewerFrame({
           transform,
         );
         const visible =
-          screen.x >= metrics.regionWidth + AXIS_EDGE_PADDING &&
-          screen.x <= stage.clientWidth - AXIS_EDGE_PADDING;
+          screen.x >=
+            metrics.regionWidth + AXIS_EDGE_PADDING - horizontalBuffer &&
+          screen.x <=
+            stage.clientWidth - AXIS_EDGE_PADDING + horizontalBuffer;
         tick.style.transform = `translate3d(${screen.x}px, 0, 0)`;
         tick.style.visibility = visible ? 'visible' : 'hidden';
       }
@@ -260,6 +306,20 @@ export function TimelineViewerFrame({
       );
       const contentLeft = metrics.regionWidth + AXIS_EDGE_PADDING;
       const contentRight = stage.clientWidth - AXIS_EDGE_PADDING;
+      const nextVirtualKeys = timelineViewerVirtualNodeKeys(
+        nodes,
+        transform,
+        contentOriginX,
+        contentLeft,
+        contentRight,
+        Math.max(1, contentRight - contentLeft),
+      );
+      const virtualSignature = nextVirtualKeys.join(',');
+      if (virtualSignature !== virtualSignatureRef.current) {
+        virtualSignatureRef.current = virtualSignature;
+        setVirtualNodeKeys(new Set(nextVirtualKeys));
+      }
+      root.dataset.viewerDomNodeCount = String(nodeElements.length);
       const collisionItems = nodeElements.flatMap((node) => {
         const barStart = Number(node.dataset.barStart) + contentOriginX;
         const barEnd = Number(node.dataset.barEnd) + contentOriginX;
@@ -272,7 +332,8 @@ export function TimelineViewerFrame({
           transform,
         );
         const visible =
-          endScreen.x >= contentLeft && startScreen.x <= contentRight;
+          endScreen.x >= contentLeft - horizontalBuffer &&
+          startScreen.x <= contentRight + horizontalBuffer;
         node.dataset.viewerVisible = visible ? 'true' : 'false';
         node.dataset.viewerStartX = String(startScreen.x);
         node.dataset.viewerEndX = String(endScreen.x);
@@ -392,8 +453,10 @@ export function TimelineViewerFrame({
           transform,
         );
         const visible =
-          screen.x >= metrics.regionWidth + AXIS_EDGE_PADDING &&
-          screen.x <= stage.clientWidth - AXIS_EDGE_PADDING;
+          screen.x >=
+            metrics.regionWidth + AXIS_EDGE_PADDING - horizontalBuffer &&
+          screen.x <=
+            stage.clientWidth - AXIS_EDGE_PADDING + horizontalBuffer;
         grid.style.height = `${boardHeight}px`;
         grid.style.transform = `translate3d(${screen.x}px, ${boardTop}px, 0)`;
         grid.style.visibility =
@@ -501,8 +564,8 @@ export function TimelineViewerFrame({
           );
         const startX = Number(node.dataset.viewerStartX);
         const endX = Number(node.dataset.viewerEndX);
-        const periodLeft = Math.max(contentLeft, startX);
-        const periodRight = Math.min(contentRight, endX);
+        const periodLeft = startX;
+        const periodRight = endX;
         const visible =
           trackCenterY >= metrics.timeHeight &&
           trackCenterY <= stage.clientHeight - metrics.controlBottom;
@@ -524,11 +587,13 @@ export function TimelineViewerFrame({
             visible && periodRight >= periodLeft ? 'visible' : 'hidden';
         }
       }
+      settledTransformRef.current = transform;
     },
     [
       contentOriginX,
       contentOriginY,
       expandedRegionIds,
+      nodes,
       regions,
       timelineMode,
       timelineWidth,
@@ -574,20 +639,78 @@ export function TimelineViewerFrame({
 
   const constrainTransform = useCallback(
     (next: TimelineViewerTransform) => {
-      const stage = stageRef.current;
-      if (!stage) return next;
-      const metrics = viewerAxisMetrics(stage.clientWidth);
+      const viewport = viewportRef.current;
       return constrainTimelineViewerVerticalPan(
         next,
         verticalBoundsRef.current.offsetY,
         verticalBoundsRef.current.height,
-        stage.clientHeight,
-        metrics.timeHeight,
-        metrics.controlBottom,
+        viewport.height,
+        viewport.metrics.timeHeight,
+        viewport.metrics.controlBottom,
         BOARD_EDGE_PADDING,
       );
     },
     [],
+  );
+
+  const writeScaleOutput = useCallback(
+    (transform: TimelineViewerTransform) => {
+      if (!scaleOutputRef.current) return;
+      const label = `${Math.round(transform.scale * 100)}%`;
+      scaleOutputRef.current.value = label;
+      scaleOutputRef.current.textContent = label;
+    },
+    [],
+  );
+
+  const applyInteractiveFrame = useCallback(
+    (next: TimelineViewerTransform) => {
+      const constrained = constrainTransform(next);
+      transformRef.current = constrained;
+      pendingInteractionTransformRef.current = constrained;
+      const root = rootRef.current;
+      if (root) root.dataset.viewerInteracting = 'true';
+
+      if (interactionFrameRef.current !== null) return;
+      interactionFrameRef.current = window.requestAnimationFrame(() => {
+        interactionFrameRef.current = null;
+        const current = pendingInteractionTransformRef.current;
+        const composite = relativeTimelineViewerCompositeTransform(
+          settledTransformRef.current,
+          current,
+        );
+        const movingTransform = `translate3d(${composite.x}px, ${composite.y}px, 0) scaleX(${composite.scaleX})`;
+        const timeTransform = `translate3d(${composite.x}px, 0, 0) scaleX(${composite.scaleX})`;
+        const regionTransform = `translate3d(0, ${composite.y}px, 0)`;
+
+        if (railContentRef.current) {
+          railContentRef.current.style.transform = movingTransform;
+        }
+        if (boardContentRef.current) {
+          boardContentRef.current.style.transform =
+            `translate3d(0, ${composite.y}px, 0)`;
+        }
+        if (nodeContentRef.current) {
+          nodeContentRef.current.style.transform = movingTransform;
+        }
+        if (timeTrackRef.current) {
+          timeTrackRef.current.style.transform = timeTransform;
+        }
+        if (regionTrackRef.current) {
+          regionTrackRef.current.style.transform = regionTransform;
+        }
+        writeScaleOutput(current);
+        if (rootRef.current) {
+          rootRef.current.dataset.viewerScale = String(current.scale);
+          rootRef.current.dataset.viewerX = String(current.x);
+          rootRef.current.dataset.viewerY = String(current.y);
+          rootRef.current.dataset.viewerCompositorFrames = String(
+            Number(rootRef.current.dataset.viewerCompositorFrames ?? 0) + 1,
+          );
+        }
+      });
+    },
+    [constrainTransform, writeScaleOutput],
   );
 
   const applyTransform = useCallback(
@@ -595,12 +718,18 @@ export function TimelineViewerFrame({
       wakeControls();
       const constrained = constrainTransform(next);
       transformRef.current = constrained;
+      pendingInteractionTransformRef.current = constrained;
+      if (interactionFrameRef.current !== null) {
+        window.cancelAnimationFrame(interactionFrameRef.current);
+        interactionFrameRef.current = null;
+      }
       const canvas = canvasRef.current;
       const root = rootRef.current;
       if (canvas) {
         canvas.style.transform = `translate3d(${constrained.x}px, ${constrained.y}px, 0) scale(${constrained.scale})`;
       }
       if (root) {
+        delete root.dataset.viewerInteracting;
         root.style.setProperty(
           '--timeline-viewer-scale',
           String(constrained.scale),
@@ -609,10 +738,7 @@ export function TimelineViewerFrame({
         root.dataset.viewerX = String(constrained.x);
         root.dataset.viewerY = String(constrained.y);
       }
-      if (scaleOutputRef.current) {
-        scaleOutputRef.current.value = `${Math.round(constrained.scale * 100)}%`;
-        scaleOutputRef.current.textContent = `${Math.round(constrained.scale * 100)}%`;
-      }
+      writeScaleOutput(constrained);
 
       const nextSemanticLevel = timelineViewerSemanticLevel(constrained.scale);
       if (nextSemanticLevel !== semanticLevelRef.current) {
@@ -627,6 +753,7 @@ export function TimelineViewerFrame({
       onSemanticLevelChange,
       scheduleFixedLayers,
       wakeControls,
+      writeScaleOutput,
     ],
   );
 
@@ -700,6 +827,16 @@ export function TimelineViewerFrame({
     [zoomAt],
   );
 
+  const scheduleWheelSettle = useCallback(() => {
+    if (wheelSettleTimerRef.current !== null) {
+      window.clearTimeout(wheelSettleTimerRef.current);
+    }
+    wheelSettleTimerRef.current = window.setTimeout(() => {
+      wheelSettleTimerRef.current = null;
+      applyTransform(transformRef.current);
+    }, 96);
+  }, [applyTransform]);
+
   const activeRuntimeRef = useRef({
     applyTransform,
     contentOriginX,
@@ -758,6 +895,11 @@ export function TimelineViewerFrame({
       const stage = stageRef.current;
       if (!stage) return;
       const metrics = viewerAxisMetrics(stage.clientWidth);
+      viewportRef.current = {
+        width: stage.clientWidth,
+        height: stage.clientHeight,
+        metrics,
+      };
       const runtime = activeRuntimeRef.current;
       fitModeRef.current = false;
       runtime.applyTransform({
@@ -774,6 +916,11 @@ export function TimelineViewerFrame({
     const observer = new ResizeObserver(() => {
       const stage = stageRef.current;
       if (!stage) return;
+      viewportRef.current = {
+        width: stage.clientWidth,
+        height: stage.clientHeight,
+        metrics: viewerAxisMetrics(stage.clientWidth),
+      };
       const runtime = activeRuntimeRef.current;
       if (fitModeRef.current) {
         runtime.fitContent();
@@ -824,6 +971,14 @@ export function TimelineViewerFrame({
         window.cancelAnimationFrame(fixedLayerFrameRef.current);
         fixedLayerFrameRef.current = null;
       }
+      if (interactionFrameRef.current !== null) {
+        window.cancelAnimationFrame(interactionFrameRef.current);
+        interactionFrameRef.current = null;
+      }
+      if (wheelSettleTimerRef.current !== null) {
+        window.clearTimeout(wheelSettleTimerRef.current);
+        wheelSettleTimerRef.current = null;
+      }
       if (controlsIdleTimerRef.current !== null) {
         window.clearTimeout(controlsIdleTimerRef.current);
         controlsIdleTimerRef.current = null;
@@ -831,6 +986,11 @@ export function TimelineViewerFrame({
       setControlsIdle(false);
     };
   }, [active]);
+
+  useEffect(() => {
+    virtualSignatureRef.current = '';
+    setVirtualNodeKeys(new Set(nodes.map((node) => node.key)));
+  }, [nodes]);
 
   useLayoutEffect(() => {
     if (!active) return;
@@ -844,6 +1004,7 @@ export function TimelineViewerFrame({
     regions,
     semanticLevel,
     scheduleFixedLayers,
+    virtualNodeKeys,
   ]);
 
   const resetGesture = () => {
@@ -862,6 +1023,10 @@ export function TimelineViewerFrame({
   const handlePointerDown = (event: PointerEvent<HTMLDivElement>) => {
     if (!active) return;
     wakeControls();
+    if (wheelSettleTimerRef.current !== null) {
+      window.clearTimeout(wheelSettleTimerRef.current);
+      wheelSettleTimerRef.current = null;
+    }
     if (
       (event.target as HTMLElement).closest(
         '[data-viewer-controls],[data-viewer-node-layer]',
@@ -911,13 +1076,13 @@ export function TimelineViewerFrame({
         translated,
         gesture.transform.scale * (distance / gesture.distance),
         center,
-        timelineViewerMaxScale(stageRef.current?.clientWidth ?? 1024),
+        timelineViewerMaxScale(viewportRef.current.width),
       );
-      applyTransform({ ...zoomed, y: translated.y });
+      applyInteractiveFrame({ ...zoomed, y: translated.y });
       return;
     }
 
-    applyTransform(
+    applyInteractiveFrame(
       panTimelineViewer(gesture.transform, {
         x: center.x - gesture.center.x,
         y: center.y - gesture.center.y,
@@ -973,6 +1138,9 @@ export function TimelineViewerFrame({
         clickResetTimerRef.current = null;
       }, 0);
     }
+    if (pointersRef.current.size === 0 && wasMoved) {
+      applyTransform(transformRef.current);
+    }
     resetGesture();
   };
 
@@ -1004,18 +1172,28 @@ export function TimelineViewerFrame({
     if (event.ctrlKey || event.metaKey) {
       event.preventDefault();
       const factor = Math.exp(-event.deltaY * 0.002);
-      zoomAt({ x: event.clientX, y: event.clientY }, factor);
+      fitModeRef.current = false;
+      const current = transformRef.current;
+      const zoomed = zoomTimelineAtPoint(
+        current,
+        current.scale * factor,
+        { x: event.clientX, y: event.clientY },
+        timelineViewerMaxScale(viewportRef.current.width),
+      );
+      applyInteractiveFrame({ ...zoomed, y: current.y });
+      scheduleWheelSettle();
       return;
     }
 
     event.preventDefault();
     fitModeRef.current = false;
-    applyTransform(
+    applyInteractiveFrame(
       panTimelineViewer(transformRef.current, {
         x: event.shiftKey ? -event.deltaY : -event.deltaX,
         y: event.shiftKey ? 0 : -event.deltaY,
       }),
     );
+    scheduleWheelSettle();
   };
 
   const handleKeyDown = (event: KeyboardEvent<HTMLDivElement>) => {
@@ -1146,42 +1324,46 @@ export function TimelineViewerFrame({
             ref={timeAxisRef}
             aria-hidden="true"
           >
-            {axisTicks.map((tick) => (
-              <span
-                key={tick}
-                className="timeline-viewer-time-tick"
-                data-viewer-tick={tick}
-                data-tick-strength={viewerTickStrength(tick)}
-                data-era-boundary={
-                  tick === 0 ||
-                  tick === timelineMode.start ||
-                  tick === timelineMode.end ||
-                  undefined
-                }
-              >
-                {formatViewerYear(tick)}
-              </span>
-            ))}
+            <div className="timeline-viewer-time-track" ref={timeTrackRef}>
+              {axisTicks.map((tick) => (
+                <span
+                  key={tick}
+                  className="timeline-viewer-time-tick"
+                  data-viewer-tick={tick}
+                  data-tick-strength={viewerTickStrength(tick)}
+                  data-era-boundary={
+                    tick === 0 ||
+                    tick === timelineMode.start ||
+                    tick === timelineMode.end ||
+                    undefined
+                  }
+                >
+                  {formatViewerYear(tick)}
+                </span>
+              ))}
+            </div>
           </div>
           <div
             className="timeline-viewer-region-axis"
             ref={regionAxisRef}
             aria-hidden="true"
           >
-            {regions.map((region) => (
-              <span
-                key={region.id}
-                className={`timeline-viewer-region-label ${
-                  region.id === 'origin'
-                    ? 'timeline-viewer-region-label--origin'
-                    : ''
-                }`}
-                data-viewer-region-id={region.id}
-                data-origin-band={region.id === 'origin' || undefined}
-              >
-                {region.label}
-              </span>
-            ))}
+            <div className="timeline-viewer-region-track" ref={regionTrackRef}>
+              {regions.map((region) => (
+                <span
+                  key={region.id}
+                  className={`timeline-viewer-region-label ${
+                    region.id === 'origin'
+                      ? 'timeline-viewer-region-label--origin'
+                      : ''
+                  }`}
+                  data-viewer-region-id={region.id}
+                  data-origin-band={region.id === 'origin' || undefined}
+                >
+                  {region.label}
+                </span>
+              ))}
+            </div>
           </div>
           <div className="timeline-viewer-axis-origin" aria-hidden="true">
             <strong>地域</strong>
@@ -1194,39 +1376,49 @@ export function TimelineViewerFrame({
             aria-hidden="true"
             data-viewer-rail-layer
           >
-            <span className="timeline-viewer-board" data-viewer-board />
-            {axisTicks.map((tick) => (
-              <span
-                key={tick}
-                className="timeline-viewer-gridline"
-                data-viewer-gridline={tick}
-                data-tick-strength={viewerTickStrength(tick)}
-              />
-            ))}
-            {regions.map((region) => (
-              <span
-                key={region.id}
-                className={`timeline-viewer-region-guide ${
-                  region.id === 'origin'
-                    ? 'timeline-viewer-region-guide--origin'
-                    : ''
-                }`}
-                data-viewer-region-guide={region.id}
-                data-origin-band={region.id === 'origin' || undefined}
-              />
-            ))}
-            {nodes.map((node) => (
-              <span
-                key={node.key}
-                className="timeline-viewer-period"
-                data-viewer-period={node.key}
-                data-movement-id={node.movementId}
-                data-secondary-occurrence={
-                  node.secondaryOccurrence || undefined
-                }
-                data-priority={node.priority || undefined}
-              />
-            ))}
+            <div
+              className="timeline-viewer-board-content"
+              ref={boardContentRef}
+            >
+              <span className="timeline-viewer-board" data-viewer-board />
+              {regions.map((region) => (
+                <span
+                  key={region.id}
+                  className={`timeline-viewer-region-guide ${
+                    region.id === 'origin'
+                      ? 'timeline-viewer-region-guide--origin'
+                      : ''
+                  }`}
+                  data-viewer-region-guide={region.id}
+                  data-origin-band={region.id === 'origin' || undefined}
+                />
+              ))}
+            </div>
+            <div
+              className="timeline-viewer-rail-content"
+              ref={railContentRef}
+            >
+              {axisTicks.map((tick) => (
+                <span
+                  key={tick}
+                  className="timeline-viewer-gridline"
+                  data-viewer-gridline={tick}
+                  data-tick-strength={viewerTickStrength(tick)}
+                />
+              ))}
+              {renderedNodes.map((node) => (
+                <span
+                  key={node.key}
+                  className="timeline-viewer-period"
+                  data-viewer-period={node.key}
+                  data-movement-id={node.movementId}
+                  data-secondary-occurrence={
+                    node.secondaryOccurrence || undefined
+                  }
+                  data-priority={node.priority || undefined}
+                />
+              ))}
+            </div>
           </div>
           <div className="timeline-viewer-position" aria-hidden="true">
             <span data-viewer-position-thumb />
@@ -1237,67 +1429,72 @@ export function TimelineViewerFrame({
             className="timeline-viewer-node-layer"
             data-viewer-node-layer
           >
-            {regions.map((region) => (
-              <button
-                key={region.id}
-                type="button"
-                className="timeline-viewer-overflow"
-                data-viewer-overflow={region.id}
-                aria-label={`${region.label}の省略項目を展開`}
-                onClick={() =>
-                  setExpandedRegionIds((current) => {
-                    const next = new Set(current);
-                    next.add(region.id);
-                    return next;
-                  })
-                }
-              />
-            ))}
-            {nodes.map((node) => (
-              <Link
-                key={node.key}
-                href={node.href}
-                prefetch={false}
-                className="timeline-viewer-node"
-                data-viewer-node
-                data-viewer-key={node.key}
-                data-movement-id={node.movementId}
-                data-region-id={node.regionId}
-                data-bar-start={node.barStart}
-                data-bar-end={node.barEnd}
-                data-secondary-occurrence={
-                  node.secondaryOccurrence || undefined
-                }
-                data-priority={node.priority || undefined}
-                onPointerEnter={() =>
-                  setMovementPeersHighlighted(node.movementId, true)
-                }
-                onPointerLeave={() =>
-                  setMovementPeersHighlighted(node.movementId, false)
-                }
-                onFocus={() =>
-                  setMovementPeersHighlighted(node.movementId, true)
-                }
-                onBlur={() =>
-                  setMovementPeersHighlighted(node.movementId, false)
-                }
-                aria-label={`${node.nameJa}。${node.dateLabel}。${node.regionLabel}。${node.classificationLabel}。${node.priority ? '基本項目' : '充実・詳細項目'}`}
-                title={`${node.nameJa} (${node.nameEn})`}
-              >
-                <span className="timeline-viewer-node__surface">
-                  <span className="timeline-viewer-node__short">
-                    {node.shortLabel ?? node.nameJa}
+            <div
+              className="timeline-viewer-node-content"
+              ref={nodeContentRef}
+            >
+              {regions.map((region) => (
+                <button
+                  key={region.id}
+                  type="button"
+                  className="timeline-viewer-overflow"
+                  data-viewer-overflow={region.id}
+                  aria-label={`${region.label}の省略項目を展開`}
+                  onClick={() =>
+                    setExpandedRegionIds((current) => {
+                      const next = new Set(current);
+                      next.add(region.id);
+                      return next;
+                    })
+                  }
+                />
+              ))}
+              {renderedNodes.map((node) => (
+                <Link
+                  key={node.key}
+                  href={node.href}
+                  prefetch={false}
+                  className="timeline-viewer-node"
+                  data-viewer-node
+                  data-viewer-key={node.key}
+                  data-movement-id={node.movementId}
+                  data-region-id={node.regionId}
+                  data-bar-start={node.barStart}
+                  data-bar-end={node.barEnd}
+                  data-secondary-occurrence={
+                    node.secondaryOccurrence || undefined
+                  }
+                  data-priority={node.priority || undefined}
+                  onPointerEnter={() =>
+                    setMovementPeersHighlighted(node.movementId, true)
+                  }
+                  onPointerLeave={() =>
+                    setMovementPeersHighlighted(node.movementId, false)
+                  }
+                  onFocus={() =>
+                    setMovementPeersHighlighted(node.movementId, true)
+                  }
+                  onBlur={() =>
+                    setMovementPeersHighlighted(node.movementId, false)
+                  }
+                  aria-label={`${node.nameJa}。${node.dateLabel}。${node.regionLabel}。${node.classificationLabel}。${node.priority ? '基本項目' : '充実・詳細項目'}`}
+                  title={`${node.nameJa} (${node.nameEn})`}
+                >
+                  <span className="timeline-viewer-node__surface">
+                    <span className="timeline-viewer-node__short">
+                      {node.shortLabel ?? node.nameJa}
+                    </span>
+                    <span className="timeline-viewer-node__name">
+                      {node.nameJa}
+                    </span>
+                    <span className="timeline-viewer-node__formal">
+                      {node.nameJa}
+                      <span lang="en">（{node.nameEn}）</span>
+                    </span>
                   </span>
-                  <span className="timeline-viewer-node__name">
-                    {node.nameJa}
-                  </span>
-                  <span className="timeline-viewer-node__formal">
-                    {node.nameJa}
-                    <span lang="en">（{node.nameEn}）</span>
-                  </span>
-                </span>
-              </Link>
-            ))}
+                </Link>
+              ))}
+            </div>
           </div>
         </>
       )}

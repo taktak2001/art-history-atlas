@@ -14,6 +14,10 @@ export type TimelineViewerTransform = TimelineViewerPoint & {
   scale: number;
 };
 
+export type TimelineViewerCompositeTransform = TimelineViewerPoint & {
+  scaleX: number;
+};
+
 export type TimelineViewerRect = TimelineViewerPoint & TimelineViewerSize;
 
 export type TimelineViewerInsets = {
@@ -103,6 +107,46 @@ export function panTimelineViewer(
     x: roundTransformValue(transform.x + delta.x),
     y: roundTransformValue(transform.y + delta.y),
   };
+}
+
+export function relativeTimelineViewerCompositeTransform(
+  settled: TimelineViewerTransform,
+  current: TimelineViewerTransform,
+): TimelineViewerCompositeTransform {
+  const scaleX = current.scale / Math.max(0.0001, settled.scale);
+  return {
+    x: roundTransformValue(current.x - settled.x * scaleX),
+    y: roundTransformValue(current.y - settled.y),
+    scaleX: roundTransformValue(scaleX),
+  };
+}
+
+export function timelineViewerVirtualNodeKeys<
+  Node extends {
+    key: string;
+    barStart: number;
+    barEnd: number;
+  },
+>(
+  nodes: Node[],
+  transform: TimelineViewerTransform,
+  contentOriginX: number,
+  viewportLeft: number,
+  viewportRight: number,
+  bufferWidth: number,
+) {
+  const left = viewportLeft - Math.max(0, bufferWidth);
+  const right = viewportRight + Math.max(0, bufferWidth);
+
+  return nodes
+    .filter((node) => {
+      const start =
+        transform.x + (contentOriginX + node.barStart) * transform.scale;
+      const end =
+        transform.x + (contentOriginX + node.barEnd) * transform.scale;
+      return Math.max(start, end) >= left && Math.min(start, end) <= right;
+    })
+    .map((node) => node.key);
 }
 
 export function constrainTimelineViewerVerticalPan(
