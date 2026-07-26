@@ -259,7 +259,8 @@ test('ノードのダブルタップでは遷移せず、下部の詳細リン�
   const node = graph.getByRole('button', { name: 'キュビスムを選択' });
   await node.dblclick();
 
-  await expect(page).toHaveURL(/\/network\/$/);
+  // 詳細ページへは遷移しない（選択はURLの ?focus= に反映されるが /network/ に留まる）
+  await expect(page).toHaveURL(/\/network\/(\?focus=cubism)?$/);
   await expect(node).toHaveAttribute('aria-pressed', 'true');
   await expect(page.getByRole('link', { name: '詳細ページへ →' })).toHaveAttribute(
     'href',

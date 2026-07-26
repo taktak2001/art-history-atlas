@@ -248,7 +248,7 @@ export default async function MovementDetailPage({
                   代表作品を見る
                 </a>
                 <Link
-                  href="/network/"
+                  href={`/network/?focus=${movement.id}`}
                   className="whitespace-nowrap border hairline bg-raised px-5 py-3 text-sm font-bold text-ink hover:border-ink/40 active:translate-y-px"
                 >
                   関係ネットワーク
@@ -519,7 +519,7 @@ export default async function MovementDetailPage({
           <Link href={`/compare/?ids=${movement.id}`} className="prose-link">
             比較に追加
           </Link>
-          <Link href="/network/" className="prose-link">関係ネットワーク</Link>
+          <Link href={`/network/?focus=${movement.id}`} className="prose-link">関係ネットワーク</Link>
         </nav>
       </Chapter>
     </article>

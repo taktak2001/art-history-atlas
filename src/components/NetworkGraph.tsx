@@ -45,6 +45,7 @@ import {
   type AggregatedRelationship,
 } from '@/lib/movement-hierarchy';
 import { useLodState } from '@/lib/use-lod-state';
+import { parseFocus, buildFocusQuery } from '@/lib/network';
 
 type Props = {
   movements: Movement[];
@@ -126,6 +127,11 @@ export function NetworkGraph({ movements, relationships, eraOrder }: Props) {
     scrollLeft: 0,
   });
   const scrollRafRef = useRef<number | null>(null);
+  // 詳細ページ→ネットワークの文脈（?focus=）を扱うための参照
+  const selectedNodeButtonRef = useRef<HTMLButtonElement | null>(null);
+  const focusSkipSyncRef = useRef(true);
+  const focusCenteredForRef = useRef<string | null>(null);
+  const focusInitialFocusDoneRef = useRef(false);
   const [selectedNodeId, setSelectedNodeId] = useState<string | null>(null);
   const [selectedEdgeId, setSelectedEdgeId] = useState<string | null>(null);
   const [focusedEdgeId, setFocusedEdgeId] = useState<string | null>(null);
@@ -145,6 +151,45 @@ export function NetworkGraph({ movements, relationships, eraOrder }: Props) {
     media.addEventListener('change', update);
     return () => media.removeEventListener('change', update);
   }, []);
+
+  const movementIds = useMemo(
+    () => new Set(movements.map((movement) => movement.id)),
+    [movements],
+  );
+
+  // URL の ?focus=（Movement.id）を選択状態へ反映。初回マウントと戻る/進む(popstate)で復元。
+  // Next Router を介さず window.history を使い、静的export/basePathを保つ（useLodStateと同方針）。
+  useEffect(() => {
+    const readFocus = () => {
+      const url = new URL(window.location.href);
+      const raw = url.searchParams.get('focus');
+      const valid = parseFocus(raw, movementIds);
+      setSelectedNodeId(valid);
+      setSelectedEdgeId(null);
+      // 無効な focus はエラーにせず、URLから静かに除去（他クエリは保持）
+      if (raw && !valid) {
+        url.search = buildFocusQuery(url.search, null);
+        window.history.replaceState(window.history.state, '', url);
+      }
+    };
+    readFocus();
+    window.addEventListener('popstate', readFocus);
+    return () => window.removeEventListener('popstate', readFocus);
+  }, [movementIds]);
+
+  // 選択状態の変化を URL(?focus=) に反映（他クエリは保持）。初回の同期はURL読取と競合するため1回だけ抑止。
+  useEffect(() => {
+    if (focusSkipSyncRef.current) {
+      focusSkipSyncRef.current = false;
+      return;
+    }
+    const url = new URL(window.location.href);
+    const nextSearch = buildFocusQuery(url.search, selectedNodeId);
+    if (nextSearch !== new URLSearchParams(url.search).toString()) {
+      url.search = nextSearch;
+      window.history.replaceState(window.history.state, '', url);
+    }
+  }, [selectedNodeId]);
 
   useEffect(() => {
     if (!isLineGuideOpen) return;
@@ -187,8 +232,10 @@ export function NetworkGraph({ movements, relationships, eraOrder }: Props) {
         ids.add(movement.id);
       }
     }
+    // 詳細ページからの deep-link（?focus=）先が現在のLODで隠れていても必ず表示する
+    if (selectedNodeId) ids.add(selectedNodeId);
     return movements.filter((movement) => ids.has(movement.id));
-  }, [expandedGroupIds, lod, movements]);
+  }, [expandedGroupIds, lod, movements, selectedNodeId]);
 
   const aggregatedEdges = useMemo(
     () =>
@@ -220,17 +267,28 @@ export function NetworkGraph({ movements, relationships, eraOrder }: Props) {
   );
 
   const displayedMovements = useMemo(() => {
-    if (visibleEdges.length === 0) {
-      return [...lodMovements]
-        .sort((a, b) => a.dates.start - b.dates.start)
-        .slice(0, isMobile ? 12 : 18);
-    }
+    const base =
+      visibleEdges.length === 0
+        ? [...lodMovements]
+            .sort((a, b) => a.dates.start - b.dates.start)
+            .slice(0, isMobile ? 12 : 18)
+        : (() => {
+            const visibleIds = new Set(
+              visibleEdges.flatMap((relationship) => [
+                relationship.from,
+                relationship.to,
+              ]),
+            );
+            return lodMovements.filter((movement) => visibleIds.has(movement.id));
+          })();
 
-    const visibleIds = new Set(
-      visibleEdges.flatMap((relationship) => [relationship.from, relationship.to]),
-    );
-    return lodMovements.filter((movement) => visibleIds.has(movement.id));
-  }, [isMobile, lodMovements, visibleEdges]);
+    // フォーカス中のノードは関係が絞り込まれていても必ず表示（位置を確保し自動解除を防ぐ）
+    if (selectedNodeId && !base.some((movement) => movement.id === selectedNodeId)) {
+      const focused = movements.find((movement) => movement.id === selectedNodeId);
+      if (focused) return [...base, focused];
+    }
+    return base;
+  }, [isMobile, lodMovements, movements, selectedNodeId, visibleEdges]);
 
   const layout = useMemo<Layout>(() => {
     const colStep = isMobile ? 212 : 248;
@@ -376,6 +434,24 @@ export function NetworkGraph({ movements, relationships, eraOrder }: Props) {
     const geometry = getEdgeGeometry(relationship, layout, visibleEdges);
     if (geometry) scrollToHorizontalCenter(geometry.midX);
   };
+
+  // deep-link/戻る等でURLから選択されたノードを中央へ寄せ、初回のみキーボードフォーカスを移す。
+  useEffect(() => {
+    if (!selectedNodeId) {
+      focusCenteredForRef.current = null;
+      return;
+    }
+    if (!layout.positions.has(selectedNodeId)) return;
+    if (focusCenteredForRef.current !== selectedNodeId) {
+      focusCenteredForRef.current = selectedNodeId;
+      window.requestAnimationFrame(() => centerNode(selectedNodeId));
+    }
+    if (!focusInitialFocusDoneRef.current && selectedNodeButtonRef.current) {
+      focusInitialFocusDoneRef.current = true;
+      selectedNodeButtonRef.current.focus({ preventScroll: true });
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [selectedNodeId, layout]);
 
   const jumpToEra = (era: EraId) => {
     const column = eraOrder.indexOf(era);
@@ -545,6 +621,11 @@ export function NetworkGraph({ movements, relationships, eraOrder }: Props) {
 
   return (
     <div className="network-ui">
+      <p className="sr-only" role="status" aria-live="polite">
+        {selectedMovement
+          ? `${selectedMovement.nameJa}を選択中。直接関係${selectedNodeEdges.length}件`
+          : '選択なし'}
+      </p>
       <section className="network-controls" aria-label="ネットワーク表示設定">
         <LodControl
           value={lod}
@@ -815,6 +896,7 @@ export function NetworkGraph({ movements, relationships, eraOrder }: Props) {
                 }}
               >
                 <button
+                  ref={isSelected ? selectedNodeButtonRef : undefined}
                   type="button"
                   onClick={(event) => {
                     if (event.detail > 1) return;
