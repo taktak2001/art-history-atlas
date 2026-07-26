@@ -19,6 +19,7 @@ import {
 } from '@/lib/timeline-presentation';
 import {
   assignTimelineViewerTracks,
+  constrainTimelineViewerVerticalPan,
   fitTimelineViewerRect,
   panTimelineViewer,
   semanticTimelineTicks,
@@ -94,6 +95,7 @@ const DOUBLE_TAP_DELAY = 320;
 const DRAG_THRESHOLD = 5;
 const AXIS_EDGE_PADDING = 10;
 const CONTROLS_IDLE_DELAY = 2500;
+const BOARD_EDGE_PADDING = 12;
 
 const pointerCenter = (points: TimelineViewerPoint[]) => ({
   x: points.reduce((sum, point) => sum + point.x, 0) / points.length,
@@ -118,6 +120,12 @@ const viewerAxisMetrics = (viewportWidth: number): AxisMetrics => {
 const formatViewerYear = (year: number) => {
   if (year === 0) return '紀元境界';
   return year < 0 ? `前${Math.abs(year).toLocaleString('ja-JP')}` : `${year}`;
+};
+
+const viewerTickStrength = (year: number) => {
+  if (year % 100 === 0) return 'century';
+  if (year % 50 === 0) return 'half-century';
+  return 'minor';
 };
 
 export function TimelineViewerFrame({
@@ -158,6 +166,15 @@ export function TimelineViewerFrame({
     useRef<TimelineViewerTransform>(IDENTITY_TRANSFORM);
   const semanticLevelRef = useRef<TimelineViewerSemanticLevel>('standard');
   const tickSignatureRef = useRef('');
+  const verticalBoundsRef = useRef({
+    offsetY: regions[0]?.top ?? contentOriginY,
+    height: regions.reduce(
+      (sum, region) =>
+        sum +
+        (region.id === 'origin' ? 56 : timelineViewerRegionHeight(1)),
+      0,
+    ),
+  });
   const [semanticLevel, setSemanticLevel] =
     useState<TimelineViewerSemanticLevel>('standard');
   const [controlsIdle, setControlsIdle] = useState(false);
@@ -223,6 +240,15 @@ export function TimelineViewerFrame({
         Array.from(
           railLayer.querySelectorAll<HTMLElement>('[data-viewer-region-guide]'),
         ).map((element) => [element.dataset.viewerRegionGuide, element]),
+      );
+      const gridElements = new Map(
+        Array.from(
+          railLayer.querySelectorAll<HTMLElement>('[data-viewer-gridline]'),
+        ).map((element) => [element.dataset.viewerGridline, element]),
+      );
+      const board = railLayer.querySelector<HTMLElement>('[data-viewer-board]');
+      const positionThumb = root.querySelector<HTMLElement>(
+        '[data-viewer-position-thumb]',
       );
       const overflowElements = new Map(
         Array.from(
@@ -319,6 +345,7 @@ export function TimelineViewerFrame({
       // Region rows keep their screen-space height, so Y must not inherit the
       // horizontal scale or the lanes disappear above/below the viewport.
       let nextRegionTop = transform.y + firstRegionTop;
+      const boardTop = nextRegionTop;
       const regionLayouts = new Map<
         string,
         { top: number; height: number; trackCount: number }
@@ -326,7 +353,10 @@ export function TimelineViewerFrame({
 
       for (const region of regions) {
         const trackCount = Math.max(1, trackCounts.get(region.id) ?? 1);
-        const height = timelineViewerRegionHeight(trackCount);
+        const height =
+          region.id === 'origin' && trackCount === 1
+            ? 56
+            : timelineViewerRegionHeight(trackCount);
         regionLayouts.set(region.id, {
           top: nextRegionTop,
           height,
@@ -334,11 +364,79 @@ export function TimelineViewerFrame({
         });
         nextRegionTop += height;
       }
+      const boardHeight = Math.max(1, nextRegionTop - boardTop);
+      verticalBoundsRef.current = {
+        offsetY: firstRegionTop,
+        height: boardHeight,
+      };
+      const boardVisible =
+        boardTop + boardHeight >= metrics.timeHeight &&
+        boardTop <= stage.clientHeight - metrics.controlBottom;
+
+      if (board) {
+        board.style.width = `${Math.max(
+          1,
+          stage.clientWidth - metrics.regionWidth,
+        )}px`;
+        board.style.height = `${boardHeight}px`;
+        board.style.transform = `translate3d(${metrics.regionWidth}px, ${boardTop}px, 0)`;
+        board.style.visibility = boardVisible ? 'visible' : 'hidden';
+      }
+
+      for (const [year, grid] of gridElements) {
+        const worldX =
+          contentOriginX +
+          yearToTimelineX(Number(year), timelineMode, timelineWidth);
+        const screen = worldToTimelineViewerScreen(
+          { x: worldX, y: 0 },
+          transform,
+        );
+        const visible =
+          screen.x >= metrics.regionWidth + AXIS_EDGE_PADDING &&
+          screen.x <= stage.clientWidth - AXIS_EDGE_PADDING;
+        grid.style.height = `${boardHeight}px`;
+        grid.style.transform = `translate3d(${screen.x}px, ${boardTop}px, 0)`;
+        grid.style.visibility =
+          visible && boardVisible ? 'visible' : 'hidden';
+      }
+
+      if (positionThumb) {
+        const viewportHeight = Math.max(
+          1,
+          stage.clientHeight -
+            metrics.timeHeight -
+            metrics.controlBottom -
+            BOARD_EDGE_PADDING * 2,
+        );
+        if (boardHeight <= viewportHeight) {
+          positionThumb.style.visibility = 'hidden';
+        } else {
+          const progress = Math.min(
+            1,
+            Math.max(
+              0,
+              (metrics.timeHeight + BOARD_EDGE_PADDING - boardTop) /
+                Math.max(1, boardHeight - viewportHeight),
+            ),
+          );
+          const thumbHeight = Math.max(
+            32,
+            (viewportHeight * viewportHeight) / boardHeight,
+          );
+          positionThumb.style.height = `${Math.min(
+            viewportHeight,
+            thumbHeight,
+          )}px`;
+          positionThumb.style.transform = `translate3d(0, ${
+            progress * Math.max(0, viewportHeight - thumbHeight)
+          }px, 0)`;
+          positionThumb.style.visibility = 'visible';
+        }
+      }
 
       for (const region of regions) {
         const layout = regionLayouts.get(region.id);
         if (!layout) continue;
-        const centerY = layout.top + layout.height / 2;
         const visible =
           layout.top + layout.height >= metrics.timeHeight &&
           layout.top <= stage.clientHeight - metrics.controlBottom;
@@ -346,7 +444,8 @@ export function TimelineViewerFrame({
           `[data-viewer-region-id="${region.id}"]`,
         );
         if (label) {
-          label.style.transform = `translate3d(0, ${centerY}px, 0) translateY(-50%)`;
+          label.style.height = `${layout.height}px`;
+          label.style.transform = `translate3d(0, ${layout.top}px, 0)`;
           label.style.visibility = visible ? 'visible' : 'hidden';
           label.dataset.viewerRegionHeight = String(layout.height);
           label.dataset.viewerTrackCount = String(layout.trackCount);
@@ -360,7 +459,8 @@ export function TimelineViewerFrame({
         const overflow = overflowElements.get(region.id);
         const overflowCount = overflowCounts.get(region.id) ?? 0;
         if (overflow) {
-          overflow.textContent = overflowCount > 0 ? `＋${overflowCount}` : '';
+          overflow.textContent =
+            overflowCount > 0 ? `他${overflowCount}件` : '';
           const overflowX = Math.min(
             contentRight - 42,
             Math.max(
@@ -414,10 +514,10 @@ export function TimelineViewerFrame({
         if (period) {
           const surfaceHeight =
             node.querySelector<HTMLElement>('.timeline-viewer-node__surface')
-              ?.offsetHeight ?? 34;
+              ?.offsetHeight ?? 32;
           const surfaceBottom =
             trackCenterY - surfaceHeight / 2 + surfaceHeight;
-          const periodY = surfaceBottom + 5;
+          const periodY = surfaceBottom + 6;
           period.style.width = `${Math.max(1, periodRight - periodLeft)}px`;
           period.style.transform = `translate3d(${periodLeft}px, ${periodY}px, 0)`;
           period.style.visibility =
@@ -472,35 +572,62 @@ export function TimelineViewerFrame({
     }, CONTROLS_IDLE_DELAY);
   }, []);
 
+  const constrainTransform = useCallback(
+    (next: TimelineViewerTransform) => {
+      const stage = stageRef.current;
+      if (!stage) return next;
+      const metrics = viewerAxisMetrics(stage.clientWidth);
+      return constrainTimelineViewerVerticalPan(
+        next,
+        verticalBoundsRef.current.offsetY,
+        verticalBoundsRef.current.height,
+        stage.clientHeight,
+        metrics.timeHeight,
+        metrics.controlBottom,
+        BOARD_EDGE_PADDING,
+      );
+    },
+    [],
+  );
+
   const applyTransform = useCallback(
     (next: TimelineViewerTransform) => {
       wakeControls();
-      transformRef.current = next;
+      const constrained = constrainTransform(next);
+      transformRef.current = constrained;
       const canvas = canvasRef.current;
       const root = rootRef.current;
       if (canvas) {
-        canvas.style.transform = `translate3d(${next.x}px, ${next.y}px, 0) scale(${next.scale})`;
+        canvas.style.transform = `translate3d(${constrained.x}px, ${constrained.y}px, 0) scale(${constrained.scale})`;
       }
       if (root) {
-        root.style.setProperty('--timeline-viewer-scale', String(next.scale));
-        root.dataset.viewerScale = String(next.scale);
-        root.dataset.viewerX = String(next.x);
-        root.dataset.viewerY = String(next.y);
+        root.style.setProperty(
+          '--timeline-viewer-scale',
+          String(constrained.scale),
+        );
+        root.dataset.viewerScale = String(constrained.scale);
+        root.dataset.viewerX = String(constrained.x);
+        root.dataset.viewerY = String(constrained.y);
       }
       if (scaleOutputRef.current) {
-        scaleOutputRef.current.value = `${Math.round(next.scale * 100)}%`;
-        scaleOutputRef.current.textContent = `${Math.round(next.scale * 100)}%`;
+        scaleOutputRef.current.value = `${Math.round(constrained.scale * 100)}%`;
+        scaleOutputRef.current.textContent = `${Math.round(constrained.scale * 100)}%`;
       }
 
-      const nextSemanticLevel = timelineViewerSemanticLevel(next.scale);
+      const nextSemanticLevel = timelineViewerSemanticLevel(constrained.scale);
       if (nextSemanticLevel !== semanticLevelRef.current) {
         semanticLevelRef.current = nextSemanticLevel;
         setSemanticLevel(nextSemanticLevel);
         onSemanticLevelChange(nextSemanticLevel);
       }
-      scheduleFixedLayers(next);
+      scheduleFixedLayers(constrained);
     },
-    [onSemanticLevelChange, scheduleFixedLayers, wakeControls],
+    [
+      constrainTransform,
+      onSemanticLevelChange,
+      scheduleFixedLayers,
+      wakeControls,
+    ],
   );
 
   const fitContent = useCallback(() => {
@@ -1024,6 +1151,7 @@ export function TimelineViewerFrame({
                 key={tick}
                 className="timeline-viewer-time-tick"
                 data-viewer-tick={tick}
+                data-tick-strength={viewerTickStrength(tick)}
                 data-era-boundary={
                   tick === 0 ||
                   tick === timelineMode.start ||
@@ -1043,8 +1171,13 @@ export function TimelineViewerFrame({
             {regions.map((region) => (
               <span
                 key={region.id}
-                className="timeline-viewer-region-label"
+                className={`timeline-viewer-region-label ${
+                  region.id === 'origin'
+                    ? 'timeline-viewer-region-label--origin'
+                    : ''
+                }`}
                 data-viewer-region-id={region.id}
+                data-origin-band={region.id === 'origin' || undefined}
               >
                 {region.label}
               </span>
@@ -1061,11 +1194,25 @@ export function TimelineViewerFrame({
             aria-hidden="true"
             data-viewer-rail-layer
           >
+            <span className="timeline-viewer-board" data-viewer-board />
+            {axisTicks.map((tick) => (
+              <span
+                key={tick}
+                className="timeline-viewer-gridline"
+                data-viewer-gridline={tick}
+                data-tick-strength={viewerTickStrength(tick)}
+              />
+            ))}
             {regions.map((region) => (
               <span
                 key={region.id}
-                className="timeline-viewer-region-guide"
+                className={`timeline-viewer-region-guide ${
+                  region.id === 'origin'
+                    ? 'timeline-viewer-region-guide--origin'
+                    : ''
+                }`}
                 data-viewer-region-guide={region.id}
+                data-origin-band={region.id === 'origin' || undefined}
               />
             ))}
             {nodes.map((node) => (
@@ -1080,6 +1227,9 @@ export function TimelineViewerFrame({
                 data-priority={node.priority || undefined}
               />
             ))}
+          </div>
+          <div className="timeline-viewer-position" aria-hidden="true">
+            <span data-viewer-position-thumb />
           </div>
 
           <div

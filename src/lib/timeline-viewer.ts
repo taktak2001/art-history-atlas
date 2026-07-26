@@ -56,7 +56,7 @@ export const TIMELINE_VIEWER_SEMANTIC_THRESHOLDS = {
 } as const;
 export const TIMELINE_VIEWER_LABEL_GAP = 10;
 export const TIMELINE_VIEWER_MAX_TRACKS = 4;
-export const TIMELINE_VIEWER_TRACK_PITCH = 36;
+export const TIMELINE_VIEWER_TRACK_PITCH = 40;
 
 const TIMELINE_VIEWER_TICK_STEPS = [
   10, 25, 50, 100, 250, 500, 1000, 2500, 5000, 10000,
@@ -102,6 +102,36 @@ export function panTimelineViewer(
     ...transform,
     x: roundTransformValue(transform.x + delta.x),
     y: roundTransformValue(transform.y + delta.y),
+  };
+}
+
+export function constrainTimelineViewerVerticalPan(
+  transform: TimelineViewerTransform,
+  contentOffsetY: number,
+  contentHeight: number,
+  viewportHeight: number,
+  topInset: number,
+  bottomInset: number,
+  padding = 12,
+): TimelineViewerTransform {
+  const viewportTop = topInset + padding;
+  const viewportBottom = Math.max(
+    viewportTop,
+    viewportHeight - bottomInset - padding,
+  );
+  const availableHeight = Math.max(1, viewportBottom - viewportTop);
+  const maximumY = viewportTop - contentOffsetY;
+
+  if (contentHeight <= availableHeight) {
+    return { ...transform, y: roundTransformValue(maximumY) };
+  }
+
+  const minimumY = viewportBottom - contentOffsetY - contentHeight;
+  return {
+    ...transform,
+    y: roundTransformValue(
+      Math.min(maximumY, Math.max(minimumY, transform.y)),
+    ),
   };
 }
 
@@ -178,10 +208,10 @@ export function assignTimelineViewerTracks(
 }
 
 export function timelineViewerRegionHeight(trackCount: number) {
-  if (trackCount <= 1) return 60;
-  if (trackCount === 2) return 90;
-  if (trackCount === 3) return 118;
-  return 146 + Math.max(0, trackCount - 4) * TIMELINE_VIEWER_TRACK_PITCH;
+  if (trackCount <= 1) return 68;
+  if (trackCount === 2) return 102;
+  if (trackCount === 3) return 136;
+  return 168 + Math.max(0, trackCount - 4) * TIMELINE_VIEWER_TRACK_PITCH;
 }
 
 export function timelineViewerTrackCenter(
