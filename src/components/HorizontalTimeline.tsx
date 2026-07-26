@@ -1,7 +1,14 @@
 'use client';
 
 import Link from 'next/link';
-import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
+import {
+  useEffect,
+  useLayoutEffect,
+  useMemo,
+  useRef,
+  useState,
+  type CSSProperties,
+} from 'react';
 import type { Movement, RegionId } from '@/lib/schema';
 import { CLASSIFICATION_LABELS, REGION_LABELS } from '@/lib/schema';
 import { LodControl } from '@/components/LodControl';
@@ -31,6 +38,7 @@ import {
   type TimelineModeId,
 } from '@/lib/timeline-presentation';
 import type { TimelineViewerSemanticLevel } from '@/lib/timeline-viewer';
+import { timelineRegionRgb } from '@/lib/timeline-region-presentation';
 
 type Props = {
   movements: Movement[];
@@ -320,6 +328,7 @@ export function HorizontalTimeline({
         barStart: left,
         barEnd: left + width,
         regionId: lane.region,
+        regionColor: timelineRegionRgb(lane.region),
         secondaryOccurrence: lane.region !== movement.regionIds[0],
         priority:
           movement.visibilityLevel === 'core' &&
@@ -353,6 +362,7 @@ export function HorizontalTimeline({
           ),
           barEnd: yearToTimelineX(summary.end, displayMode, timelineWidth),
           regionId: 'origin',
+          regionColor: undefined,
           secondaryOccurrence: false,
           priority: true,
         },
@@ -372,7 +382,7 @@ export function HorizontalTimeline({
         ? [
             {
               id: 'origin',
-              label: '起点',
+              label: '背景・基盤',
               top: headerHeight,
               height: SURVEY_SUMMARY_H,
             },
@@ -381,6 +391,7 @@ export function HorizontalTimeline({
       ...laneOffsets.map((lane) => ({
         id: lane.region,
         label: REGION_LABELS[lane.region],
+        regionColor: timelineRegionRgb(lane.region),
         top: lane.top,
         height: lane.height,
       })),
@@ -760,9 +771,10 @@ export function HorizontalTimeline({
           {mode.id === 'survey' && (
             <div
               className="timeline-region-label flex items-center px-2 text-xs"
+              data-origin-band
               style={{ height: SURVEY_SUMMARY_H }}
             >
-              起点
+              背景・基盤
             </div>
           )}
           {laneLayouts.map((lane) => (
@@ -770,7 +782,12 @@ export function HorizontalTimeline({
               key={lane.region}
               data-region-lane-label={lane.region}
               className="timeline-region-label flex items-center px-2 text-[11px] leading-snug sm:text-xs"
-              style={{ height: lane.height }}
+              style={
+                {
+                  height: lane.height,
+                  '--timeline-region-rgb': timelineRegionRgb(lane.region),
+                } as CSSProperties
+              }
             >
               {REGION_LABELS[lane.region]}
             </div>
@@ -923,13 +940,17 @@ export function HorizontalTimeline({
                       data-bar-start={left}
                       data-bar-end={left + width}
                       data-visual-width={width}
+                      data-timeline-region={lane.region}
                       className="timeline-bar group absolute text-left text-[11px] leading-tight focus-visible:z-20 active:translate-y-px"
-                      style={{
-                        left,
-                        top: lanePaddingY + row * (barHeight + barGap),
-                        width,
-                        height: barHeight,
-                      }}
+                      style={
+                        {
+                          left,
+                          top: lanePaddingY + row * (barHeight + barGap),
+                          width,
+                          height: barHeight,
+                          '--timeline-region-rgb': timelineRegionRgb(lane.region),
+                        } as CSSProperties
+                      }
                     >
                       <span
                         className="absolute left-1/2 top-1/2 h-11 min-w-11 -translate-x-1/2 -translate-y-1/2"
