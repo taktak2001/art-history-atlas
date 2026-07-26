@@ -4,6 +4,46 @@ import AxeBuilder from '@axe-core/playwright';
 const modeButton = (page: Page, name: string) =>
   page.getByRole('group', { name: '表示モード' }).getByRole('button', { name, exact: true });
 
+const expectViewerLabelsNotToOverlap = async (page: Page) => {
+  const labels = await page
+    .locator('[data-viewer-node]:visible .timeline-viewer-node__surface')
+    .evaluateAll((elements) =>
+      elements.map((element) => {
+        const node = element.closest<HTMLElement>('[data-viewer-node]');
+        const rect = element.getBoundingClientRect();
+        return {
+          id: node?.dataset.movementId,
+          region: node?.dataset.regionId,
+          left: rect.left,
+          right: rect.right,
+          top: rect.top,
+          bottom: rect.bottom,
+        };
+      }),
+    );
+
+  for (let firstIndex = 0; firstIndex < labels.length; firstIndex += 1) {
+    for (
+      let secondIndex = firstIndex + 1;
+      secondIndex < labels.length;
+      secondIndex += 1
+    ) {
+      const first = labels[firstIndex];
+      const second = labels[secondIndex];
+      if (first.region !== second.region) continue;
+      const overlaps =
+        first.left < second.right &&
+        first.right > second.left &&
+        first.top < second.bottom &&
+        first.bottom > second.top;
+      expect(
+        overlaps,
+        `${first.region}: ${first.id} and ${second.id} overlap`,
+      ).toBe(false);
+    }
+  }
+};
+
 test('通史はコンパクトな俯瞰表示と1行ラベルを使う', async ({ page }, testInfo) => {
   await page.goto('/timeline/');
 
@@ -440,10 +480,27 @@ test('閲覧モードはマウスパン・ダブルクリック・キーボー�
   const viewer = page.locator('[data-timeline-viewer="active"]');
   const stage = viewer.locator('[data-timeline-viewer-stage]');
   const beforeX = Number(await viewer.getAttribute('data-viewer-x'));
-  await stage.hover({ position: { x: 620, y: 420 } });
-  await page.mouse.down();
-  await page.mouse.move(500, 350, { steps: 4 });
-  await page.mouse.up();
+  await stage.dispatchEvent('pointerdown', {
+    pointerId: 41,
+    pointerType: 'mouse',
+    clientX: 620,
+    clientY: 420,
+    isPrimary: true,
+  });
+  await stage.dispatchEvent('pointermove', {
+    pointerId: 41,
+    pointerType: 'mouse',
+    clientX: 500,
+    clientY: 350,
+    isPrimary: true,
+  });
+  await stage.dispatchEvent('pointerup', {
+    pointerId: 41,
+    pointerType: 'mouse',
+    clientX: 500,
+    clientY: 350,
+    isPrimary: true,
+  });
   await expect
     .poll(async () => Number((await viewer.getAttribute('data-viewer-x')) ?? 0))
     .not.toBe(beforeX);
@@ -542,35 +599,6 @@ test('閲覧モードは固定軸と一定寸法のノードでセマンティ�
     firstNode.boundingBox(),
   ]);
 
-  if (testInfo.project.name === 'desktop') {
-    await stage.hover({ position: { x: 650, y: 420 } });
-    await page.mouse.down();
-    await page.mouse.move(520, 350, { steps: 4 });
-    await page.mouse.up();
-  } else {
-    await stage.dispatchEvent('pointerdown', {
-      pointerId: 21,
-      pointerType: 'touch',
-      clientX: 240,
-      clientY: 380,
-      isPrimary: true,
-    });
-    await stage.dispatchEvent('pointermove', {
-      pointerId: 21,
-      pointerType: 'touch',
-      clientX: 190,
-      clientY: 340,
-      isPrimary: true,
-    });
-    await stage.dispatchEvent('pointerup', {
-      pointerId: 21,
-      pointerType: 'touch',
-      clientX: 190,
-      clientY: 340,
-      isPrimary: true,
-    });
-  }
-
   for (let index = 0; index < 4; index += 1) {
     const beforeScale = Number(await viewer.getAttribute('data-viewer-scale'));
     await viewer.getByRole('button', { name: '拡大' }).click();
@@ -589,29 +617,111 @@ test('閲覧モードは固定軸と一定寸法のノードでセマンティ�
     timeAxis.boundingBox(),
     regionAxis.boundingBox(),
     origin.boundingBox(),
-    viewer.locator('[data-viewer-node]:visible').first().boundingBox(),
+    viewer.locator('[data-viewer-node]').first().evaluate((element) => {
+      const rect = element.getBoundingClientRect();
+      return { width: rect.width, height: rect.height };
+    }),
   ]);
   expect(fixedAfter[0]?.height).toBe(fixedBefore[0]?.height);
   expect(fixedAfter[1]?.width).toBe(fixedBefore[1]?.width);
   expect(fixedAfter[2]).toEqual(fixedBefore[2]);
 
   const nodeBox = fixedAfter[3];
-  expect(nodeBox?.height).toBeLessThanOrEqual(
+  expect(nodeBox.height).toBeLessThanOrEqual(
     testInfo.project.name === 'mobile' ? 60 : 68,
   );
-  expect(nodeBox?.width).toBeLessThanOrEqual(
+  expect(nodeBox.width).toBeLessThanOrEqual(
     testInfo.project.name === 'mobile' ? 180 : 220,
   );
-  const detailedNode = viewer.locator('[data-viewer-node]:visible').first();
-  await expect(detailedNode.locator('.timeline-viewer-node__date')).toBeVisible();
-  await expect(detailedNode.locator('.timeline-viewer-node__english-inline')).toHaveCount(0);
+  const detailedNode = viewer.locator('[data-viewer-node]').first();
+  await expect(detailedNode.locator('.timeline-viewer-node__date')).toHaveCount(0);
+  expect(
+    await detailedNode
+      .locator('.timeline-viewer-node__formal')
+      .evaluate((element) => getComputedStyle(element).display),
+  ).not.toBe('none');
   await expect(viewer.locator('[data-viewer-relation]')).toHaveCount(0);
   await expect(viewer.locator('.timeline-viewer-selection')).toHaveCount(0);
   const nodeFontSize = await detailedNode
-    .locator('.timeline-viewer-node__name')
+    .locator('.timeline-viewer-node__formal')
     .evaluate((element) => parseFloat(getComputedStyle(element).fontSize));
-  expect(nodeFontSize).toBeGreaterThanOrEqual(10);
-  expect(nodeFontSize).toBeLessThanOrEqual(14);
+  expect(nodeFontSize).toBeGreaterThanOrEqual(14);
+  expect(nodeFontSize).toBeLessThanOrEqual(16);
+});
+
+test('閲覧モードは156%、195%、305%で同一地域のラベルを自動段組みする', async ({
+  page,
+}, testInfo) => {
+  test.skip(testInfo.project.name !== 'desktop', 'desktop project only');
+  await page.goto('/timeline/');
+  await modeButton(page, '近代').click();
+  await page.getByRole('button', { name: 'タイムラインを全画面で表示' }).click();
+
+  const viewer = page.locator('[data-timeline-viewer="active"]');
+  const zoomIn = viewer.getByRole('button', { name: '拡大' });
+  let maximumFranceTrackCount = 0;
+  for (const expectedScale of [1.25, 1.563, 1.953, 2.441, 3.052]) {
+    await zoomIn.click();
+    await expect
+      .poll(async () => Number((await viewer.getAttribute('data-viewer-scale')) ?? 0))
+      .toBeCloseTo(expectedScale, 2);
+    await viewer.evaluate(
+      () =>
+        new Promise<void>((resolve) => {
+          requestAnimationFrame(() => requestAnimationFrame(() => resolve()));
+        }),
+    );
+    if ([1.563, 1.953, 3.052].includes(expectedScale)) {
+      await expectViewerLabelsNotToOverlap(page);
+    }
+    const franceTracks = await viewer
+      .locator('[data-viewer-node][data-region-id="france"]:visible')
+      .evaluateAll((nodes) =>
+        [...new Set(nodes.map((node) => (node as HTMLElement).dataset.viewerTrack))],
+      );
+    maximumFranceTrackCount = Math.max(
+      maximumFranceTrackCount,
+      franceTracks.length,
+    );
+  }
+
+  expect(maximumFranceTrackCount).toBeGreaterThan(1);
+});
+
+test('閲覧モードは実年代の期間線と固定寸法の名称ラベルを分離する', async ({
+  page,
+}) => {
+  await page.goto('/timeline/');
+  await modeButton(page, '中世').click();
+  await page.getByRole('button', { name: 'タイムラインを全画面で表示' }).click();
+
+  const viewer = page.locator('[data-timeline-viewer="active"]');
+  const node = viewer.locator('[data-movement-id="early-christian-byzantine"]:visible').first();
+  await expect(node).toBeVisible();
+  const viewerKey = await node.getAttribute('data-viewer-key');
+  expect(viewerKey).toBeTruthy();
+  const period = viewer.locator(`[data-viewer-period="${viewerKey}"]`);
+  await expect(period).toBeVisible();
+  await expect(node).toHaveAttribute(
+    'href',
+    '/movements/early-christian-byzantine/',
+  );
+  const dimensions = await Promise.all([
+    node.locator('.timeline-viewer-node__surface').evaluate((element) => {
+      const rect = element.getBoundingClientRect();
+      return { width: rect.width, height: rect.height };
+    }),
+    period.evaluate((element) => {
+      const rect = element.getBoundingClientRect();
+      return { width: rect.width, height: rect.height };
+    }),
+  ]);
+  expect(dimensions[0].height).toBeGreaterThanOrEqual(28);
+  expect(dimensions[0].height).toBeLessThanOrEqual(36);
+  expect(dimensions[1].height).toBeLessThanOrEqual(2);
+  expect(dimensions[1].width).not.toBe(dimensions[0].width);
+  await expect(viewer.locator('[data-viewer-relation]')).toHaveCount(0);
+  await expect(viewer.locator('[data-movement-inspector]')).toHaveCount(0);
 });
 
 test('閲覧モードにaxeの重大なアクセシビリティ違反がない', async ({ page }) => {

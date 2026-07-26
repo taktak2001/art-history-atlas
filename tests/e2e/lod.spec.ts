@@ -84,19 +84,17 @@ test('一覧は階層表示でグループ文脈を示す', async ({ page }) => 
   await expect(page.getByRole('heading', { name: '印象派周辺' })).toBeVisible();
 });
 
-test('PCの通史coreで代表項目からグループ内訳を展開する', async ({ page }, testInfo) => {
+test('PCの通史coreは一時インスペクタを出さず代表項目から詳細へ移動する', async ({
+  page,
+}, testInfo) => {
   test.skip(testInfo.project.name !== 'desktop', 'desktop project only');
   await page.goto('/timeline/?lod=core');
 
   const cubism = page.locator('[data-timeline-bar="cubism"]').first();
   await cubism.hover();
-  await expect(page.locator('[data-movement-inspector]')).toContainText('キュビスム');
-  await page.locator('[data-timeline-expand="cubism"]').click();
-  await expect(page.locator('[data-timeline-bar="futurism"]').first()).toBeVisible();
-  await expect(page.locator('[data-timeline-bar="futurism"]').first()).toHaveAttribute(
-    'data-hierarchy-level',
-    'child',
-  );
+  await expect(cubism).toHaveAttribute('title', /キュビスム/);
+  await expect(cubism).toHaveAttribute('href', '/movements/cubism/');
+  await expect(page.locator('[data-movement-inspector]')).toHaveCount(0);
 });
 
 test('ネットワークはLOD外ノードをDOMへ描画しない', async ({ page }, testInfo) => {
