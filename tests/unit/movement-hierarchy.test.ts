@@ -109,10 +109,31 @@ describe('Movement グループ', () => {
     expect(
       aggregated.some(
         (relationship) =>
-          relationship.originalRelationshipIds.includes('rel-futurism-to-dada') &&
-          relationship.from === 'cubism' &&
-          relationship.to === 'dada',
+          relationship.originalRelationshipIds.includes('rel-dutch-to-realism') &&
+          relationship.from === 'baroque' &&
+          relationship.to === 'realism',
       ),
     ).toBe(true);
+  });
+
+  it('直接関係がある組合せへ別の派生関係を重ねない', () => {
+    const visible = filterMovementsByLod(movements, 'core');
+    const aggregated = aggregateRelationshipsForVisibleMovements(
+      relationships,
+      movements,
+      new Set(visible.map((movement) => movement.id)),
+    );
+    const renaissanceToBaroque = aggregated.filter(
+      (relationship) =>
+        relationship.from === 'italian-renaissance' &&
+        relationship.to === 'baroque',
+    );
+
+    expect(renaissanceToBaroque).toHaveLength(1);
+    expect(renaissanceToBaroque[0]).toMatchObject({
+      kind: 'succession',
+      hasDirectRelationship: true,
+      originalRelationshipIds: ['rel-renaissance-to-baroque'],
+    });
   });
 });

@@ -563,29 +563,29 @@ export function NetworkGraph({ movements, relationships, eraOrder }: Props) {
         />
 
         <div className="network-controls__row">
-          <div
-            className="inline-flex border hairline"
-            role="group"
-            aria-label="関係の表示範囲"
-          >
-            {([
-              ['important', '重要関係のみ'],
-              ['all', 'すべて表示'],
-            ] as const).map(([scope, label]) => (
-              <button
-                key={scope}
-                type="button"
-                onClick={() => setScope(scope)}
-                aria-pressed={relationScope === scope}
-                className={`min-h-11 px-3 text-xs font-bold ${
-                  relationScope === scope
-                    ? 'bg-ink text-paper underline decoration-2 underline-offset-4'
-                    : 'bg-paper text-muted hover:text-ink'
-                }`}
-              >
-                {label}
-              </button>
-            ))}
+          <div className="network-scope-control">
+            <span className="network-control-label">表示関係</span>
+            <div
+              className="network-scope-options"
+              role="group"
+              aria-label="関係の表示範囲"
+            >
+              {([
+                ['important', '重要関係', '重要関係のみ'],
+                ['all', 'すべて', 'すべて表示'],
+              ] as const).map(([scope, label, accessibleLabel]) => (
+                <button
+                  key={scope}
+                  type="button"
+                  onClick={() => setScope(scope)}
+                  aria-pressed={relationScope === scope}
+                  aria-label={accessibleLabel}
+                  className="network-scope-option"
+                >
+                  {label}
+                </button>
+              ))}
+            </div>
           </div>
 
           <label className="network-kind-filter">
@@ -675,7 +675,7 @@ export function NetworkGraph({ movements, relationships, eraOrder }: Props) {
               setSelectedNodeId(null);
               setSelectedEdgeId(null);
             }}
-            className="min-h-11 border hairline px-3 text-xs text-muted hover:text-ink active:translate-y-px"
+            className="network-clear-selection"
           >
             選択を解除
           </button>

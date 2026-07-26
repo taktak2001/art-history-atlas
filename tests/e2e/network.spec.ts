@@ -186,7 +186,7 @@ test('ノード選択時は強調線を無関係ノードより前、関連ノ�
   );
 });
 
-test('ルネサンスから伸びる反発線をバロックへの継承線と分離する', async ({
+test('基本表示ではルネサンスとバロックの直接関係だけを示す', async ({
   page,
 }) => {
   await page.setViewportSize({ width: 390, height: 844 });
@@ -202,20 +202,13 @@ test('ルネサンスから伸びる反発線をバロックへの継承線と�
   );
 
   await expect(collapsedSuccession).toHaveAttribute('data-route-offset', '0');
-  await expect(collapsedReaction).toHaveAttribute('data-route-offset', '-24');
+  await expect(collapsedReaction).toHaveCount(0);
 
-  await graph.getByRole('button', { name: 'イタリア・ルネサンスを選択' }).click();
-
-  const highlighted = graph.locator('[data-network-layer="highlighted-edges"]');
-  const succession = highlighted.locator(
-    '[data-network-edge-id="lod-succession-italian-renaissance-baroque"]',
+  await page.getByRole('button', { name: /充実/ }).click();
+  const standardReaction = graph.locator(
+    '[data-network-layer="base-edges"] [data-network-edge-id="lod-reaction-mannerism-baroque"]',
   );
-  const longReaction = highlighted.locator(
-    '[data-network-edge-id="lod-reaction-italian-renaissance-cubism"]',
-  );
-
-  await expect(succession).toHaveAttribute('data-route-offset', '0');
-  await expect(longReaction).toHaveAttribute('data-route-offset', /^-\d+$/);
+  await expect(standardReaction).toBeAttached();
 });
 
 test('関係選択時に起点・到達先と自然な反発文を表示する', async ({ page }) => {

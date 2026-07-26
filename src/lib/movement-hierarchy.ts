@@ -254,6 +254,7 @@ export function groupMovementsForDisplay(items: Movement[]) {
 export type AggregatedRelationship = Relationship & {
   aggregateCount: number;
   originalRelationshipIds: string[];
+  hasDirectRelationship: boolean;
 };
 
 /**
@@ -290,10 +291,14 @@ export function aggregateRelationshipsForVisibleMovements(
     const to = resolve(relationship.to);
     if (!from || !to || from === to) continue;
     const key = `${from}:${to}:${relationship.kind}`;
+    const isDirect =
+      relationship.from === from &&
+      relationship.to === to;
     const existing = buckets.get(key);
     if (existing) {
       existing.aggregateCount += 1;
       existing.originalRelationshipIds.push(relationship.id);
+      existing.hasDirectRelationship ||= isDirect;
       continue;
     }
     buckets.set(key, {
@@ -303,7 +308,22 @@ export function aggregateRelationshipsForVisibleMovements(
       to,
       aggregateCount: 1,
       originalRelationshipIds: [relationship.id],
+      hasDirectRelationship: isDirect,
     });
   }
-  return [...buckets.values()];
+
+  const aggregated = [...buckets.values()];
+  const pairsWithDirectRelationship = new Set(
+    aggregated
+      .filter((relationship) => relationship.hasDirectRelationship)
+      .map((relationship) => `${relationship.from}:${relationship.to}`),
+  );
+
+  return aggregated.filter(
+    (relationship) =>
+      relationship.hasDirectRelationship ||
+      !pairsWithDirectRelationship.has(
+        `${relationship.from}:${relationship.to}`,
+      ),
+  );
 }
