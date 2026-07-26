@@ -631,7 +631,7 @@ test('閲覧モードは固定軸と一定寸法のノードでセマンティ�
     testInfo.project.name === 'mobile' ? 60 : 68,
   );
   expect(nodeBox.width).toBeLessThanOrEqual(
-    testInfo.project.name === 'mobile' ? 180 : 220,
+    testInfo.project.name === 'mobile' ? 190 : 240,
   );
   const detailedNode = viewer.locator('[data-viewer-node]').first();
   await expect(detailedNode.locator('.timeline-viewer-node__date')).toHaveCount(0);
@@ -709,19 +709,147 @@ test('閲覧モードは実年代の期間線と固定寸法の名称ラベル�
   const dimensions = await Promise.all([
     node.locator('.timeline-viewer-node__surface').evaluate((element) => {
       const rect = element.getBoundingClientRect();
-      return { width: rect.width, height: rect.height };
+      return {
+        x: rect.x,
+        y: rect.y,
+        width: rect.width,
+        height: rect.height,
+      };
     }),
     period.evaluate((element) => {
       const rect = element.getBoundingClientRect();
-      return { width: rect.width, height: rect.height };
+      return {
+        x: rect.x,
+        y: rect.y,
+        width: rect.width,
+        height: rect.height,
+      };
     }),
   ]);
   expect(dimensions[0].height).toBeGreaterThanOrEqual(28);
   expect(dimensions[0].height).toBeLessThanOrEqual(36);
   expect(dimensions[1].height).toBeLessThanOrEqual(2);
   expect(dimensions[1].width).not.toBe(dimensions[0].width);
+  expect(Math.abs(dimensions[1].x - dimensions[0].x)).toBeLessThanOrEqual(1);
+  expect(
+    dimensions[1].y - (dimensions[0].y + dimensions[0].height),
+  ).toBeGreaterThanOrEqual(4);
+  expect(
+    dimensions[1].y - (dimensions[0].y + dimensions[0].height),
+  ).toBeLessThanOrEqual(7);
   await expect(viewer.locator('[data-viewer-relation]')).toHaveCount(0);
   await expect(viewer.locator('[data-movement-inspector]')).toHaveCount(0);
+});
+
+test('閲覧モードのラベルは内容幅で、地域レーンと操作帯を軽量に保つ', async ({
+  page,
+}, testInfo) => {
+  test.skip(testInfo.project.name !== 'desktop', 'desktop project only');
+  await page.goto('/timeline/');
+  await modeButton(page, '近世').click();
+  await page.getByRole('button', { name: 'タイムラインを全画面で表示' }).click();
+
+  const viewer = page.locator('[data-timeline-viewer="active"]');
+  await viewer.getByRole('button', { name: '拡大' }).click();
+  await expect(viewer).toHaveAttribute('data-semantic-level', 'standard');
+
+  const labelWidths = await viewer.evaluate(() => {
+    const widthFor = (id: string) =>
+      document
+        .querySelector<HTMLElement>(
+          `[data-timeline-viewer="active"] [data-movement-id="${id}"] .timeline-viewer-node__surface`,
+        )
+        ?.getBoundingClientRect().width ?? 0;
+    return {
+      baroque: widthFor('baroque'),
+      neoclassicism: widthFor('neoclassicism'),
+      renaissance: widthFor('italian-renaissance'),
+    };
+  });
+  expect(labelWidths.baroque).toBeGreaterThanOrEqual(88);
+  expect(labelWidths.baroque).toBeLessThanOrEqual(120);
+  expect(labelWidths.neoclassicism).toBeGreaterThan(labelWidths.baroque);
+  expect(labelWidths.renaissance).toBeGreaterThan(labelWidths.neoclassicism);
+  expect(labelWidths.renaissance).toBeLessThanOrEqual(240);
+
+  const oneTrackHeights = await viewer
+    .locator('[data-viewer-region-id][data-viewer-track-count="1"]')
+    .evaluateAll((labels) =>
+      labels.map((label) =>
+        Number((label as HTMLElement).dataset.viewerRegionHeight),
+      ),
+    );
+  expect(oneTrackHeights.length).toBeGreaterThan(0);
+  expect(Math.max(...oneTrackHeights)).toBeLessThanOrEqual(72);
+
+  const controls = viewer.locator('[data-viewer-controls]');
+  const [controlsBox, viewport] = await Promise.all([
+    controls.boundingBox(),
+    page.evaluate(() => ({ width: innerWidth, height: innerHeight })),
+  ]);
+  expect(controlsBox?.width).toBeLessThanOrEqual(320);
+  expect(controlsBox?.height).toBeLessThanOrEqual(52);
+  expect(
+    Math.abs((controlsBox?.x ?? 0) + (controlsBox?.width ?? 0) / 2 - viewport.width / 2),
+  ).toBeLessThanOrEqual(2);
+
+  await expect(viewer).toHaveAttribute('data-controls-idle', 'true', {
+    timeout: 3200,
+  });
+  const idleOpacity = await controls.evaluate((element) =>
+    parseFloat(getComputedStyle(element).opacity),
+  );
+  expect(idleOpacity).toBeLessThanOrEqual(0.5);
+  await viewer.locator('[data-timeline-viewer-stage]').dispatchEvent('pointerdown', {
+    pointerId: 77,
+    pointerType: 'mouse',
+    clientX: 700,
+    clientY: 500,
+    isPrimary: true,
+  });
+  await expect(viewer).not.toHaveAttribute('data-controls-idle', 'true');
+});
+
+test('軽量キャプション型タイムラインの比較スクリーンショットを保存する', async ({
+  page,
+}, testInfo) => {
+  await page.goto('/timeline/');
+  await modeButton(page, '近世').click();
+  await page.getByRole('button', { name: 'タイムラインを全画面で表示' }).click();
+
+  const viewer = page.locator('[data-timeline-viewer="active"]');
+  if (testInfo.project.name === 'mobile') {
+    await page.screenshot({
+      path: 'docs/screenshots/timeline-viewer-caption-rails-iphone-100.png',
+      fullPage: false,
+    });
+    return;
+  }
+
+  const zoomIn = viewer.getByRole('button', { name: '拡大' });
+  await zoomIn.click();
+  await zoomIn.click();
+  await expect
+    .poll(async () => Number(await viewer.getAttribute('data-viewer-scale')))
+    .toBeCloseTo(1.56, 2);
+  await page.screenshot({
+    path: 'docs/screenshots/timeline-viewer-caption-rails-desktop-156.png',
+    fullPage: false,
+  });
+
+  await page.evaluate(() => {
+    localStorage.setItem('aha-theme', 'dark');
+    document.documentElement.dataset.theme = 'dark';
+  });
+  await zoomIn.click();
+  await zoomIn.click();
+  await expect
+    .poll(async () => Number(await viewer.getAttribute('data-viewer-scale')))
+    .toBeCloseTo(2.44, 2);
+  await page.screenshot({
+    path: 'docs/screenshots/timeline-viewer-caption-rails-dark-desktop-244.png',
+    fullPage: false,
+  });
 });
 
 test('閲覧モードにaxeの重大なアクセシビリティ違反がない', async ({ page }) => {

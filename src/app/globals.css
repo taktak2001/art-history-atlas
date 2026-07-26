@@ -653,7 +653,7 @@ html.dark .relation-badge {
 /* 横型タイムライン：表の箱ではなく、年代軸に沿う展示レールとして見せる */
 .timeline-shell {
   border-block: 1px solid rgb(var(--c-line) / 0.62);
-  background: rgb(var(--c-paper));
+  background: rgb(var(--c-paper) / 0.99);
 }
 
 .timeline-track {
@@ -1111,7 +1111,7 @@ html.dark .relation-badge {
   right: 0;
   left: 0;
   height: var(--timeline-viewer-time-axis-height, 56px);
-  border-bottom: 1px solid rgb(var(--c-line) / 0.42);
+  border-bottom: 1px solid rgb(var(--c-line) / 0.3);
   overflow: hidden;
   pointer-events: auto;
   touch-action: none;
@@ -1119,11 +1119,11 @@ html.dark .relation-badge {
 
 .timeline-viewer-time-tick {
   position: absolute;
-  bottom: 0.65rem;
+  bottom: 0.6rem;
   left: 0;
   color: rgb(var(--c-muted));
   font-size: 0.75rem;
-  font-weight: 450;
+  font-weight: 400;
   font-variant-numeric: tabular-nums;
   line-height: 1;
   white-space: nowrap;
@@ -1150,7 +1150,7 @@ html.dark .relation-badge {
   bottom: 0;
   left: 0;
   width: var(--timeline-viewer-region-axis-width, 176px);
-  border-right: 1px solid rgb(var(--c-line) / 0.42);
+  border-right: 1px solid rgb(var(--c-line) / 0.3);
   overflow: hidden;
   pointer-events: auto;
   touch-action: none;
@@ -1163,7 +1163,7 @@ html.dark .relation-badge {
   display: -webkit-box;
   width: 100%;
   max-height: 2.8rem;
-  padding-inline: 0.9rem;
+  padding-inline: 0.75rem;
   overflow: hidden;
   color: rgb(var(--c-ink));
   font-size: 0.875rem;
@@ -1182,21 +1182,21 @@ html.dark .relation-badge {
   height: var(--timeline-viewer-time-axis-height, 56px);
   align-items: flex-end;
   justify-content: space-between;
-  padding: 0.7rem 0.85rem;
-  border-right: 1px solid rgb(var(--c-line) / 0.46);
-  border-bottom: 1px solid rgb(var(--c-line) / 0.46);
+  padding: 0.6rem 0.7rem;
+  border-right: 1px solid rgb(var(--c-line) / 0.32);
+  border-bottom: 1px solid rgb(var(--c-line) / 0.32);
   pointer-events: auto;
   touch-action: none;
 }
 
 .timeline-viewer-axis-origin strong {
-  font-size: 0.6875rem;
+  font-size: 0.75rem;
   font-weight: 600;
 }
 
 .timeline-viewer-axis-origin span {
   color: rgb(var(--c-muted));
-  font-size: 0.5625rem;
+  font-size: 0.55rem;
   font-weight: 500;
 }
 
@@ -1221,7 +1221,7 @@ html.dark .relation-badge {
   top: 0;
   left: 0;
   width: calc(100% - var(--timeline-viewer-region-axis-width, 152px));
-  border-bottom: 1px solid rgb(var(--c-line) / 0.3);
+  border-bottom: 1px solid rgb(var(--c-line) / 0.2);
   transform: translate3d(-200vw, -200vh, 0);
 }
 
@@ -1229,14 +1229,24 @@ html.dark .relation-badge {
   position: absolute;
   top: -1px;
   left: 0;
-  height: 2px;
+  height: 1.5px;
   min-width: 1px;
-  background: rgb(var(--c-line) / 0.72);
+  background: rgb(var(--c-line) / 0.58);
   transform: translate3d(-200vw, -200vh, 0);
 }
 
 .timeline-viewer-period[data-priority='true'] {
-  background: rgb(var(--c-accent) / 0.62);
+  background: rgb(var(--c-accent) / 0.6);
+}
+
+.timeline-viewer-period::before {
+  position: absolute;
+  bottom: 0;
+  left: 0;
+  width: 1px;
+  height: 5px;
+  background: inherit;
+  content: '';
 }
 
 .timeline-viewer-node {
@@ -1244,7 +1254,9 @@ html.dark .relation-badge {
   top: 0;
   left: 0;
   display: flex;
-  width: 9.5rem;
+  width: max-content;
+  min-width: 5.5rem;
+  max-width: 15rem;
   height: 2.75rem;
   align-items: center;
   justify-content: center;
@@ -1258,14 +1270,14 @@ html.dark .relation-badge {
 .timeline-viewer-node__surface {
   display: flex;
   width: 100%;
-  height: 2rem;
+  height: 2.125rem;
   align-items: center;
   justify-content: center;
-  padding-inline: 0.625rem;
+  padding-inline: 0.75rem;
   overflow: hidden;
-  border: 1px solid rgb(var(--c-line) / 0.64);
+  border: 1px solid rgb(var(--c-line) / 0.38);
   border-radius: 4px;
-  background: rgb(var(--c-paper) / 0.96);
+  background: rgb(var(--c-paper) / 0.76);
   transition:
     border-color 140ms ease,
     background-color 140ms ease,
@@ -1273,14 +1285,14 @@ html.dark .relation-badge {
 }
 
 .timeline-viewer-node[data-priority='true'] .timeline-viewer-node__surface {
-  border-color: rgb(var(--c-accent) / 0.42);
-  background: rgb(var(--c-accent) / 0.075);
+  border-color: rgb(var(--c-accent) / 0.46);
+  background: rgb(var(--c-accent) / 0.055);
 }
 
 .timeline-viewer-node:hover .timeline-viewer-node__surface,
 .timeline-viewer-node:focus-visible .timeline-viewer-node__surface {
   border-color: rgb(var(--c-accent) / 0.8);
-  background: rgb(var(--c-accent) / 0.13);
+  background: rgb(var(--c-accent) / 0.09);
 }
 
 .timeline-viewer-node:focus-visible {
@@ -1294,9 +1306,9 @@ html.dark .relation-badge {
 .timeline-viewer-node__formal {
   overflow: hidden;
   min-width: 0;
-  font-size: 0.875rem;
+  font-size: 0.9375rem;
   font-weight: 600;
-  line-height: 1.08;
+  line-height: 1.2;
   overflow-wrap: normal;
   word-break: keep-all;
 }
@@ -1333,11 +1345,6 @@ html.dark .relation-badge {
 }
 
 .timeline-viewer-frame--active[data-semantic-level='overview']
-  .timeline-viewer-node {
-  width: 6rem;
-}
-
-.timeline-viewer-frame--active[data-semantic-level='overview']
   .timeline-viewer-node__short {
   display: block;
 }
@@ -1347,21 +1354,6 @@ html.dark .relation-badge {
 .timeline-viewer-frame--active[data-semantic-level='overview']
   .timeline-viewer-node__formal {
   display: none;
-}
-
-.timeline-viewer-frame--active[data-semantic-level='standard']
-  .timeline-viewer-node {
-  width: 9.5rem;
-}
-
-.timeline-viewer-frame--active[data-semantic-level='contextual']
-  .timeline-viewer-node {
-  width: 11.875rem;
-}
-
-.timeline-viewer-frame--active[data-semantic-level='detailed']
-  .timeline-viewer-node {
-  width: 13.75rem;
 }
 
 .timeline-viewer-frame--active[data-semantic-level='contextual']
@@ -1380,30 +1372,39 @@ html.dark .relation-badge {
 
 .timeline-viewer-frame--active[data-semantic-level='detailed']
   .timeline-viewer-node__surface {
-  height: 2.25rem;
+  height: 2.375rem;
 }
 
 .timeline-viewer-controls {
   position: absolute;
   z-index: 7;
-  right: max(0.75rem, env(safe-area-inset-right));
-  bottom: max(0.75rem, env(safe-area-inset-bottom));
+  right: auto;
+  bottom: max(0.625rem, env(safe-area-inset-bottom));
+  left: 50%;
   display: grid;
-  grid-template-columns: 2.75rem 2.75rem 3.75rem 2.75rem 3.5rem;
-  height: 3.5rem;
+  grid-template-columns: 2.75rem 2.75rem 4rem 2.75rem 3.25rem;
+  width: max-content;
+  max-width: min(20rem, calc(100vw - 1.5rem));
+  height: 3.25rem;
   align-items: center;
-  border: 1px solid rgb(var(--c-line) / 0.5);
-  background: rgb(var(--c-paper) / 0.88);
-  box-shadow: 0 0.35rem 1rem rgb(var(--c-ink) / 0.055);
-  opacity: 0.82;
+  border: 1px solid rgb(var(--c-line) / 0.42);
+  border-radius: 6px;
+  background: rgb(var(--c-paper) / 0.84);
+  box-shadow: none;
+  opacity: 0.9;
   backdrop-filter: blur(10px);
   -webkit-backdrop-filter: blur(10px);
-  transition: opacity 140ms ease;
+  transform: translateX(-50%);
+  transition: opacity 180ms ease;
 }
 
 .timeline-viewer-controls:hover,
 .timeline-viewer-controls:focus-within {
   opacity: 1;
+}
+
+.timeline-viewer-controls[data-idle='true'] {
+  opacity: 0.48;
 }
 
 .timeline-viewer-controls button,
@@ -1431,8 +1432,8 @@ html.dark .relation-badge {
 }
 
 .timeline-viewer-controls button:last-child {
-  min-width: 3.5rem;
-  padding-inline: 0.625rem;
+  min-width: 3.25rem;
+  padding-inline: 0.5rem;
   border-inline-end: 0;
 }
 
@@ -1448,27 +1449,14 @@ html.dark .relation-badge {
   }
 
   .timeline-viewer-node__surface {
-    height: 1.875rem;
-    padding-inline: 0.5rem;
+    height: 2rem;
+    padding-inline: 0.625rem;
   }
 
   .timeline-viewer-node__short,
   .timeline-viewer-node__name,
   .timeline-viewer-node__formal {
     font-size: 0.875rem;
-  }
-
-  .timeline-viewer-frame--active[data-semantic-level='contextual']
-    .timeline-viewer-node {
-    width: 10.5rem;
-  }
-
-  .timeline-viewer-frame--active[data-semantic-level='detailed']
-    .timeline-viewer-node {
-    width: min(
-      10.5rem,
-      calc(100vw - var(--timeline-viewer-region-axis-width) - 1.25rem)
-    );
   }
 
   .timeline-viewer-frame--active[data-semantic-level='detailed']
@@ -1478,16 +1466,20 @@ html.dark .relation-badge {
 
   .timeline-viewer-controls {
     top: auto;
-    right: max(0.5rem, env(safe-area-inset-right));
-    bottom: max(0.5rem, env(safe-area-inset-bottom));
-    left: max(0.5rem, env(safe-area-inset-left));
-    height: 3.5rem;
-    grid-template-columns: 2.75rem 2.75rem minmax(3rem, 1fr) 2.75rem auto;
+    right: auto;
+    bottom: max(0.625rem, env(safe-area-inset-bottom));
+    left: 50%;
+    height: 3.25rem;
+    grid-template-columns: 2.75rem 2.75rem 4rem 2.75rem 3.25rem;
   }
 
   .timeline-viewer-controls button:last-child {
-    min-width: 3.5rem;
+    min-width: 3.25rem;
     padding-inline: 0.5rem;
+  }
+
+  .timeline-viewer-node {
+    max-width: 11.875rem;
   }
 }
 
