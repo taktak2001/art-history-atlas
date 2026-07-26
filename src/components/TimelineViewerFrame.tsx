@@ -11,6 +11,7 @@ import {
   type MouseEvent,
   type PointerEvent,
   type ReactNode,
+  type CSSProperties,
   type WheelEvent,
 } from 'react';
 import {
@@ -50,6 +51,7 @@ export type TimelineViewerNode = {
   barStart: number;
   barEnd: number;
   regionId: string;
+  regionColor?: string;
   secondaryOccurrence: boolean;
   priority: boolean;
 };
@@ -57,6 +59,7 @@ export type TimelineViewerNode = {
 export type TimelineViewerRegion = {
   id: string;
   label: string;
+  regionColor?: string;
   top: number;
   height: number;
 };
@@ -1359,6 +1362,13 @@ export function TimelineViewerFrame({
                   }`}
                   data-viewer-region-id={region.id}
                   data-origin-band={region.id === 'origin' || undefined}
+                  style={
+                    region.regionColor
+                      ? ({
+                          '--timeline-region-rgb': region.regionColor,
+                        } as CSSProperties)
+                      : undefined
+                  }
                 >
                   {region.label}
                 </span>
@@ -1416,6 +1426,14 @@ export function TimelineViewerFrame({
                     node.secondaryOccurrence || undefined
                   }
                   data-priority={node.priority || undefined}
+                  data-region-id={node.regionId}
+                  style={
+                    node.regionColor
+                      ? ({
+                          '--timeline-region-rgb': node.regionColor,
+                        } as CSSProperties)
+                      : undefined
+                  }
                 />
               ))}
             </div>
@@ -1465,6 +1483,13 @@ export function TimelineViewerFrame({
                     node.secondaryOccurrence || undefined
                   }
                   data-priority={node.priority || undefined}
+                  style={
+                    node.regionColor
+                      ? ({
+                          '--timeline-region-rgb': node.regionColor,
+                        } as CSSProperties)
+                      : undefined
+                  }
                   onPointerEnter={() =>
                     setMovementPeersHighlighted(node.movementId, true)
                   }

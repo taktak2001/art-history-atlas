@@ -127,7 +127,7 @@ test('バーと追従ラベルは薄いラベル型で、フォーカス時も�
   ]);
   expect(typography[0]).toEqual({
     color: 'rgb(28, 28, 30)',
-    fontWeight: 500,
+    fontWeight: 600,
     paddingLeft: 1,
   });
   expect(typography[1]).toBe(600);
@@ -142,6 +142,82 @@ test('バーと追従ラベルは薄いラベル型で、フォーカス時も�
   );
   expect(normalBorder).toBe(1);
   expect(selectedBorder).toBe(1);
+});
+
+test('地域色を同一地域で統一し、副次地域も同じラベル強度で示す', async ({
+  page,
+}) => {
+  await page.goto('/timeline/');
+  await modeButton(page, '近代').click();
+
+  const franceBars = page.locator('[data-timeline-region="france"]');
+  await expect(franceBars.first()).toBeVisible();
+  expect(await franceBars.count()).toBeGreaterThan(1);
+  const franceColors = await franceBars.evaluateAll((elements) =>
+    elements.map((element) =>
+      getComputedStyle(element)
+        .getPropertyValue('--timeline-region-rgb')
+        .trim(),
+    ),
+  );
+  expect(new Set(franceColors).size).toBe(1);
+
+  const italyColor = await page
+    .locator('[data-timeline-region="italy"]')
+    .first()
+    .evaluate((element) =>
+      getComputedStyle(element)
+        .getPropertyValue('--timeline-region-rgb')
+        .trim(),
+    );
+  expect(italyColor).not.toBe(franceColors[0]);
+
+  await modeButton(page, '中世').click();
+  const byzantineBars = page.locator(
+    '[data-timeline-bar="early-christian-byzantine"]',
+  );
+  expect(await byzantineBars.count()).toBeGreaterThan(1);
+  const appearances = await byzantineBars
+    .locator('[data-timeline-bar-visual]')
+    .evaluateAll((elements) =>
+      elements.map((element) => {
+        const style = getComputedStyle(element);
+        return {
+          borderWidth: parseFloat(style.borderTopWidth),
+          radius: parseFloat(style.borderRadius),
+          color: style.color,
+          background: style.backgroundColor,
+        };
+      }),
+    );
+  expect(
+    appearances.every(
+      ({ borderWidth, radius, color, background }) =>
+        borderWidth === 1 &&
+        radius === 3 &&
+        color === 'rgb(28, 28, 30)' &&
+        background !== 'rgba(0, 0, 0, 0)',
+    ),
+  ).toBe(true);
+});
+
+test('通史の起点を地域から独立した背景・基盤帯として示す', async ({
+  page,
+}) => {
+  await page.goto('/timeline/');
+
+  const origin = page.locator('[data-region-column] [data-origin-band]');
+  await expect(origin).toHaveText('背景・基盤');
+  await expect(
+    page.locator('[data-region-lane-label="mediterranean"]'),
+  ).toBeVisible();
+  expect(
+    await origin.evaluate((element) => getComputedStyle(element).fontSize),
+  ).not.toBe(
+    await page
+      .locator('[data-region-lane-label="mediterranean"]')
+      .evaluate((element) => getComputedStyle(element).fontSize),
+  );
 });
 
 test('時代別モードは端末と密度に応じた幅と自動フィット目盛りを使う', async ({ page }, testInfo) => {
@@ -225,7 +301,7 @@ test('詳細ラベルは名称と年代だけの1行表示で、PCでも直接�
     };
   });
   expect(labelStyle.whiteSpace).toBe('nowrap');
-  expect(labelStyle.fontWeight).toBe('500');
+  expect(labelStyle.fontWeight).toBe('600');
   expect(labelStyle.opacity).toBe('1');
   expect(labelStyle.wordBreak).toBe('keep-all');
   expect(labelStyle.color).not.toBe('rgb(92, 92, 96)');
@@ -934,6 +1010,28 @@ test('閲覧モードは年代位置を保ち、地域反復と省略項目を�
       )
       .first(),
   ).toBeVisible();
+  const occurrenceStyles = await romanticism
+    .locator('.timeline-viewer-node__surface')
+    .evaluateAll((elements) =>
+      elements.map((element) => {
+        const style = getComputedStyle(element);
+        return {
+          opacity: style.opacity,
+          color: style.color,
+          background: style.backgroundColor,
+          borderWidth: style.borderTopWidth,
+        };
+      }),
+    );
+  expect(
+    occurrenceStyles.every(
+      ({ opacity, color, background, borderWidth }) =>
+        opacity === '1' &&
+        color === occurrenceStyles[0].color &&
+        background === occurrenceStyles[0].background &&
+        borderWidth === occurrenceStyles[0].borderWidth,
+    ),
+  ).toBe(true);
 
   await romanticism.first().hover();
   await expect
