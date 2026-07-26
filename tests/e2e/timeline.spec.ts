@@ -44,7 +44,9 @@ const expectViewerLabelsNotToOverlap = async (page: Page) => {
   }
 };
 
-test('通史はコンパクトな俯瞰表示と1行ラベルを使う', async ({ page }, testInfo) => {
+test('通史はコンパクトな俯瞰表示と日本語名・年代の2段ラベルを使う', async ({
+  page,
+}, testInfo) => {
   await page.goto('/timeline/');
 
   const track = page.locator('[data-timeline-track]');
@@ -79,6 +81,17 @@ test('通史はコンパクトな俯瞰表示と1行ラベルを使う', async (
     )
     .toBeGreaterThan(0);
   expect(await surveyLabel.evaluate((element) => getComputedStyle(element).whiteSpace)).toBe('nowrap');
+  const surveyDate = page
+    .locator(
+      '[data-timeline-bar="early-christian-byzantine"] [data-label-date]',
+    )
+    .first();
+  await expect(surveyDate).toContainText('330〜1453');
+  expect(
+    await surveyDate.evaluate((element) => element.getBoundingClientRect().y),
+  ).toBeGreaterThan(
+    await surveyLabel.evaluate((element) => element.getBoundingClientRect().y),
+  );
 });
 
 test('時代別の表示範囲は時代名と年代だけを示し、通史はリンク状に戻る', async ({ page }) => {
@@ -140,8 +153,8 @@ test('バーと追従ラベルは薄いラベル型で、フォーカス時も�
   const selectedBorder = await visual.evaluate((element) =>
     parseFloat(getComputedStyle(element).borderTopWidth),
   );
-  expect(normalBorder).toBe(1);
-  expect(selectedBorder).toBe(1);
+  expect(normalBorder).toBeGreaterThanOrEqual(2);
+  expect(selectedBorder).toBeGreaterThanOrEqual(2);
 });
 
 test('地域色を同一地域で統一し、副次地域も同じラベル強度で示す', async ({
@@ -161,6 +174,19 @@ test('地域色を同一地域で統一し、副次地域も同じラベル強�
     ),
   );
   expect(new Set(franceColors).size).toBe(1);
+  const franceDot = page
+    .locator('[data-region-lane-label="france"]')
+    .locator('.timeline-region-dot');
+  await expect(franceDot).toBeVisible();
+  const dotStyle = await franceDot.evaluate((element) => {
+    const style = getComputedStyle(element);
+    return {
+      background: style.backgroundColor,
+      width: parseFloat(style.width),
+    };
+  });
+  expect(dotStyle.background).toBe('rgba(64, 103, 137, 0.78)');
+  expect(dotStyle.width).toBeGreaterThanOrEqual(7);
 
   const italyColor = await page
     .locator('[data-timeline-region="italy"]')
@@ -193,7 +219,7 @@ test('地域色を同一地域で統一し、副次地域も同じラベル強�
   expect(
     appearances.every(
       ({ borderWidth, radius, color, background }) =>
-        borderWidth === 1 &&
+        borderWidth >= 2 &&
         radius === 3 &&
         color === 'rgb(28, 28, 30)' &&
         background !== 'rgba(0, 0, 0, 0)',
@@ -279,7 +305,7 @@ test('近代では対象範囲、使用レーン、クリップ表示だけを�
   expect(emptyLanes).toBe(0);
 });
 
-test('詳細ラベルは名称と年代だけの1行表示で、PCでも直接詳細へ遷移する', async ({ page }, testInfo) => {
+test('詳細ラベルは日本語名称と年代の2段表示で、PCでも直接詳細へ遷移する', async ({ page }, testInfo) => {
   test.skip(testInfo.project.name !== 'desktop', 'desktop project only');
   await page.goto('/timeline/');
   await modeButton(page, '現代').click();
@@ -312,7 +338,7 @@ test('詳細ラベルは名称と年代だけの1行表示で、PCでも直接�
   ).toBeGreaterThanOrEqual(44);
 });
 
-test('バーは44pxの操作領域内に22pxの展示レールとして表示する', async ({ page }) => {
+test('バーは44pxの操作領域内に34pxの日本語名・年代ラベルとして表示する', async ({ page }) => {
   await page.goto('/timeline/');
   await modeButton(page, '近代').click();
 
@@ -333,8 +359,8 @@ test('バーは44pxの操作領域内に22pxの展示レールとして表示す
     };
   });
   expect(metrics.targetHeight).toBeGreaterThanOrEqual(44);
-  expect(metrics.visualHeight).toBe(22);
-  expect(metrics.visualBorderTop).toBe('1px');
+  expect(metrics.visualHeight).toBe(34);
+  expect(metrics.visualBorderTop).toBe('2px');
   expect(await label.evaluate((element) => getComputedStyle(element).textAlign)).toBe(
     'center',
   );
@@ -796,7 +822,10 @@ test('閲覧モードは固定軸と一定寸法のノードでセマンティ�
     testInfo.project.name === 'mobile' ? 190 : 240,
   );
   const detailedNode = viewer.locator('[data-viewer-node]').first();
-  await expect(detailedNode.locator('.timeline-viewer-node__date')).toHaveCount(0);
+  const detailedDate = detailedNode.locator('.timeline-viewer-node__date');
+  await expect(detailedDate).toHaveCount(1);
+  await expect(detailedDate).not.toHaveText('');
+  await expect(detailedNode.locator('[lang="en"]')).toHaveCount(0);
   expect(
     await detailedNode
       .locator('.timeline-viewer-node__formal')
@@ -893,7 +922,7 @@ test('閲覧モードは実年代の期間線と固定寸法の名称ラベル�
     }),
   ]);
   expect(dimensions[0].height).toBeGreaterThanOrEqual(28);
-  expect(dimensions[0].height).toBeLessThanOrEqual(36);
+  expect(dimensions[0].height).toBeLessThanOrEqual(44);
   expect(dimensions[1].height).toBeLessThanOrEqual(2);
   expect(dimensions[1].width).not.toBe(dimensions[0].width);
   expect(Math.abs(dimensions[1].x - dimensions[0].x)).toBeLessThanOrEqual(1);
@@ -1137,10 +1166,10 @@ test('展示ボードの年代階層と上下終端を明示する', async ({
         underline: getComputedStyle(element, '::after').content,
       };
     });
-  expect(labelStyle.height).toBeLessThanOrEqual(34);
+  expect(labelStyle.height).toBeLessThanOrEqual(44);
   expect(labelStyle.radius).toBeGreaterThanOrEqual(4);
   expect(labelStyle.weight).toBeGreaterThanOrEqual(600);
-  expect(labelStyle.underline).not.toBe('none');
+  expect(labelStyle.underline).toBe('none');
 
   if (testInfo.project.name === 'desktop') {
     await expect(viewer.locator('.timeline-viewer-position > span')).toBeVisible();
