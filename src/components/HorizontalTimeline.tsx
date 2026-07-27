@@ -941,7 +941,7 @@ export function HorizontalTimeline({
                         data-timeline-hit-area
                       />
                       <span
-                        className={`timeline-bar-visual pointer-events-none absolute inset-x-0 top-1 overflow-hidden ${
+                        className={`timeline-bar-visual pointer-events-none absolute inset-x-0 top-1/2 overflow-hidden ${
                           isPriority
                             ? 'timeline-bar-visual--priority'
                             : 'timeline-bar-visual--secondary'

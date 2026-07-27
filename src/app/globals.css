@@ -781,12 +781,13 @@ html.dark .relation-badge {
 }
 
 .timeline-bar-visual {
-  height: 1.5rem;
-  border: 2px solid rgb(var(--timeline-region-rgb) / 0.82);
+  height: 1.375rem;
+  border: 1px solid rgb(var(--timeline-region-rgb) / 0.82);
   border-radius: 3px;
   background: rgb(var(--c-paper) / 0.94);
   box-shadow: none;
   color: rgb(var(--c-ink));
+  transform: translateY(-50%);
   transition:
     background-color 140ms ease,
     border-color 140ms ease,
@@ -851,7 +852,7 @@ html.dark .relation-badge {
 
 .timeline-label-date {
   color: rgb(var(--c-faint));
-  font-size: 0.625rem;
+  font-size: 0.5625rem;
   font-weight: 400;
   line-height: 1;
   white-space: nowrap;
@@ -1759,12 +1760,13 @@ html.dark .relation-badge {
 
 .timeline-bar-visual {
   position: absolute;
-  height: 1.5rem;
+  height: 1.375rem;
   overflow: hidden;
-  border: 2px solid rgb(var(--timeline-region-rgb) / 0.82);
+  border: 1px solid rgb(var(--timeline-region-rgb) / 0.82);
   border-radius: 3px;
   background: rgb(var(--c-paper) / 0.94);
   color: rgb(var(--c-ink));
+  transform: translateY(-50%);
   transition:
     border-color 140ms ease,
     background-color 140ms ease,
@@ -1788,7 +1790,6 @@ html.dark .relation-badge {
 
 [data-timeline-bar]:hover .timeline-bar-visual,
 [data-timeline-bar]:focus-visible .timeline-bar-visual {
-  border-width: 2px;
   border-color: rgb(var(--timeline-region-rgb) / 0.86);
   background: rgb(var(--timeline-region-rgb) / 0.075);
   box-shadow: none;
