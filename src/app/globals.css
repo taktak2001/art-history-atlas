@@ -787,7 +787,6 @@ html.dark .relation-badge {
   background: rgb(var(--c-paper) / 0.94);
   box-shadow: none;
   color: rgb(var(--c-ink));
-  transform: translateY(-50%);
   transition:
     background-color 140ms ease,
     border-color 140ms ease,
@@ -1766,7 +1765,6 @@ html.dark .relation-badge {
   border-radius: 3px;
   background: rgb(var(--c-paper) / 0.94);
   color: rgb(var(--c-ink));
-  transform: translateY(-50%);
   transition:
     border-color 140ms ease,
     background-color 140ms ease,
