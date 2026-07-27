@@ -156,8 +156,10 @@ test('バーと追従ラベルは薄いラベル型で、フォーカス時も�
   const selectedBorder = await visual.evaluate((element) =>
     parseFloat(getComputedStyle(element).borderTopWidth),
   );
-  expect(normalBorder).toBeGreaterThanOrEqual(2);
-  expect(selectedBorder).toBeGreaterThanOrEqual(2);
+  // 細い枠（1px）を通常時もフォーカス時も保つ
+  expect(normalBorder).toBeGreaterThanOrEqual(1);
+  expect(normalBorder).toBeLessThanOrEqual(1.5);
+  expect(selectedBorder).toBeLessThanOrEqual(1.5);
 });
 
 test('地域色を同一地域で統一し、副次地域も同じラベル強度で示す', async ({
@@ -222,7 +224,7 @@ test('地域色を同一地域で統一し、副次地域も同じラベル強�
   expect(
     appearances.every(
       ({ borderWidth, radius, color, background }) =>
-        borderWidth >= 2 &&
+        borderWidth >= 1 &&
         radius === 3 &&
         color === 'rgb(28, 28, 30)' &&
         background !== 'rgba(0, 0, 0, 0)',
@@ -341,7 +343,7 @@ test('詳細ラベルは日本語名称と年代の2段表示で、PCでも直�
   ).toBeGreaterThanOrEqual(44);
 });
 
-test('バーは44pxの操作領域内に34pxの日本語名・年代ラベルとして表示する', async ({ page }) => {
+test('バーは44pxの操作領域内に22pxの日本語名ブロックと枠外の年代を表示する', async ({ page }) => {
   await page.goto('/timeline/');
   await modeButton(page, '近代').click();
 
@@ -362,8 +364,13 @@ test('バーは44pxの操作領域内に34pxの日本語名・年代ラベルと
     };
   });
   expect(metrics.targetHeight).toBeGreaterThanOrEqual(44);
-  expect(metrics.visualHeight).toBe(34);
-  expect(metrics.visualBorderTop).toBe('2px');
+  expect(metrics.visualHeight).toBe(22);
+  expect(metrics.visualBorderTop).toBe('1px');
+  // 年代ラベルは枠（visual）の外に配置する
+  await expect(
+    bar.locator('[data-timeline-bar-visual] [data-label-date]'),
+  ).toHaveCount(0);
+  await expect(bar.locator('[data-label-date]')).toHaveCount(1);
   expect(await label.evaluate((element) => getComputedStyle(element).textAlign)).toBe(
     'center',
   );

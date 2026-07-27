@@ -74,7 +74,6 @@ type LabelGeometry = {
   shortLabel?: string;
   nameWidth: number;
   shortLabelWidth?: number;
-  dateWidth: number;
 };
 
 const SURVEY_PRIORITY = new Set([
@@ -437,10 +436,7 @@ export function HorizontalTimeline({
                 );
         const resolvedLabelWidth = Math.max(
           1,
-          Math.min(
-            Math.max(chosenWidth, geometry.dateWidth) + LABEL_TEXT_PADDING,
-            availableWidth,
-          ),
+          Math.min(chosenWidth + LABEL_TEXT_PADDING, availableWidth),
         );
         geometry.textElement.textContent = choice.label;
         geometry.element.dataset.labelVariant = choice.variant;
@@ -482,8 +478,7 @@ export function HorizontalTimeline({
     for (const element of labels) {
       const bar = element.closest<HTMLElement>('[data-timeline-bar]');
       const textElement = element.querySelector<HTMLElement>('[data-label-text]');
-      const dateElement = element.querySelector<HTMLElement>('[data-label-date]');
-      if (!bar || !textElement || !dateElement) continue;
+      if (!bar || !textElement) continue;
       const barStart = Number(bar.dataset.barStart);
       const barEnd = Number(bar.dataset.barEnd);
       const barAvailableWidth = Math.max(
@@ -491,7 +486,6 @@ export function HorizontalTimeline({
         barEnd - barStart - LABEL_INNER_PADDING * 2,
       );
       const availableWidth = barAvailableWidth;
-      const dateWidth = dateElement.getBoundingClientRect().width;
       const availableNameWidth = Math.max(
         1,
         availableWidth - LABEL_TEXT_PADDING,
@@ -525,10 +519,7 @@ export function HorizontalTimeline({
             : Math.min(shortLabelWidth ?? nameWidth, availableNameWidth);
       const resolvedLabelWidth = Math.max(
         1,
-        Math.min(
-          Math.max(chosenWidth, dateWidth) + LABEL_TEXT_PADDING,
-          availableWidth,
-        ),
+        Math.min(chosenWidth + LABEL_TEXT_PADDING, availableWidth),
       );
       element.style.width = `${resolvedLabelWidth}px`;
       nextGeometries.push({
@@ -542,7 +533,6 @@ export function HorizontalTimeline({
         shortLabel,
         nameWidth,
         shortLabelWidth,
-        dateWidth,
       });
     }
 
@@ -970,7 +960,7 @@ export function HorizontalTimeline({
                           data-short-label={timelineJapaneseShortLabel(
                             movement.shortLabel,
                           )}
-                          className="timeline-follow-label pointer-events-none absolute inset-y-0 left-0 flex flex-col items-center justify-center overflow-hidden px-px"
+                          className="timeline-follow-label pointer-events-none absolute inset-y-0 left-0 flex items-center justify-center overflow-hidden px-px"
                         >
                           <span
                             data-label-text
@@ -982,21 +972,22 @@ export function HorizontalTimeline({
                           >
                             {movement.nameJa}
                           </span>
-                          <span
-                            data-label-date
-                            className="timeline-label-date shrink-0 tabular-nums"
-                          >
-                            {fmtYear(movement.dates.start)}〜
-                            {movement.dates.end === null
-                              ? '現在'
-                              : fmtYear(movement.dates.end)}
-                          </span>
                         </span>
                         {clippedEnd && (
                           <span className="absolute inset-y-0 right-0 z-10 flex w-3 items-center justify-end bg-gradient-to-l from-paper/90 to-transparent text-[10px]">
                             ›
                           </span>
                         )}
+                      </span>
+                      <span
+                        data-label-date
+                        aria-hidden="true"
+                        className="timeline-label-date pointer-events-none absolute bottom-0 left-0 tabular-nums"
+                      >
+                        {fmtYear(movement.dates.start)}〜
+                        {movement.dates.end === null
+                          ? '現在'
+                          : fmtYear(movement.dates.end)}
                       </span>
                     </Link>
                   );
