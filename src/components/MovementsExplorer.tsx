@@ -300,7 +300,7 @@ export function MovementsExplorer() {
       )}
 
       <p className="mt-6 text-xs text-faint">
-        検索は表示する範囲に関係なく全30件を対象とします。作品・作家の詳細は
+        検索は表示する範囲に関係なく全{movements.length}件を対象とします。作品・作家の詳細は
         <Link href="/movements/" className="prose-link">各ムーブメント</Link>
         から辿れます。
       </p>

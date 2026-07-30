@@ -27,6 +27,17 @@ const STANDARD_ONE_IDS = [
   'art-nouveau',
 ] as const;
 
+const FINAL_STANDARD_IDS = ['fauvism', 'russian-constructivism'] as const;
+const FINAL_DETAILED_IDS = [
+  'suprematism',
+  'de-stijl',
+  'art-informel',
+  'fluxus',
+  'arte-povera',
+  'land-art',
+] as const;
+const FINAL_IDS = [...FINAL_STANDARD_IDS, ...FINAL_DETAILED_IDS] as const;
+
 describe('第1弾ムーブメント拡張: core 8件', () => {
   it('指定した8件をcoreとして収録する', () => {
     for (const id of CORE_EXPANSION_IDS) {
@@ -53,18 +64,14 @@ describe('第1弾ムーブメント拡張: core 8件', () => {
     }
   });
 
-  it('権利確認済み画像を20点追加し、未確認画像はnullにする', () => {
+  it('権利確認済み画像を22点掲載し、未確認画像はnullにする', () => {
     const expansionWorks = works.filter((work) =>
       work.movementIds.some((id) =>
         CORE_EXPANSION_IDS.includes(id as (typeof CORE_EXPANSION_IDS)[number]),
       ),
     );
-    expect(expansionWorks.filter((work) => work.image)).toHaveLength(20);
-    expect(
-      expansionWorks
-        .filter((work) => work.movementIds.includes('bauhaus'))
-        .every((work) => work.image === null),
-    ).toBe(true);
+    expect(expansionWorks.filter((work) => work.image)).toHaveLength(22);
+    expect(works.find((work) => work.id === 'work-brandt-tea-infuser')?.image).toBeNull();
   });
 
   it('作家と作品の相互参照が一致する', () => {
@@ -141,5 +148,71 @@ describe('第1弾ムーブメント拡張: standard前半8件', () => {
     expect(
       relationships.find((edge) => edge.id === 'rel-yamato-to-rinpa'),
     ).toMatchObject({ from: 'yamato-e', to: 'rinpa', kind: 'revival' });
+  });
+});
+
+describe('第1弾ムーブメント拡張: standard後半2件＋detailed 6件', () => {
+  it('指定したLODで8件を収録する', () => {
+    for (const id of FINAL_STANDARD_IDS) {
+      expect(movements.find((movement) => movement.id === id)?.visibilityLevel).toBe(
+        'standard',
+      );
+    }
+    for (const id of FINAL_DETAILED_IDS) {
+      expect(movements.find((movement) => movement.id === id)?.visibilityLevel).toBe(
+        'detailed',
+      );
+    }
+  });
+
+  it('各項目が複数機関の概説出典と2作品を持つ', () => {
+    const sourceById = new Map(sources.map((source) => [source.id, source]));
+    for (const id of FINAL_IDS) {
+      const movement = movements.find((candidate) => candidate.id === id)!;
+      const publishers = new Set(
+        movement.sourceIds.map((sourceId) => sourceById.get(sourceId)?.publisher),
+      );
+      expect(publishers.size, `${id}: publishers`).toBeGreaterThanOrEqual(2);
+      expect(movement.workIds, `${id}: workIds`).toHaveLength(2);
+      expect(
+        works.filter((work) => work.movementIds.includes(id)),
+        `${id}: works`,
+      ).toHaveLength(2);
+    }
+  });
+
+  it('確認できた画像8点だけを掲載し、戦後作品は権利未確認のままnullにする', () => {
+    const expansionWorks = works.filter((work) =>
+      work.movementIds.some((id) =>
+        FINAL_IDS.includes(id as (typeof FINAL_IDS)[number]),
+      ),
+    );
+    expect(expansionWorks).toHaveLength(16);
+    expect(expansionWorks.filter((work) => work.image)).toHaveLength(8);
+    expect(
+      expansionWorks
+        .filter((work) =>
+          ['art-informel', 'fluxus', 'arte-povera', 'land-art'].some((id) =>
+            work.movementIds.includes(id),
+          ),
+        )
+        .every((work) => work.image === null),
+    ).toBe(true);
+  });
+
+  it('慎重な関係種別と方向を維持する', () => {
+    expect(
+      relationships.find((edge) => edge.id === 'rel-informel-gutai-contemporary'),
+    ).toMatchObject({ from: 'art-informel', to: 'gutai', kind: 'contemporary' });
+    expect(
+      relationships.find((edge) => edge.id === 'rel-arte-povera-monoha-contemporary'),
+    ).toMatchObject({ from: 'arte-povera', to: 'mono-ha', kind: 'contemporary' });
+    expect(
+      relationships.find((edge) => edge.id === 'rel-postminimalism-to-land-art'),
+    ).toMatchObject({
+      from: 'postminimalism',
+      to: 'land-art',
+      kind: 'succession',
+    });
   });
 });

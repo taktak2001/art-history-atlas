@@ -1,9 +1,10 @@
 import type { Movement } from '@/lib/schema';
 import { coreExpansionMovements } from './expansion/core-movements';
+import { finalExpansionMovements } from './expansion/final-movements';
 import { standardOneExpansionMovements } from './expansion/standard-one-movements';
 
 /**
- * 初期収録ムーブメント（30件）。
+ * 収録ムーブメント（初期30件＋第1弾拡張24件）。
  *
  * 各記述は出典（sourceIds）に基づく。事実と解釈を区別し、断定を避けるべき箇所は
  * 「〜とされる」「見解の一つ」等で示す。年代は諸説ある場合 dates.circa=true と note で明示。
@@ -1725,4 +1726,5 @@ export const movements: Movement[] = [
   },
   ...coreExpansionMovements,
   ...standardOneExpansionMovements,
+  ...finalExpansionMovements,
 ];

@@ -39,8 +39,8 @@ describe('Movement LOD', () => {
     const detailed = filterMovementsByLod(movements, 'detailed');
 
     expect(core).toHaveLength(32);
-    expect(standard).toHaveLength(46);
-    expect(detailed).toHaveLength(46);
+    expect(standard).toHaveLength(48);
+    expect(detailed).toHaveLength(54);
     expect(core.every((movement) => movement.visibilityLevel === 'core')).toBe(true);
   });
 

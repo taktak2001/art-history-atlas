@@ -20,7 +20,7 @@ test('初期表示は時代ヒーローだけを示し、選択した展示を�
   await expect(hero).toContainText(/\d+ movements?/);
   await expect(page.getByText('展示室を選んで、美術史を読む')).toBeVisible();
   await expect(
-    page.getByRole('button', { name: /基本\s*24/ }),
+    page.getByRole('button', { name: /基本\s*32/ }),
   ).toBeVisible();
   await expect(page.locator('.chronology-era__toggle')).toHaveCount(0);
   await expect(page.locator('.chronology-era__chevron')).toHaveCount(8);

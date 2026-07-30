@@ -1,5 +1,6 @@
 import type { Artist } from '@/lib/schema';
 import { coreExpansionArtists } from './expansion/core-artists';
+import { finalExpansionArtists } from './expansion/final-artists';
 import { standardOneExpansionArtists } from './expansion/standard-one-artists';
 
 /**
@@ -938,4 +939,5 @@ export const artists: Artist[] = [
   },
   ...coreExpansionArtists,
   ...standardOneExpansionArtists,
+  ...finalExpansionArtists,
 ];
