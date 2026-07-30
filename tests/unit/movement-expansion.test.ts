@@ -16,6 +16,17 @@ const CORE_EXPANSION_IDS = [
   'bauhaus',
 ] as const;
 
+const STANDARD_ONE_IDS = [
+  'mesopotamian-art',
+  'hellenistic-art',
+  'literati-painting',
+  'yamato-e',
+  'japanese-ink-painting',
+  'rinpa',
+  'arts-and-crafts',
+  'art-nouveau',
+] as const;
+
 describe('第1弾ムーブメント拡張: core 8件', () => {
   it('指定した8件をcoreとして収録する', () => {
     for (const id of CORE_EXPANSION_IDS) {
@@ -77,5 +88,58 @@ describe('第1弾ムーブメント拡張: core 8件', () => {
         ['post-impressionism', 'influence'],
       ]),
     );
+  });
+});
+
+describe('第1弾ムーブメント拡張: standard前半8件', () => {
+  it('指定した8件をstandardとして収録する', () => {
+    for (const id of STANDARD_ONE_IDS) {
+      const movement = movements.find((candidate) => candidate.id === id);
+      expect(movement, id).toBeDefined();
+      expect(movement?.visibilityLevel, id).toBe('standard');
+    }
+  });
+
+  it('各項目が複数機関の概説出典と3作品を持つ', () => {
+    const sourceById = new Map(sources.map((source) => [source.id, source]));
+    for (const id of STANDARD_ONE_IDS) {
+      const movement = movements.find((candidate) => candidate.id === id)!;
+      const publishers = new Set(
+        movement.sourceIds.map((sourceId) => sourceById.get(sourceId)?.publisher),
+      );
+      expect(publishers.size, `${id}: publishers`).toBeGreaterThanOrEqual(2);
+      expect(movement.workIds, `${id}: workIds`).toHaveLength(3);
+      expect(
+        works.filter((work) => work.movementIds.includes(id)),
+        `${id}: works`,
+      ).toHaveLength(3);
+    }
+  });
+
+  it('権利確認済み画像を23点追加し、不明な画像はnullにする', () => {
+    const expansionWorks = works.filter((work) =>
+      work.movementIds.some((id) =>
+        STANDARD_ONE_IDS.includes(id as (typeof STANDARD_ONE_IDS)[number]),
+      ),
+    );
+    expect(expansionWorks).toHaveLength(24);
+    expect(expansionWorks.filter((work) => work.image)).toHaveLength(23);
+    expect(works.find((work) => work.id === 'work-mucha-camelias')?.image).toBeNull();
+  });
+
+  it('作家・作品・関係の参照方向が一致する', () => {
+    const artistById = new Map(artists.map((artist) => [artist.id, artist]));
+    for (const id of STANDARD_ONE_IDS) {
+      const movement = movements.find((candidate) => candidate.id === id)!;
+      for (const artistId of movement.artistIds) {
+        expect(artistById.get(artistId)?.movementIds, `${id}:${artistId}`).toContain(id);
+      }
+      for (const workId of movement.workIds) {
+        expect(works.find((work) => work.id === workId)?.movementIds, `${id}:${workId}`).toContain(id);
+      }
+    }
+    expect(
+      relationships.find((edge) => edge.id === 'rel-yamato-to-rinpa'),
+    ).toMatchObject({ from: 'yamato-e', to: 'rinpa', kind: 'revival' });
   });
 });

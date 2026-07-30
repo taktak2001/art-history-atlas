@@ -1,5 +1,6 @@
 import type { Work, ImageMeta } from '@/lib/schema';
 import { coreExpansionWorks } from './expansion/core-works';
+import { standardOneExpansionWorks } from './expansion/standard-one-works';
 
 /**
  * 作品データ。
@@ -1498,4 +1499,5 @@ export const works: Work[] = [
     verification: 'single-source',
   },
   ...coreExpansionWorks,
+  ...standardOneExpansionWorks,
 ];

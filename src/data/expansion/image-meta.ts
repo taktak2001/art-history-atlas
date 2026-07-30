@@ -77,3 +77,26 @@ export function commonsPublicDomainImage(
       'Wikimedia Commonsのファイルページで作品情報、原寸画像、パブリックドメイン表記を2026-07-30に確認。',
   };
 }
+
+export function commonsLicensedImage(
+  fileName: string,
+  image: ImageDescription,
+  options: {
+    license: 'cc-by' | 'cc-by-sa';
+    credit: string;
+    verificationNote: string;
+  },
+): ImageMeta {
+  const encodedFileName = encodeURIComponent(fileName);
+  return {
+    ...image,
+    provider: 'Wikimedia Commons',
+    sourceUrl: `https://commons.wikimedia.org/wiki/File:${encodedFileName}`,
+    fileUrl: `https://commons.wikimedia.org/wiki/Special:FilePath/${encodedFileName}`,
+    license: options.license,
+    credit: options.credit,
+    isPublicDomain: false,
+    verifiedOn: VERIFIED_ON,
+    verificationNote: options.verificationNote,
+  };
+}

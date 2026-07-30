@@ -1,5 +1,6 @@
 import type { Artist } from '@/lib/schema';
 import { coreExpansionArtists } from './expansion/core-artists';
+import { standardOneExpansionArtists } from './expansion/standard-one-artists';
 
 /**
  * 作家データ。生没年に諸説がある場合は lifeNote に明示する。
@@ -936,4 +937,5 @@ export const artists: Artist[] = [
     verification: 'verified',
   },
   ...coreExpansionArtists,
+  ...standardOneExpansionArtists,
 ];

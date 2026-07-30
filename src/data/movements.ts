@@ -1,5 +1,6 @@
 import type { Movement } from '@/lib/schema';
 import { coreExpansionMovements } from './expansion/core-movements';
+import { standardOneExpansionMovements } from './expansion/standard-one-movements';
 
 /**
  * 初期収録ムーブメント（30件）。
@@ -1723,4 +1724,5 @@ export const movements: Movement[] = [
     verification: 'single-source',
   },
   ...coreExpansionMovements,
+  ...standardOneExpansionMovements,
 ];

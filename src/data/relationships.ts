@@ -1,5 +1,6 @@
 import type { Relationship } from '@/lib/schema';
 import { coreExpansionRelationships } from './expansion/core-relationships';
+import { standardOneExpansionRelationships } from './expansion/standard-one-relationships';
 
 /**
  * ムーブメント間の関係（有向エッジ）。
@@ -375,4 +376,5 @@ export const relationships: Relationship[] = [
     sourceIds: ['tate-installation-art'],
   },
   ...coreExpansionRelationships,
+  ...standardOneExpansionRelationships,
 ];

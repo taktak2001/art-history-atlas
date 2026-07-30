@@ -159,6 +159,7 @@ export const coreExpansionMovements: Movement[] = [
     aliases: ['山水画', 'shan shui', 'Chinese landscape'],
     shortLabel: '中国山水画',
     visibilityLevel: 'core',
+    groupId: 'east-asian-ink-traditions',
     isRepresentative: true,
     displayOrder: 430,
     classification: 'style',
