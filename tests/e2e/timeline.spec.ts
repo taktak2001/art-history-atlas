@@ -6,14 +6,14 @@ const modeButton = (page: Page, name: string) =>
 
 const expectViewerLabelsNotToOverlap = async (page: Page) => {
   const labels = await page
-    .locator('[data-viewer-node]:visible .timeline-viewer-node__surface')
+    .locator('[data-viewer-node]:visible')
     .evaluateAll((elements) =>
       elements.map((element) => {
-        const node = element.closest<HTMLElement>('[data-viewer-node]');
+        const node = element as HTMLElement;
         const rect = element.getBoundingClientRect();
         return {
-          id: node?.dataset.movementId,
-          region: node?.dataset.regionId,
+          id: node.dataset.movementId,
+          region: node.dataset.regionId,
           left: rect.left,
           right: rect.right,
           top: rect.top,
@@ -40,6 +40,16 @@ const expectViewerLabelsNotToOverlap = async (page: Page) => {
         overlaps,
         `${first.region}: ${first.id} and ${second.id} overlap`,
       ).toBe(false);
+      if (first.left < second.right && first.right > second.left) {
+        const verticalGap = Math.max(
+          second.top - first.bottom,
+          first.top - second.bottom,
+        );
+        expect(
+          verticalGap,
+          `${first.region}: ${first.id} and ${second.id} need breathing room`,
+        ).toBeGreaterThanOrEqual(4);
+      }
     }
   }
 };
@@ -835,6 +845,35 @@ test('閲覧モードは固定軸と一定寸法のノードでセマンティ�
   const detailedDate = detailedNode.locator('.timeline-viewer-node__date');
   await expect(detailedDate).toHaveCount(1);
   await expect(detailedDate).not.toHaveText('');
+  await expect(
+    detailedNode.locator(
+      '.timeline-viewer-node__surface .timeline-viewer-node__date',
+    ),
+  ).toHaveCount(0);
+  const captionHierarchy = await detailedNode.evaluate((element) => {
+    const surface = element.querySelector<HTMLElement>(
+      '.timeline-viewer-node__surface',
+    );
+    const date = element.querySelector<HTMLElement>(
+      '.timeline-viewer-node__date',
+    );
+    const name =
+      element.querySelector<HTMLElement>('.timeline-viewer-node__formal') ??
+      element.querySelector<HTMLElement>('.timeline-viewer-node__name');
+    if (!surface || !date || !name) return null;
+    const surfaceRect = surface.getBoundingClientRect();
+    const dateRect = date.getBoundingClientRect();
+    return {
+      dateBelowSurface: dateRect.top >= surfaceRect.bottom,
+      dateSmaller:
+        parseFloat(getComputedStyle(date).fontSize) <
+        parseFloat(getComputedStyle(name).fontSize),
+    };
+  });
+  expect(captionHierarchy).toEqual({
+    dateBelowSurface: true,
+    dateSmaller: true,
+  });
   await expect(detailedNode.locator('[lang="en"]')).toHaveCount(0);
   expect(
     await detailedNode
@@ -912,13 +951,21 @@ test('閲覧モードは実年代の期間線と固定寸法の名称ラベル�
     '/movements/early-christian-byzantine/',
   );
   const dimensions = await Promise.all([
-    node.locator('.timeline-viewer-node__surface').evaluate((element) => {
-      const rect = element.getBoundingClientRect();
+    node.evaluate((element) => {
+      const nodeRect = element.getBoundingClientRect();
+      const surfaceRect = element
+        .querySelector('.timeline-viewer-node__surface')!
+        .getBoundingClientRect();
+      const dateRect = element
+        .querySelector('.timeline-viewer-node__date')!
+        .getBoundingClientRect();
       return {
-        x: rect.x,
-        y: rect.y,
-        width: rect.width,
-        height: rect.height,
+        x: nodeRect.x,
+        y: nodeRect.y,
+        width: nodeRect.width,
+        height: nodeRect.height,
+        surfaceHeight: surfaceRect.height,
+        dateBelowSurface: dateRect.top >= surfaceRect.bottom,
       };
     }),
     period.evaluate((element) => {
@@ -931,17 +978,18 @@ test('閲覧モードは実年代の期間線と固定寸法の名称ラベル�
       };
     }),
   ]);
-  expect(dimensions[0].height).toBeGreaterThanOrEqual(28);
-  expect(dimensions[0].height).toBeLessThanOrEqual(44);
+  expect(dimensions[0].surfaceHeight).toBeGreaterThanOrEqual(28);
+  expect(dimensions[0].surfaceHeight).toBeLessThanOrEqual(32);
+  expect(dimensions[0].dateBelowSurface).toBe(true);
   expect(dimensions[1].height).toBeLessThanOrEqual(2);
   expect(dimensions[1].width).not.toBe(dimensions[0].width);
   expect(Math.abs(dimensions[1].x - dimensions[0].x)).toBeLessThanOrEqual(1);
   expect(
     dimensions[1].y - (dimensions[0].y + dimensions[0].height),
-  ).toBeGreaterThanOrEqual(4);
+  ).toBeGreaterThanOrEqual(3);
   expect(
     dimensions[1].y - (dimensions[0].y + dimensions[0].height),
-  ).toBeLessThanOrEqual(7);
+  ).toBeLessThanOrEqual(6);
   const periodConnector = await period.evaluate((element) =>
     getComputedStyle(element, '::before').content,
   );
@@ -989,7 +1037,7 @@ test('閲覧モードのラベルは内容幅で、地域レーンと操作帯�
       ),
     );
   expect(oneTrackHeights.length).toBeGreaterThan(0);
-  expect(Math.max(...oneTrackHeights)).toBeLessThanOrEqual(72);
+  expect(Math.max(...oneTrackHeights)).toBeLessThanOrEqual(80);
 
   const controls = viewer.locator('[data-viewer-controls]');
   const [controlsBox, viewport] = await Promise.all([

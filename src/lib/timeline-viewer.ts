@@ -60,7 +60,7 @@ export const TIMELINE_VIEWER_SEMANTIC_THRESHOLDS = {
 } as const;
 export const TIMELINE_VIEWER_LABEL_GAP = 10;
 export const TIMELINE_VIEWER_MAX_TRACKS = 4;
-export const TIMELINE_VIEWER_TRACK_PITCH = 40;
+export const TIMELINE_VIEWER_TRACK_PITCH = 50;
 
 const TIMELINE_VIEWER_TICK_STEPS = [
   10, 25, 50, 100, 250, 500, 1000, 2500, 5000, 10000,
@@ -252,10 +252,16 @@ export function assignTimelineViewerTracks(
 }
 
 export function timelineViewerRegionHeight(trackCount: number) {
-  if (trackCount <= 1) return 68;
-  if (trackCount === 2) return 102;
-  if (trackCount === 3) return 136;
-  return 168 + Math.max(0, trackCount - 4) * TIMELINE_VIEWER_TRACK_PITCH;
+  const visibleTrackCount = Math.max(
+    1,
+    Math.min(trackCount, TIMELINE_VIEWER_MAX_TRACKS),
+  );
+  return (
+    80 +
+    (visibleTrackCount - 1) * TIMELINE_VIEWER_TRACK_PITCH +
+    Math.max(0, trackCount - TIMELINE_VIEWER_MAX_TRACKS) *
+      TIMELINE_VIEWER_TRACK_PITCH
+  );
 }
 
 export function timelineViewerTrackCenter(

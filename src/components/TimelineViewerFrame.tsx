@@ -577,12 +577,8 @@ export function TimelineViewerFrame({
         node.style.visibility = visible ? 'visible' : 'hidden';
         node.dataset.viewerTrack = String(placement.track);
         if (period) {
-          const surfaceHeight =
-            node.querySelector<HTMLElement>('.timeline-viewer-node__surface')
-              ?.offsetHeight ?? 32;
-          const surfaceBottom =
-            trackCenterY - surfaceHeight / 2 + surfaceHeight;
-          const periodY = surfaceBottom + 6;
+          const nodeTop = trackCenterY - node.offsetHeight / 2;
+          const periodY = nodeTop + node.offsetHeight + 4;
           period.style.width = `${Math.max(1, periodRight - periodLeft)}px`;
           period.style.transform = `translate3d(${periodLeft}px, ${periodY}px, 0)`;
           period.style.visibility =
@@ -1520,9 +1516,9 @@ export function TimelineViewerFrame({
                     <span className="timeline-viewer-node__formal">
                       {node.nameJa}
                     </span>
-                    <span className="timeline-viewer-node__date">
-                      {node.dateLabel}
-                    </span>
+                  </span>
+                  <span className="timeline-viewer-node__date">
+                    {node.dateLabel}
                   </span>
                 </Link>
               ))}
