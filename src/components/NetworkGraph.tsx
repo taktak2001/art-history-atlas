@@ -640,7 +640,7 @@ export function NetworkGraph({ movements, relationships, eraOrder }: Props) {
             standard: filterMovementsByLod(movements, 'standard').length,
             detailed: filterMovementsByLod(movements, 'detailed').length,
           }}
-          compact
+          catalogue
         />
 
         <div className="network-controls__row">

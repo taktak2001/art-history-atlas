@@ -302,7 +302,7 @@ export function ChronologyView({ movements }: { movements: Movement[] }) {
           value={lod}
           onChange={setLod}
           counts={counts}
-          exhibition
+          catalogue
         />
       </div>
 
