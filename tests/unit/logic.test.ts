@@ -16,6 +16,7 @@ import {
   compareSections,
   COMPARE_ACCENTS,
   assignCompareAccents,
+  buildCompareShareUrl,
   MAX_COMPARE,
 } from '@/lib/compare';
 import { buildHeroSummary } from '@/lib/movement-detail';
@@ -137,6 +138,43 @@ describe('比較ロジック', () => {
     );
     expect(afterRemoval.baroque).toBe(initial.baroque);
     expect(new Set(Object.values(afterRemoval)).size).toBe(2);
+  });
+
+  it('GitHub PagesのbasePathを維持して共有URLを生成する', () => {
+    expect(
+      buildCompareShareUrl(
+        'https://taktak2001.github.io/art-history-atlas/compare/?preview=1#table',
+        ['surrealism', 'baroque'],
+      ),
+    ).toBe(
+      'https://taktak2001.github.io/art-history-atlas/compare/?ids=surrealism%2Cbaroque',
+    );
+  });
+
+  it('localhostではbasePathを追加せず共有URLを生成する', () => {
+    expect(
+      buildCompareShareUrl(
+        'http://localhost:3000/compare/?source=home',
+        ['gothic', 'italian-renaissance'],
+      ),
+    ).toBe(
+      'http://localhost:3000/compare/?ids=gothic%2Citalian-renaissance',
+    );
+  });
+
+  it('共有URLから既存の不要なqueryとhashを除去する', () => {
+    const shareUrl = new URL(
+      buildCompareShareUrl(
+        'https://example.com/art-history-atlas/compare/?lod=detailed&focus=baroque#comparison',
+        ['baroque', 'rococo'],
+      ),
+    );
+
+    expect(shareUrl.pathname).toBe('/art-history-atlas/compare/');
+    expect(shareUrl.searchParams.get('ids')).toBe('baroque,rococo');
+    expect(shareUrl.searchParams.has('lod')).toBe(false);
+    expect(shareUrl.searchParams.has('focus')).toBe(false);
+    expect(shareUrl.hash).toBe('');
   });
 });
 

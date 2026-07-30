@@ -19,6 +19,7 @@ import {
   MAX_COMPARE,
   compareMovements,
   assignCompareAccents,
+  buildCompareShareUrl,
 } from '@/lib/compare';
 import { getMovementChildren } from '@/lib/movement-hierarchy';
 
@@ -79,7 +80,7 @@ export function CompareBoard() {
   );
 
   const share = async () => {
-    const url = `${window.location.origin}/compare/?ids=${ids.join(',')}`;
+    const url = buildCompareShareUrl(window.location.href, ids);
     try {
       await navigator.clipboard.writeText(url);
       setCopied(true);

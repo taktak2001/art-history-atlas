@@ -38,6 +38,45 @@ test('2件のムーブメントを比較できる', async ({ page }) => {
   await expect(page.getByRole('rowheader', { name: '後世への影響' })).toBeVisible();
 });
 
+test('比較共有URLを開くと選択状態を復元できる', async ({ page }) => {
+  await page.addInitScript(() => {
+    Object.defineProperty(navigator, 'clipboard', {
+      configurable: true,
+      value: {
+        writeText: async (text: string) => {
+          (
+            window as typeof window & { __copiedCompareUrl?: string }
+          ).__copiedCompareUrl = text;
+        },
+      },
+    });
+  });
+
+  await page.goto('/compare/?ids=surrealism,baroque');
+  await page.getByRole('button', { name: '比較URLを共有' }).click();
+
+  const copiedUrl = await page.evaluate(
+    () =>
+      (window as typeof window & { __copiedCompareUrl?: string })
+        .__copiedCompareUrl,
+  );
+  expect(copiedUrl).toBe(
+    'http://127.0.0.1:3100/compare/?ids=surrealism%2Cbaroque',
+  );
+
+  await page.goto(copiedUrl!);
+  await expect(
+    page.locator('[data-compare-chip="surrealism"]'),
+  ).toBeVisible();
+  await expect(page.locator('[data-compare-chip="baroque"]')).toBeVisible();
+
+  await page.reload();
+  await expect(
+    page.locator('[data-compare-chip="surrealism"]'),
+  ).toBeVisible();
+  await expect(page.locator('[data-compare-chip="baroque"]')).toBeVisible();
+});
+
 test('地域フィルタ（日本）を適用できる', async ({ page }) => {
   await page.goto('/movements/');
   await page.getByLabel('地域', { exact: true }).selectOption('japan');
