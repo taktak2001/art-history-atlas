@@ -1,5 +1,23 @@
 import { test, expect } from '@playwright/test';
 
+test('主要4画面で図録型LODと基本・充実・すべてを共通表示する', async ({
+  page,
+}) => {
+  for (const route of ['/timeline/', '/chronology/', '/network/', '/movements/']) {
+    await page.goto(route);
+    const control = page.locator('[data-lod-control]');
+    await expect(control).toHaveClass(/lod-control--catalogue/);
+    await expect(
+      control.getByText('LEVEL OF DETAIL', { exact: true }),
+    ).toBeVisible();
+    await expect(control.getByRole('button', { name: /基本\s*24/ })).toBeVisible();
+    await expect(control.getByRole('button', { name: /充実\s*30/ })).toBeVisible();
+    await expect(
+      control.getByRole('button', { name: /すべて\s*30/ }),
+    ).toBeVisible();
+  }
+});
+
 test('Aboutの凡例も基本・充実・すべてへ統一する', async ({ page }) => {
   await page.goto('/about/');
 

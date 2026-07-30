@@ -67,7 +67,7 @@ test('通史はコンパクトな俯瞰表示と日本語名・年代の2段ラ�
   ).toHaveCount(0);
   await expect(page.getByRole('navigation', { name: '時代ナビゲーション' })).toHaveCount(0);
   await expect(page.getByText('時代へ移動', { exact: true })).toHaveCount(0);
-  await expect(page.getByText('Level of detail', { exact: true })).toBeVisible();
+  await expect(page.getByText('LEVEL OF DETAIL', { exact: true })).toBeVisible();
   await expect(page.getByText('Era', { exact: true })).toBeVisible();
   await expect(page.getByText('表示中', { exact: true })).toHaveCount(0);
 

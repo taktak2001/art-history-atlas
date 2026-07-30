@@ -164,6 +164,7 @@ export function MovementsExplorer() {
           standard: filterMovementsByLod(movements, 'standard').length,
           detailed: filterMovementsByLod(movements, 'detailed').length,
         }}
+        catalogue
       />
 
       <div className="mt-5 grid gap-3 border hairline bg-surface p-4 sm:grid-cols-2 lg:grid-cols-3">
