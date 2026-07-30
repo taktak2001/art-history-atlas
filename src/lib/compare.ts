@@ -129,3 +129,18 @@ export const canCompare = (ids: string[]): boolean =>
 
 export const compareMovements = (ids: string[]): Movement[] =>
   ids.map((id) => getMovement(id)).filter((m): m is Movement => Boolean(m));
+
+/**
+ * 現在の比較ページURLを基準に共有URLを生成する。
+ * origin直下から組み立てず、GitHub PagesのbasePathやローカル配信パスを維持する。
+ */
+export const buildCompareShareUrl = (
+  currentHref: string,
+  ids: string[],
+): string => {
+  const shareUrl = new URL(currentHref);
+  shareUrl.search = '';
+  shareUrl.hash = '';
+  shareUrl.searchParams.set('ids', ids.join(','));
+  return shareUrl.toString();
+};
