@@ -243,12 +243,12 @@ describe('timeline viewer geometry', () => {
   });
 
   it('トラック数に応じて地域高と中心位置を調整する', () => {
-    expect(timelineViewerRegionHeight(1)).toBe(68);
-    expect(timelineViewerRegionHeight(2)).toBe(102);
-    expect(timelineViewerRegionHeight(3)).toBe(136);
-    expect(timelineViewerRegionHeight(4)).toBe(168);
-    expect(timelineViewerTrackCenter(0, 1)).toBe(34);
-    expect(timelineViewerTrackCenter(0, 3)).toBe(28);
-    expect(timelineViewerTrackCenter(2, 3)).toBe(108);
+    expect(timelineViewerRegionHeight(1)).toBe(80);
+    expect(timelineViewerRegionHeight(2)).toBe(130);
+    expect(timelineViewerRegionHeight(3)).toBe(180);
+    expect(timelineViewerRegionHeight(4)).toBe(230);
+    expect(timelineViewerTrackCenter(0, 1)).toBe(40);
+    expect(timelineViewerTrackCenter(0, 3)).toBe(40);
+    expect(timelineViewerTrackCenter(2, 3)).toBe(140);
   });
 });
