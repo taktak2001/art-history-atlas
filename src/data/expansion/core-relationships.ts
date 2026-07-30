@@ -1,0 +1,68 @@
+import type { Relationship } from '@/lib/schema';
+
+export const coreExpansionRelationships: Relationship[] = [
+  {
+    id: 'rel-greek-to-roman',
+    from: 'ancient-greek-classical',
+    to: 'ancient-roman-art',
+    kind: 'influence',
+    note: 'ローマはギリシアの彫刻・神殿・神話・比例を広く受容したが、肖像・都市・帝国統治・邸宅という別の用途へ翻案した。直接の後継関係に単純化しない。',
+    sourceIds: ['met-classical-greece', 'smarthistory-roman-art-intro'],
+  },
+  {
+    id: 'rel-roman-to-byzantine',
+    from: 'ancient-roman-art',
+    to: 'early-christian-byzantine',
+    kind: 'succession',
+    note: '初期キリスト教・ビザンティンはローマのバシリカ、ドーム、モザイク、皇帝表象を継承し、キリスト教の礼拝と神学へ再構成した。',
+    sourceIds: ['met-roman-provinces', 'met-byzantium'],
+  },
+  {
+    id: 'rel-romanesque-to-gothic',
+    from: 'romanesque-art',
+    to: 'gothic',
+    kind: 'succession',
+    note: 'ゴシックはロマネスクの石造教会、巡礼、建築彫刻、キリスト教図像を受け継ぎ、尖頭アーチ・リブ・飛梁によって採光と高さを大きく展開した。',
+    sourceIds: ['met-romanesque-art', 'smarthistory-gothic-architecture'],
+  },
+  {
+    id: 'rel-ukiyoe-to-impressionism',
+    from: 'ukiyo-e',
+    to: 'impressionism',
+    kind: 'influence',
+    note: '浮世絵の非対称構図、画面端の切り取り、平面化、連作は、19世紀後半のフランスで印象派の一部の作家へ作用した。印象派成立の唯一の原因とはしない。',
+    sourceIds: ['met-japonisme', 'tate-impressionism'],
+  },
+  {
+    id: 'rel-ukiyoe-to-post-impressionism',
+    from: 'ukiyo-e',
+    to: 'post-impressionism',
+    kind: 'influence',
+    note: '浮世絵の輪郭、色面、俯瞰、反復的な意匠は、ゴッホやゴーギャンらポスト印象派の一部へ作用した。作品・作家ごとの受容差を残す。',
+    sourceIds: ['met-japonisme', 'tate-post-impressionism'],
+  },
+  {
+    id: 'rel-symbolism-to-expressionism',
+    from: 'symbolism',
+    to: 'expressionism',
+    kind: 'influence',
+    note: '象徴主義の内面・精神・夢への関心は、表現主義が外見より心理的・精神的な経験を優先する一因となった。',
+    sourceIds: ['tate-symbolism', 'smarthistory-expressionism-intro'],
+  },
+  {
+    id: 'rel-post-impressionism-to-expressionism',
+    from: 'post-impressionism',
+    to: 'expressionism',
+    kind: 'influence',
+    note: 'ゴッホやゴーギャンの強い色、輪郭、主観的変形は表現主義の複数の作家に作用したが、表現主義は都市・精神性・集団活動という別の条件を持つ。',
+    sourceIds: ['tate-post-impressionism', 'smarthistory-expressionism-intro'],
+  },
+  {
+    id: 'rel-expressionism-to-bauhaus',
+    from: 'expressionism',
+    to: 'bauhaus',
+    kind: 'influence',
+    note: '初期バウハウスは表現主義的な総合芸術と共同体の理念を共有した。その後、産業・標準化へ重心を移したため、全期間を同一系譜としない。',
+    sourceIds: ['smarthistory-expressionism-intro', 'met-bauhaus'],
+  },
+];

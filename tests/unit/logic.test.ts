@@ -202,7 +202,7 @@ describe('年代フォーマット', () => {
 
 describe('詳細ページの導入要旨', () => {
   it('全ムーブメントで編集済みの短い概要を省略せず表示する', () => {
-    expect(movements).toHaveLength(30);
+    expect(movements).toHaveLength(38);
 
     for (const movement of movements) {
       const summary = buildHeroSummary(movement.summary);

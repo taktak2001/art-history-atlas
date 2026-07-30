@@ -1,4 +1,5 @@
 import type { Work, ImageMeta } from '@/lib/schema';
+import { coreExpansionWorks } from './expansion/core-works';
 
 /**
  * 作品データ。
@@ -1496,4 +1497,5 @@ export const works: Work[] = [
     sourceIds: ['teamlab-tokyo', 'teamlab-body-immersive'],
     verification: 'single-source',
   },
+  ...coreExpansionWorks,
 ];
