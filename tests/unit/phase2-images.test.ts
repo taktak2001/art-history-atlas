@@ -24,8 +24,13 @@ describe('Phase 2: 作品と画像の不変条件', () => {
     for (const w of works) {
       if (!w.image) continue;
       expect(() => ImageMeta.parse(w.image), w.id).not.toThrow();
-      expect(w.image.alt.trim().length, `${w.id} alt`).toBeGreaterThan(0);
+      expect(w.image.alt.trim().length, `${w.id} alt`).toBeGreaterThanOrEqual(20);
       expect(w.image.credit, `${w.id} credit`).toBeTruthy();
+      expect(w.image.provider, `${w.id} provider`).toBeTruthy();
+      expect(w.image.verifiedOn, `${w.id} verifiedOn`).toMatch(
+        /^\d{4}-\d{2}-\d{2}$/,
+      );
+      expect(w.image.verificationNote, `${w.id} verificationNote`).toBeTruthy();
       expect(() => new URL(w.image!.sourceUrl), `${w.id} sourceUrl`).not.toThrow();
       if (w.image.fileUrl) {
         expect(() => new URL(w.image!.fileUrl!), `${w.id} fileUrl`).not.toThrow();

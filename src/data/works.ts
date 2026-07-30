@@ -1,4 +1,8 @@
 import type { Work, ImageMeta } from '@/lib/schema';
+import { coreExpansionWorks } from './expansion/core-works';
+import { finalExpansionWorks } from './expansion/final-works';
+import { applyImageSupplements } from './expansion/image-supplements';
+import { standardOneExpansionWorks } from './expansion/standard-one-works';
 
 /**
  * 作品データ。
@@ -41,7 +45,7 @@ function pd(
   };
 }
 
-export const works: Work[] = [
+const workRecords: Work[] = [
   /* ── 先史 ───────────────────────────── */
   {
     id: 'work-lascaux-hall-of-bulls',
@@ -1496,4 +1500,9 @@ export const works: Work[] = [
     sourceIds: ['teamlab-tokyo', 'teamlab-body-immersive'],
     verification: 'single-source',
   },
+  ...coreExpansionWorks,
+  ...standardOneExpansionWorks,
+  ...finalExpansionWorks,
 ];
+
+export const works: Work[] = applyImageSupplements(workRecords);

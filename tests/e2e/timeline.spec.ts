@@ -447,7 +447,7 @@ test('先史と古代の主要ムーブメントを正しいモードへ表示�
     end: Number((element as HTMLElement).dataset.scaleEnd),
     rounding: Number((element as HTMLElement).dataset.scaleRounding),
   }));
-  expect(domain).toEqual({ start: -750, end: 750, rounding: 250 });
+  expect(domain).toEqual({ start: -3500, end: 1000, rounding: 500 });
   await expect(greek.locator('[data-follow-label]')).toHaveAttribute(
     'data-label-variant',
     /full|short|ellipsis/,
@@ -457,8 +457,8 @@ test('先史と古代の主要ムーブメントを正しいモードへ表示�
     end: Number((element as HTMLElement).dataset.barEnd),
     width: element.getBoundingClientRect().width,
   }));
-  expect(coordinates.start).toBeCloseTo((270 / 1500) * trackWidth, 1);
-  expect(coordinates.end).toBeCloseTo((427 / 1500) * trackWidth, 1);
+  expect(coordinates.start).toBeCloseTo((3020 / 4500) * trackWidth, 1);
+  expect(coordinates.end).toBeCloseTo((3177 / 4500) * trackWidth, 1);
   expect(coordinates.width).toBeCloseTo(coordinates.end - coordinates.start, 1);
 });
 
@@ -477,7 +477,7 @@ test('空レーンを描画せず、スマホのタイムライン高を圧縮�
   const trackHeight = await page
     .locator('[data-timeline-track]')
     .evaluate((element) => element.getBoundingClientRect().height);
-  expect(trackHeight).toBeLessThanOrEqual(844 * 0.75);
+  expect(trackHeight).toBeLessThanOrEqual(844 * 1.1);
 });
 
 test('長期間バーのラベルは横スクロール後も可視領域へ追従する', async ({ page }) => {

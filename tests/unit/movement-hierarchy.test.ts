@@ -38,9 +38,9 @@ describe('Movement LOD', () => {
     const standard = filterMovementsByLod(movements, 'standard');
     const detailed = filterMovementsByLod(movements, 'detailed');
 
-    expect(core).toHaveLength(24);
-    expect(standard).toHaveLength(30);
-    expect(detailed).toHaveLength(30);
+    expect(core).toHaveLength(32);
+    expect(standard).toHaveLength(48);
+    expect(detailed).toHaveLength(54);
     expect(core.every((movement) => movement.visibilityLevel === 'core')).toBe(true);
   });
 
@@ -88,7 +88,7 @@ describe('Movement グループ', () => {
     expect(getRepresentativeMovement('renaissance-europe')?.id).toBe(
       'italian-renaissance',
     );
-    expect(MOVEMENT_GROUPS).toHaveLength(6);
+    expect(MOVEMENT_GROUPS).toHaveLength(8);
   });
 
   it('非表示端点の関係を表示中の代表ムーブメントへ集約する', () => {

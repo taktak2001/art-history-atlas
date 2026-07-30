@@ -1,4 +1,7 @@
 import type { Relationship } from '@/lib/schema';
+import { coreExpansionRelationships } from './expansion/core-relationships';
+import { finalExpansionRelationships } from './expansion/final-relationships';
+import { standardOneExpansionRelationships } from './expansion/standard-one-relationships';
 
 /**
  * ムーブメント間の関係（有向エッジ）。
@@ -171,14 +174,6 @@ export const relationships: Relationship[] = [
     sourceIds: ['tate-symbolism'],
   },
   // 日本→西洋（同時代の相互作用）
-  {
-    id: 'rel-impressionism-japonisme',
-    from: 'impressionism',
-    to: 'post-impressionism',
-    kind: 'shared-idea',
-    note: '浮世絵（ジャポニスム）の大胆な構図・平面性が、印象派・ポスト印象派に共通の刺激を与えた。西洋の一本道ではなく異文化の作用があった。',
-    sourceIds: ['smarthistory-japonisme'],
-  },
   // モダニズムへ
   {
     id: 'rel-post-to-cubism',
@@ -381,4 +376,7 @@ export const relationships: Relationship[] = [
     note: 'ミニマル／インスタレーションの「場」と鑑賞者の身体への注目が、没入型作品の環境設計に連続する。',
     sourceIds: ['tate-installation-art'],
   },
+  ...coreExpansionRelationships,
+  ...standardOneExpansionRelationships,
+  ...finalExpansionRelationships,
 ];

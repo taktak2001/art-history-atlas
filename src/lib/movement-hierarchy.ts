@@ -61,6 +61,18 @@ export const MOVEMENT_GROUPS: MovementGroup[] = [
     representativeMovementId: 'gutai',
     displayOrder: 60,
   },
+  {
+    id: 'east-asian-ink-traditions',
+    label: '東アジアの山水・水墨',
+    representativeMovementId: 'chinese-landscape-painting',
+    displayOrder: 70,
+  },
+  {
+    id: 'japanese-classical-painting',
+    label: '日本の古典絵画と再解釈',
+    representativeMovementId: 'yamato-e',
+    displayOrder: 80,
+  },
 ];
 
 const movementSort = (a: Movement, b: Movement) =>

@@ -1,4 +1,8 @@
 import type { Source } from '@/lib/schema';
+import { coreExpansionSources } from './expansion/core-sources';
+import { finalExpansionSources } from './expansion/final-sources';
+import { supplementalImageSources } from './expansion/image-supplements';
+import { standardOneExpansionSources } from './expansion/standard-one-sources';
 
 /**
  * 出典ライブラリ。
@@ -604,4 +608,8 @@ export const sources: Source[] = [
     reliability: 'high',
     supports: '象徴主義の観念/感情の優位・自然主義への反発',
   },
+  ...coreExpansionSources,
+  ...standardOneExpansionSources,
+  ...finalExpansionSources,
+  ...supplementalImageSources,
 ];
