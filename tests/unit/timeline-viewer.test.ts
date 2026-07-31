@@ -7,10 +7,12 @@ import {
   fitTimelineViewerRect,
   panTimelineViewer,
   relativeTimelineViewerCompositeTransform,
+  selectTimelineViewerTickLabels,
   semanticTimelineTicks,
   timelineViewerMaxScale,
   timelineViewerRegionHeight,
   timelineViewerSemanticLevel,
+  timelineViewerTickPriority,
   timelineViewerTrackCenter,
   timelineViewerVirtualNodeKeys,
   TIMELINE_VIEWER_MAX_SCALE,
@@ -20,7 +22,10 @@ import {
   worldToTimelineViewerScreen,
   zoomTimelineAtPoint,
 } from '@/lib/timeline-viewer';
-import { timelineModeById } from '@/lib/timeline-presentation';
+import {
+  formatTimelineYearLabel,
+  timelineModeById,
+} from '@/lib/timeline-presentation';
 
 describe('timeline viewer geometry', () => {
   it('拡大率を操作範囲へ収める', () => {
@@ -192,6 +197,53 @@ describe('timeline viewer geometry', () => {
     expect(detailed.at(-1)).toBe(mode.end);
   });
 
+  it('紀元前年代を軸用の短い表記へ統一する', () => {
+    expect(formatTimelineYearLabel(-40000)).toBe('前4万');
+    expect(formatTimelineYearLabel(-3000)).toBe('前3000');
+    expect(formatTimelineYearLabel(-500)).toBe('前500');
+    expect(formatTimelineYearLabel(0)).toBe('紀元境界');
+    expect(formatTimelineYearLabel(0, '0')).toBe('0');
+    expect(formatTimelineYearLabel(1400)).toBe('1400');
+  });
+
+  it('年代ラベルは重要tickを優先して画面上の重複を除く', () => {
+    const mode = timelineModeById('survey');
+    const visible = selectTimelineViewerTickLabels([
+      {
+        year: -40000,
+        x: 110,
+        width: 38,
+        priority: timelineViewerTickPriority(-40000, mode),
+      },
+      {
+        year: -3000,
+        x: 148,
+        width: 46,
+        priority: timelineViewerTickPriority(-3000, mode),
+      },
+      {
+        year: 0,
+        x: 202,
+        width: 12,
+        priority: timelineViewerTickPriority(0, mode),
+      },
+      {
+        year: 500,
+        x: 236,
+        width: 24,
+        priority: timelineViewerTickPriority(500, mode),
+      },
+      {
+        year: 1400,
+        x: 302,
+        width: 32,
+        priority: timelineViewerTickPriority(1400, mode),
+      },
+    ]);
+
+    expect(visible).toEqual([-40000, 0, 1400]);
+  });
+
   it('縮小時は短縮名、拡大時は正式名称を選ぶ', () => {
     expect(viewerLabelVariant(0.8, true)).toBe('short');
     expect(viewerLabelVariant(1.1, true)).toBe('short');
@@ -251,12 +303,12 @@ describe('timeline viewer geometry', () => {
 
   it('トラック数に応じて地域高と中心位置を調整する', () => {
     expect(timelineViewerRegionHeight(1)).toBe(80);
-    expect(timelineViewerRegionHeight(2)).toBe(130);
-    expect(timelineViewerRegionHeight(3)).toBe(180);
-    expect(timelineViewerRegionHeight(4)).toBe(230);
-    expect(timelineViewerRegionHeight(5)).toBe(280);
+    expect(timelineViewerRegionHeight(2)).toBe(132);
+    expect(timelineViewerRegionHeight(3)).toBe(184);
+    expect(timelineViewerRegionHeight(4)).toBe(236);
+    expect(timelineViewerRegionHeight(5)).toBe(288);
     expect(timelineViewerTrackCenter(0, 1)).toBe(40);
     expect(timelineViewerTrackCenter(0, 3)).toBe(40);
-    expect(timelineViewerTrackCenter(2, 3)).toBe(140);
+    expect(timelineViewerTrackCenter(2, 3)).toBe(144);
   });
 });

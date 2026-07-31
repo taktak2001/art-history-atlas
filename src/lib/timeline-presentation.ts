@@ -164,6 +164,21 @@ export const SURVEY_TICKS = [
   TIMELINE_NOW,
 ];
 
+export function formatTimelineYearLabel(
+  year: number,
+  zeroLabel: '紀元境界' | '0' = '紀元境界',
+) {
+  if (year === 0) return zeroLabel;
+  if (year > 0) return `${year}`;
+
+  const absoluteYear = Math.abs(year);
+  if (absoluteYear >= 10000) {
+    const tenThousands = Number((absoluteYear / 10000).toFixed(1));
+    return `前${tenThousands}万`;
+  }
+  return `前${absoluteYear}`;
+}
+
 const clamp = (value: number, min: number, max: number) =>
   Math.min(max, Math.max(min, value));
 
