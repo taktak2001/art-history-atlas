@@ -1195,7 +1195,7 @@ test('閲覧モードは年代位置を保ち、地域反復と省略項目を�
   await viewer
     .locator('[data-viewer-node][data-region-id="france"]')
     .evaluateAll((elements) => {
-      elements.slice(0, 5).forEach((element) => {
+      elements.slice(0, 6).forEach((element) => {
         const node = element as HTMLElement;
         node.dataset.barStart = '220';
         node.dataset.barEnd = '300';
