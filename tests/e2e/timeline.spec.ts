@@ -597,6 +597,10 @@ test('閲覧モードはマウスパン・ダブルクリック・キーボー�
 }, testInfo) => {
   test.skip(testInfo.project.name !== 'desktop', 'desktop project only');
   await page.goto('/timeline/');
+  await page
+    .getByRole('group', { name: '表示する範囲' })
+    .getByRole('button', { name: /すべて/ })
+    .click();
   await page.getByRole('button', { name: 'タイムラインを全画面で表示' }).click();
 
   const viewer = page.locator('[data-timeline-viewer="active"]');
@@ -644,6 +648,10 @@ test('パン中は再レイアウトせずcompositor transformだけを更新す
 }, testInfo) => {
   test.skip(testInfo.project.name !== 'desktop', 'desktop project only');
   await page.goto('/timeline/');
+  await page
+    .getByRole('group', { name: '表示する範囲' })
+    .getByRole('button', { name: /すべて/ })
+    .click();
   await page.getByRole('button', { name: 'タイムラインを全画面で表示' }).click();
 
   const viewer = page.locator('[data-timeline-viewer="active"]');
@@ -758,9 +766,6 @@ test('iPhone幅の閲覧モードは2本指の中点を保ってピンチズー�
     emit('pointermove', 11, 90, true);
     emit('pointermove', 12, 290);
   });
-  await expect
-    .poll(async () => Number((await viewer.getAttribute('data-viewer-scale')) ?? 0))
-    .toBeGreaterThan(1);
   await stage.evaluate((element) => {
     for (const [pointerId, clientX] of [
       [11, 90],
@@ -778,6 +783,9 @@ test('iPhone幅の閲覧モードは2本指の中点を保ってピンチズー�
       );
     }
   });
+  await expect
+    .poll(async () => Number((await viewer.getAttribute('data-viewer-scale')) ?? 0))
+    .toBeGreaterThan(1);
 
   await page.setViewportSize({ width: 844, height: 390 });
   await expect(viewer).toBeVisible();
@@ -806,6 +814,32 @@ test('閲覧モードは固定軸と一定寸法のノードでセマンティ�
     origin.boundingBox(),
     firstNode.boundingBox(),
   ]);
+  const axisLayering = await viewer.evaluate(() => {
+    const time = document.querySelector<HTMLElement>(
+      '.timeline-viewer-time-axis',
+    )!;
+    const region = document.querySelector<HTMLElement>(
+      '.timeline-viewer-region-axis',
+    )!;
+    const corner = document.querySelector<HTMLElement>(
+      '.timeline-viewer-axis-origin',
+    )!;
+    return {
+      timeZ: Number(getComputedStyle(time).zIndex),
+      regionZ: Number(getComputedStyle(region).zIndex),
+      cornerZ: Number(getComputedStyle(corner).zIndex),
+      cornerBackground: getComputedStyle(corner).backgroundColor,
+    };
+  });
+  expect(
+    Math.abs(
+      (fixedBefore[1]?.y ?? 0) -
+        ((fixedBefore[0]?.y ?? 0) + (fixedBefore[0]?.height ?? 0)),
+    ),
+  ).toBeLessThanOrEqual(1);
+  expect(axisLayering.cornerZ).toBeGreaterThan(axisLayering.timeZ);
+  expect(axisLayering.cornerZ).toBeGreaterThan(axisLayering.regionZ);
+  expect(axisLayering.cornerBackground).not.toMatch(/,\s*0(?:\.\d+)?\)$/);
 
   for (let index = 0; index < 4; index += 1) {
     const beforeScale = Number(await viewer.getAttribute('data-viewer-scale'));
@@ -1083,7 +1117,7 @@ test('閲覧モードは年代位置を保ち、地域反復と省略項目を�
       getComputedStyle(element).maskImage ||
       getComputedStyle(element).webkitMaskImage,
   );
-  expect(maskImage).toContain('linear-gradient');
+  expect(maskImage).toBe('none');
 
   const romanticism = viewer.locator(
     '[data-viewer-node][data-movement-id="romanticism"]:visible',
@@ -1161,7 +1195,7 @@ test('閲覧モードは年代位置を保ち、地域反復と省略項目を�
   await viewer
     .locator('[data-viewer-node][data-region-id="france"]')
     .evaluateAll((elements) => {
-      elements.slice(0, 5).forEach((element) => {
+      elements.slice(0, 6).forEach((element) => {
         const node = element as HTMLElement;
         node.dataset.barStart = '220';
         node.dataset.barEnd = '300';

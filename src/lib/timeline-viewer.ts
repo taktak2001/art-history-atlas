@@ -59,7 +59,10 @@ export const TIMELINE_VIEWER_SEMANTIC_THRESHOLDS = {
   detailed: 3,
 } as const;
 export const TIMELINE_VIEWER_LABEL_GAP = 10;
-export const TIMELINE_VIEWER_MAX_TRACKS = 4;
+// Dense regions such as France can use one additional row before collapsing
+// items. Sparse regions keep their natural height because row height is based
+// on the tracks actually occupied, not this ceiling.
+export const TIMELINE_VIEWER_MAX_TRACKS = 5;
 export const TIMELINE_VIEWER_TRACK_PITCH = 50;
 
 const TIMELINE_VIEWER_TICK_STEPS = [

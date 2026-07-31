@@ -1131,12 +1131,12 @@ html.dark .relation-badge {
 .timeline-viewer-region-axis,
 .timeline-viewer-axis-origin {
   position: absolute;
-  z-index: 5;
   background: rgb(var(--c-paper));
   color: rgb(var(--c-ink));
 }
 
 .timeline-viewer-time-axis {
+  z-index: 7;
   top: 0;
   right: 0;
   left: 0;
@@ -1209,7 +1209,8 @@ html.dark .relation-badge {
 }
 
 .timeline-viewer-region-axis {
-  top: 0;
+  z-index: 7;
+  top: var(--timeline-viewer-time-axis-height, 56px);
   bottom: 0;
   left: 0;
   width: var(--timeline-viewer-region-axis-width, 176px);
@@ -1230,10 +1231,10 @@ html.dark .relation-badge {
   padding-inline: 0.75rem;
   overflow: hidden;
   border-bottom: 1px solid rgb(var(--c-line) / 0.34);
-  background: rgb(var(--c-surface) / 0.34);
+  background: rgb(var(--c-paper));
   color: rgb(var(--c-ink));
   font-size: 0.875rem;
-  font-weight: 550;
+  font-weight: 500;
   line-height: 1.25;
   transform: translate3d(0, -200vh, 0);
 }
@@ -1260,6 +1261,7 @@ html.dark .relation-badge {
 }
 
 .timeline-viewer-axis-origin {
+  z-index: 8;
   top: 0;
   left: 0;
   display: flex;
@@ -1270,7 +1272,7 @@ html.dark .relation-badge {
   padding: 0.6rem 0.7rem;
   border-right: 1px solid rgb(var(--c-line) / 0.56);
   border-bottom: 1px solid rgb(var(--c-line) / 0.56);
-  background: rgb(var(--c-surface) / 0.46);
+  background: rgb(var(--c-paper));
   pointer-events: auto;
   touch-action: none;
 }
@@ -1338,20 +1340,6 @@ html.dark .relation-badge {
 
 .timeline-viewer-node-layer {
   z-index: 3;
-  mask-image: linear-gradient(
-    to right,
-    transparent 0,
-    #000 calc(var(--timeline-viewer-region-axis-width, 152px) + 10px),
-    #000 calc(100% - 20px),
-    transparent 100%
-  );
-  -webkit-mask-image: linear-gradient(
-    to right,
-    transparent 0,
-    #000 calc(var(--timeline-viewer-region-axis-width, 152px) + 10px),
-    #000 calc(100% - 20px),
-    transparent 100%
-  );
 }
 
 .timeline-viewer-region-guide {
@@ -1435,6 +1423,11 @@ html.dark .relation-badge {
 }
 
 .timeline-viewer-frame--active[data-viewer-interacting='true']
+  .timeline-viewer-node-content {
+  pointer-events: none;
+}
+
+.timeline-viewer-frame--active[data-viewer-interacting='true']
   .timeline-viewer-time-tick:not([data-tick-strength='century']) {
   opacity: 0.28;
 }
@@ -1448,8 +1441,7 @@ html.dark .relation-badge {
   justify-content: center;
   padding-inline: 0.6875rem;
   overflow: hidden;
-  border: 2px solid
-    rgb(var(--timeline-region-rgb, var(--c-line)) / 0.82);
+  border: 1px solid rgb(var(--timeline-region-rgb, var(--c-line)) / 0.46);
   border-radius: 4px;
   background: rgb(var(--c-paper) / 0.96);
   transition:
@@ -1464,7 +1456,7 @@ html.dark .relation-badge {
 
 .timeline-viewer-node[data-priority='true'] .timeline-viewer-node__surface {
   min-width: 4.5rem;
-  border-color: rgb(var(--timeline-region-rgb, var(--c-line)) / 0.82);
+  border-color: rgb(var(--timeline-region-rgb, var(--c-line)) / 0.5);
   background: rgb(var(--c-paper) / 0.96);
 }
 
@@ -1477,7 +1469,7 @@ html.dark .relation-badge {
 
 .timeline-viewer-node[data-secondary-occurrence='true']
   .timeline-viewer-node__surface {
-  border-color: rgb(var(--timeline-region-rgb, var(--c-line)) / 0.82);
+  border-color: rgb(var(--timeline-region-rgb, var(--c-line)) / 0.42);
   color: rgb(var(--c-ink));
   background: rgb(var(--c-paper) / 0.96);
 }
@@ -1632,7 +1624,7 @@ html.dark .relation-badge {
   position: absolute;
   z-index: 7;
   right: auto;
-  bottom: max(0.875rem, calc(env(safe-area-inset-bottom) + 0.75rem));
+  bottom: max(0.5rem, calc(env(safe-area-inset-bottom) + 0.375rem));
   left: 50%;
   display: grid;
   grid-template-columns: 3rem 3rem 4.5rem 3rem 5.5rem;
@@ -1644,8 +1636,6 @@ html.dark .relation-badge {
   background: rgb(var(--c-paper) / 0.96);
   box-shadow: none;
   opacity: 1;
-  backdrop-filter: blur(6px);
-  -webkit-backdrop-filter: blur(6px);
   transform: translateX(-50%);
   transition: opacity 180ms ease;
 }
@@ -1719,7 +1709,7 @@ html.dark .relation-badge {
   .timeline-viewer-controls {
     top: auto;
     right: auto;
-    bottom: max(0.875rem, calc(env(safe-area-inset-bottom) + 0.75rem));
+    bottom: max(0.5rem, calc(env(safe-area-inset-bottom) + 0.375rem));
     left: 50%;
     height: 3.125rem;
     grid-template-columns: 3rem 3rem 4.5rem 3rem 5.5rem;

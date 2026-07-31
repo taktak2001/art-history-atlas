@@ -173,6 +173,8 @@ export function TimelineViewerFrame({
   const interactionFrameRef = useRef<number | null>(null);
   const controlsIdleTimerRef = useRef<number | null>(null);
   const wheelSettleTimerRef = useRef<number | null>(null);
+  const interactionActiveRef = useRef(false);
+  const compositorFrameCountRef = useRef(0);
   const pendingFixedTransformRef =
     useRef<TimelineViewerTransform>(IDENTITY_TRANSFORM);
   const pendingInteractionTransformRef =
@@ -235,6 +237,7 @@ export function TimelineViewerFrame({
       ]) {
         layer?.style.removeProperty('transform');
       }
+      interactionActiveRef.current = false;
       delete root.dataset.viewerInteracting;
       root.dataset.viewerLayoutPasses = String(
         Number(root.dataset.viewerLayoutPasses ?? 0) + 1,
@@ -510,7 +513,9 @@ export function TimelineViewerFrame({
         );
         if (label) {
           label.style.height = `${layout.height}px`;
-          label.style.transform = `translate3d(0, ${layout.top}px, 0)`;
+          label.style.transform = `translate3d(0, ${
+            layout.top - metrics.timeHeight
+          }px, 0)`;
           label.style.visibility = visible ? 'visible' : 'hidden';
           label.dataset.viewerRegionHeight = String(layout.height);
           label.dataset.viewerTrackCount = String(layout.trackCount);
@@ -667,7 +672,10 @@ export function TimelineViewerFrame({
       transformRef.current = constrained;
       pendingInteractionTransformRef.current = constrained;
       const root = rootRef.current;
-      if (root) root.dataset.viewerInteracting = 'true';
+      if (root && !interactionActiveRef.current) {
+        interactionActiveRef.current = true;
+        root.dataset.viewerInteracting = 'true';
+      }
 
       if (interactionFrameRef.current !== null) return;
       interactionFrameRef.current = window.requestAnimationFrame(() => {
@@ -697,18 +705,15 @@ export function TimelineViewerFrame({
         if (regionTrackRef.current) {
           regionTrackRef.current.style.transform = regionTransform;
         }
-        writeScaleOutput(current);
         if (rootRef.current) {
-          rootRef.current.dataset.viewerScale = String(current.scale);
-          rootRef.current.dataset.viewerX = String(current.x);
-          rootRef.current.dataset.viewerY = String(current.y);
+          compositorFrameCountRef.current += 1;
           rootRef.current.dataset.viewerCompositorFrames = String(
-            Number(rootRef.current.dataset.viewerCompositorFrames ?? 0) + 1,
+            compositorFrameCountRef.current,
           );
         }
       });
     },
-    [constrainTransform, writeScaleOutput],
+    [constrainTransform],
   );
 
   const applyTransform = useCallback(
@@ -727,6 +732,7 @@ export function TimelineViewerFrame({
         canvas.style.transform = `translate3d(${constrained.x}px, ${constrained.y}px, 0) scale(${constrained.scale})`;
       }
       if (root) {
+        interactionActiveRef.current = false;
         delete root.dataset.viewerInteracting;
         root.style.setProperty(
           '--timeline-viewer-scale',
@@ -973,6 +979,7 @@ export function TimelineViewerFrame({
         window.cancelAnimationFrame(interactionFrameRef.current);
         interactionFrameRef.current = null;
       }
+      interactionActiveRef.current = false;
       if (wheelSettleTimerRef.current !== null) {
         window.clearTimeout(wheelSettleTimerRef.current);
         wheelSettleTimerRef.current = null;
