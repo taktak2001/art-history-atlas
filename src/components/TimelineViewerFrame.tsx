@@ -1,6 +1,7 @@
 'use client';
 
 import Link from 'next/link';
+import { NativeTimelineViewerFrame } from '@/components/NativeTimelineViewerFrame';
 import {
   useCallback,
   useEffect,
@@ -66,7 +67,7 @@ export type TimelineViewerRegion = {
   height: number;
 };
 
-type Props = {
+export type TimelineViewerFrameProps = {
   active: boolean;
   contentHeight: number;
   contentOriginX: number;
@@ -130,7 +131,7 @@ const viewerTickStrength = (year: number) => {
   return 'minor';
 };
 
-export function TimelineViewerFrame({
+function LegacyTimelineViewerFrame({
   active,
   contentHeight,
   contentOriginX,
@@ -143,7 +144,7 @@ export function TimelineViewerFrame({
   onClose,
   onSemanticLevelChange,
   children,
-}: Props) {
+}: TimelineViewerFrameProps) {
   const rootRef = useRef<HTMLDivElement>(null);
   const stageRef = useRef<HTMLDivElement>(null);
   const canvasRef = useRef<HTMLDivElement>(null);
@@ -1614,4 +1615,15 @@ export function TimelineViewerFrame({
       </div>
     </div>
   );
+}
+
+const nativeTimelineScrollEnabled =
+  process.env.NEXT_PUBLIC_TIMELINE_NATIVE_SCROLL !== '0';
+
+export function TimelineViewerFrame(props: TimelineViewerFrameProps) {
+  if (nativeTimelineScrollEnabled) {
+    return <NativeTimelineViewerFrame {...props} />;
+  }
+
+  return <LegacyTimelineViewerFrame {...props} />;
 }

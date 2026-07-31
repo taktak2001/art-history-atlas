@@ -9,9 +9,11 @@ import {
   relativeTimelineViewerCompositeTransform,
   selectTimelineViewerTickLabels,
   semanticTimelineTicks,
+  snapTimelineViewerPixel,
   timelineViewerMaxScale,
   timelineViewerRegionHeight,
   timelineViewerSemanticLevel,
+  timelineViewerScrollAfterScale,
   timelineViewerTickPriority,
   timelineViewerTrackCenter,
   timelineViewerVirtualNodeKeys,
@@ -54,6 +56,54 @@ describe('timeline viewer geometry', () => {
     expect(after).toEqual({ x: -580, y: -240, scale: 2 });
     expect(after.x + contentPoint.x * after.scale).toBe(center.x);
     expect(after.y + contentPoint.y * after.scale).toBe(center.y);
+  });
+
+  it('native scrollでもviewport中央の年代位置を保って拡大する', () => {
+    const beforeScrollLeft = 420;
+    const anchorX = 195;
+    const axisInset = 102;
+    const contentPoint =
+      (beforeScrollLeft + anchorX - axisInset) / 1;
+    const afterScrollLeft = timelineViewerScrollAfterScale({
+      scrollLeft: beforeScrollLeft,
+      anchorX,
+      axisInset,
+      currentScale: 1,
+      nextScale: 2,
+    });
+
+    expect(afterScrollLeft).toBe(933);
+    expect(
+      (afterScrollLeft + anchorX - axisInset) / 2,
+    ).toBe(contentPoint);
+  });
+
+  it('native zoom後のscrollLeftを実寸worldの範囲へ収める', () => {
+    expect(
+      timelineViewerScrollAfterScale({
+        scrollLeft: 1200,
+        anchorX: 195,
+        axisInset: 102,
+        currentScale: 1,
+        nextScale: 3,
+        maximumScrollLeft: 1600,
+      }),
+    ).toBe(1600);
+    expect(
+      timelineViewerScrollAfterScale({
+        scrollLeft: 0,
+        anchorX: 195,
+        axisInset: 102,
+        currentScale: 2,
+        nextScale: 0.6,
+      }),
+    ).toBe(0);
+  });
+
+  it('ラベルと罫線の座標をdevice pixelへ揃える', () => {
+    expect(snapTimelineViewerPixel(10.26, 2)).toBe(10.5);
+    expect(snapTimelineViewerPixel(10.24, 2)).toBe(10);
+    expect(snapTimelineViewerPixel(10.6, Number.NaN)).toBe(11);
   });
 
   it('パン量を現在座標へ加算する', () => {
