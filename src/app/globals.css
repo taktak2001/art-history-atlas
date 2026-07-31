@@ -1702,6 +1702,181 @@ html.dark .relation-badge {
   line-height: 1;
 }
 
+/* Native viewer engine
+ *
+ * One-finger movement belongs to the browser scroll container. The world has
+ * real dimensions, while the two axes share the same scroll context and rely
+ * on CSS sticky rather than JavaScript transform synchronisation.
+ */
+.timeline-viewer-frame--native .timeline-viewer-stage {
+  position: absolute;
+  z-index: 1;
+  inset: 0;
+  overflow: auto;
+  cursor: auto;
+  overscroll-behavior: contain;
+  scrollbar-width: none;
+  touch-action: pan-x pan-y;
+  user-select: none;
+  -webkit-overflow-scrolling: touch;
+}
+
+.timeline-viewer-frame--native .timeline-viewer-stage::-webkit-scrollbar {
+  display: none;
+}
+
+.timeline-viewer-frame--native .timeline-viewer-stage:active {
+  cursor: auto;
+}
+
+.timeline-viewer-native-world {
+  position: relative;
+  display: grid;
+  width: max(
+    100%,
+    calc(
+      var(--timeline-viewer-region-axis-width, 144px) +
+        var(--timeline-viewer-native-content-width, 1px)
+    )
+  );
+  min-height: max(
+    100%,
+    calc(
+      var(--timeline-viewer-time-axis-height, 52px) +
+        var(--timeline-viewer-native-board-height, 1px)
+    )
+  );
+  grid-template-columns:
+    var(--timeline-viewer-region-axis-width, 144px)
+    max(
+      var(--timeline-viewer-native-content-width, 1px),
+      calc(100dvw - var(--timeline-viewer-region-axis-width, 144px))
+    );
+  grid-template-rows:
+    var(--timeline-viewer-time-axis-height, 52px)
+    var(--timeline-viewer-native-board-height, 1px);
+  background: rgb(var(--c-paper));
+}
+
+.timeline-viewer-frame--native .timeline-viewer-native-time-axis {
+  position: sticky;
+  z-index: 7;
+  top: 0;
+  right: auto;
+  left: auto;
+  width: auto;
+  height: var(--timeline-viewer-time-axis-height, 52px);
+  grid-column: 2;
+  grid-row: 1;
+  overflow: hidden;
+  background: rgb(var(--c-paper));
+  pointer-events: none;
+  touch-action: pan-x pan-y;
+}
+
+.timeline-viewer-native-time-track {
+  position: relative;
+  width: var(--timeline-viewer-native-content-width, 1px);
+  height: 100%;
+}
+
+.timeline-viewer-frame--native .timeline-viewer-time-tick {
+  transform: none;
+}
+
+.timeline-viewer-frame--native
+  .timeline-viewer-time-tick[data-axis-edge='start'] {
+  transform: translateX(8px);
+}
+
+.timeline-viewer-frame--native
+  .timeline-viewer-time-tick[data-axis-edge='end'] {
+  transform: translateX(calc(-100% - 12px));
+}
+
+.timeline-viewer-frame--native .timeline-viewer-native-region-axis {
+  position: sticky;
+  z-index: 7;
+  top: auto;
+  bottom: auto;
+  left: 0;
+  width: var(--timeline-viewer-region-axis-width, 144px);
+  height: var(--timeline-viewer-native-board-height, 1px);
+  grid-column: 1;
+  grid-row: 2;
+  overflow: hidden;
+  background: rgb(var(--c-paper));
+  pointer-events: none;
+  touch-action: pan-x pan-y;
+}
+
+.timeline-viewer-frame--native .timeline-viewer-region-label {
+  transform: none;
+}
+
+.timeline-viewer-frame--native .timeline-viewer-native-origin {
+  position: sticky;
+  z-index: 9;
+  top: 0;
+  left: 0;
+  width: var(--timeline-viewer-region-axis-width, 144px);
+  height: var(--timeline-viewer-time-axis-height, 52px);
+  grid-column: 1;
+  grid-row: 1;
+  background: rgb(var(--c-paper));
+  pointer-events: none;
+  touch-action: pan-x pan-y;
+}
+
+.timeline-viewer-native-board {
+  position: relative;
+  width: max(
+    var(--timeline-viewer-native-content-width, 1px),
+    calc(100dvw - var(--timeline-viewer-region-axis-width, 144px))
+  );
+  height: var(--timeline-viewer-native-board-height, 1px);
+  grid-column: 2;
+  grid-row: 2;
+  overflow: hidden;
+  border-block: 2px solid rgb(var(--c-ink) / 0.42);
+  background: rgb(var(--c-surface) / 0.12);
+}
+
+.timeline-viewer-frame--native .timeline-viewer-gridline,
+.timeline-viewer-frame--native .timeline-viewer-region-guide,
+.timeline-viewer-frame--native .timeline-viewer-period,
+.timeline-viewer-frame--native .timeline-viewer-overflow,
+.timeline-viewer-frame--native .timeline-viewer-node {
+  transform: none;
+}
+
+.timeline-viewer-frame--native .timeline-viewer-gridline {
+  top: 0;
+}
+
+.timeline-viewer-frame--native .timeline-viewer-region-guide {
+  left: 0;
+  width: 100%;
+}
+
+.timeline-viewer-frame--native .timeline-viewer-node,
+.timeline-viewer-frame--native .timeline-viewer-overflow {
+  z-index: 4;
+}
+
+.timeline-viewer-frame--native .timeline-viewer-period {
+  z-index: 3;
+}
+
+.timeline-viewer-frame--native .timeline-viewer-position {
+  display: none;
+}
+
+.timeline-viewer-frame--native[data-viewer-pinch-preview]
+  .timeline-viewer-controls {
+  opacity: 1;
+}
+
 @media (max-width: 639px) {
   .timeline-viewer-region-label {
     padding-inline: 0.7rem;

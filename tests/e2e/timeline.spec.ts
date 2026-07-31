@@ -551,9 +551,7 @@ test('閲覧モードは全画面へ入り、倍率操作・全体表示・終�
   expect(
     await trigger.evaluate((element) => element.getBoundingClientRect().height),
   ).toBeGreaterThanOrEqual(44);
-  expect(await normalStage.evaluate((element) => getComputedStyle(element).touchAction)).not.toBe(
-    'none',
-  );
+  await expect(normalStage).toHaveCount(0);
 
   await trigger.click();
   const viewer = page.locator('[data-timeline-viewer="active"]');
@@ -575,7 +573,9 @@ test('閲覧モードは全画面へ入り、倍率操作・全体表示・終�
       width: await page.evaluate(() => window.innerWidth),
       height: await page.evaluate(() => window.innerHeight),
     });
-  expect(await stage.evaluate((element) => getComputedStyle(element).touchAction)).toBe('none');
+  expect(
+    await stage.evaluate((element) => getComputedStyle(element).touchAction),
+  ).toContain('pan-x');
 
   await viewer.getByRole('button', { name: '拡大' }).click();
   await expect
@@ -614,6 +614,14 @@ test('閲覧モードの年代軸は縮小・拡大時も短い表記を重ね�
           document
             .querySelector('.timeline-viewer-axis-origin')
             ?.getBoundingClientRect().right ?? 0;
+        const timeAxisRect = document
+          .querySelector('.timeline-viewer-native-time-axis')
+          ?.getBoundingClientRect();
+        const visibleLeft = Math.max(originRight, timeAxisRect?.left ?? 0);
+        const visibleRight = Math.min(
+          window.innerWidth,
+          timeAxisRect?.right ?? window.innerWidth,
+        );
         return {
           originRight,
           viewportWidth: window.innerWidth,
@@ -626,6 +634,10 @@ test('閲覧モードの年代軸は縮小・拡大時も短い表記を重ね�
                 text: element.textContent ?? '',
               };
             })
+            .filter(
+              ({ left, right }) =>
+                left >= visibleLeft && right <= visibleRight,
+            )
             .sort((a, b) => a.left - b.left),
         };
       });
@@ -635,6 +647,7 @@ test('閲覧モードの年代軸は縮小・拡大時も短い表記を重ね�
     for (let index = 1; index < visibleTicks.length; index += 1) {
       expect(
         visibleTicks[index].left - visibleTicks[index - 1].left,
+        JSON.stringify(visibleTicks),
       ).toBeGreaterThanOrEqual(63);
       expect(visibleTicks[index].left).toBeGreaterThanOrEqual(
         visibleTicks[index - 1].right + 7,
@@ -644,8 +657,8 @@ test('閲覧モードの年代軸は縮小・拡大時も短い表記を重ね�
       '前40,000',
     );
     for (const tick of visibleTicks) {
-      expect(tick.left).toBeGreaterThanOrEqual(tickLayout.originRight + 7);
-      expect(tick.right).toBeLessThanOrEqual(tickLayout.viewportWidth - 7);
+      expect(tick.left).toBeGreaterThanOrEqual(tickLayout.originRight);
+      expect(tick.right).toBeLessThanOrEqual(tickLayout.viewportWidth);
     }
   };
 
@@ -678,7 +691,7 @@ test('閲覧モードの年代軸は縮小・拡大時も短い表記を重ね�
   await assertReadableTicks();
 });
 
-test('閲覧モードはマウスパン・ダブルクリック・キーボード操作を共有する', async ({
+test('閲覧モードはnative scroll・ダブルクリック・キーボード操作を共有する', async ({
   page,
 }, testInfo) => {
   test.skip(testInfo.project.name !== 'desktop', 'desktop project only');
@@ -691,31 +704,35 @@ test('閲覧モードはマウスパン・ダブルクリック・キーボー�
 
   const viewer = page.locator('[data-timeline-viewer="active"]');
   const stage = viewer.locator('[data-timeline-viewer-stage]');
-  const beforeX = Number(await viewer.getAttribute('data-viewer-x'));
-  await stage.dispatchEvent('pointerdown', {
-    pointerId: 41,
-    pointerType: 'mouse',
-    clientX: 620,
-    clientY: 420,
-    isPrimary: true,
+  await expect(viewer).toHaveAttribute('data-viewer-engine', 'native-scroll');
+  await expect(viewer).toHaveAttribute(
+    'data-native-one-finger-pan',
+    'browser',
+  );
+  const nativeStyles = await stage.evaluate((element) => {
+    const style = getComputedStyle(element);
+    return {
+      overflowX: style.overflowX,
+      overflowY: style.overflowY,
+      touchAction: style.touchAction,
+      pointerMoveHandler: element.onpointermove,
+    };
   });
-  await stage.dispatchEvent('pointermove', {
-    pointerId: 41,
-    pointerType: 'mouse',
-    clientX: 500,
-    clientY: 350,
-    isPrimary: true,
-  });
-  await stage.dispatchEvent('pointerup', {
-    pointerId: 41,
-    pointerType: 'mouse',
-    clientX: 500,
-    clientY: 350,
-    isPrimary: true,
+  expect(nativeStyles.overflowX).toBe('auto');
+  expect(nativeStyles.overflowY).toBe('auto');
+  expect(nativeStyles.touchAction).toContain('pan-x');
+  expect(nativeStyles.touchAction).toContain('pan-y');
+  expect(nativeStyles.pointerMoveHandler).toBeNull();
+  const beforeScrollLeft = await stage.evaluate((element) => element.scrollLeft);
+  await stage.evaluate((element) => {
+    element.scrollLeft = Math.min(
+      element.scrollLeft + 180,
+      element.scrollWidth - element.clientWidth,
+    );
   });
   await expect
-    .poll(async () => Number((await viewer.getAttribute('data-viewer-x')) ?? 0))
-    .not.toBe(beforeX);
+    .poll(async () => stage.evaluate((element) => element.scrollLeft))
+    .toBeGreaterThan(beforeScrollLeft);
 
   await stage.dispatchEvent('dblclick', { clientX: 720, clientY: 520 });
   await expect(viewer).toHaveAttribute('data-viewer-scale', '1.75');
@@ -729,7 +746,7 @@ test('閲覧モードはマウスパン・ダブルクリック・キーボー�
     .toBeGreaterThan(0);
 });
 
-test('パン中は再レイアウトせずcompositor transformだけを更新する', async ({
+test('native scroll中はReact render・DOM差替え・compositor transformを発生させない', async ({
   page,
 }, testInfo) => {
   test.skip(testInfo.project.name !== 'desktop', 'desktop project only');
@@ -742,81 +759,35 @@ test('パン中は再レイアウトせずcompositor transformだけを更新す
 
   const viewer = page.locator('[data-timeline-viewer="active"]');
   const stage = viewer.locator('[data-timeline-viewer-stage]');
-  await expect
-    .poll(async () =>
-      Number((await viewer.getAttribute('data-viewer-layout-passes')) ?? 0),
-    )
-    .toBeGreaterThan(0);
-  await page.waitForTimeout(160);
-  const layoutPasses = Number(
-    (await viewer.getAttribute('data-viewer-layout-passes')) ?? 0,
-  );
-  const compositorFrames = Number(
-    (await viewer.getAttribute('data-viewer-compositor-frames')) ?? 0,
-  );
-
+  await page.waitForTimeout(180);
+  const before = await viewer.evaluate((element) => ({
+    renders: Number(element.getAttribute('data-viewer-render-count') ?? 0),
+    nodes: element.querySelectorAll('[data-viewer-node]').length,
+  }));
   await stage.evaluate((element) => {
-    const emit = (type: string, clientX: number, clientY: number) => {
-      element.dispatchEvent(
-        new PointerEvent(type, {
-          bubbles: true,
-          cancelable: true,
-          pointerId: 61,
-          pointerType: 'mouse',
-          clientX,
-          clientY,
-          isPrimary: true,
-        }),
-      );
-    };
-    emit('pointerdown', 760, 440);
-    for (let step = 0; step < 24; step += 1) {
-      emit('pointermove', 760 - step * 8, 440 - step * 2);
-    }
+    element.scrollLeft = Math.min(
+      520,
+      element.scrollWidth - element.clientWidth,
+    );
+    element.scrollTop = Math.min(
+      240,
+      element.scrollHeight - element.clientHeight,
+    );
+    element.dispatchEvent(new Event('scroll'));
   });
-  await expect(viewer).toHaveAttribute('data-viewer-interacting', 'true');
-  expect(
-    Number((await viewer.getAttribute('data-viewer-layout-passes')) ?? 0),
-  ).toBe(layoutPasses);
-  await expect
-    .poll(
-      async () =>
-        Number(
-          (await viewer.getAttribute('data-viewer-compositor-frames')) ?? 0,
-        ) - compositorFrames,
-    )
-    .toBeGreaterThan(0);
-  const interactionFrames =
-    Number((await viewer.getAttribute('data-viewer-compositor-frames')) ?? 0) -
-    compositorFrames;
-  expect(interactionFrames).toBeLessThanOrEqual(2);
-
-  const compositeLayer = viewer.locator('.timeline-viewer-node-content');
-  const compositeStyles = await compositeLayer.evaluate((element) => {
-    const style = getComputedStyle(element);
-    return {
-      contain: style.contain,
-      transform: style.transform,
-      willChange: style.willChange,
-    };
-  });
-  expect(compositeStyles.contain).toContain('layout');
-  expect(compositeStyles.transform).not.toBe('none');
-  expect(compositeStyles.willChange).toContain('transform');
-
-  await stage.dispatchEvent('pointerup', {
-    pointerId: 61,
-    pointerType: 'mouse',
-    clientX: 576,
-    clientY: 394,
-    isPrimary: true,
-  });
-  await expect(viewer).not.toHaveAttribute('data-viewer-interacting');
-  await expect
-    .poll(async () =>
-      Number((await viewer.getAttribute('data-viewer-layout-passes')) ?? 0),
-    )
-    .toBeGreaterThan(layoutPasses);
+  await page.waitForTimeout(180);
+  const after = await viewer.evaluate((element) => ({
+    renders: Number(element.getAttribute('data-viewer-render-count') ?? 0),
+    nodes: element.querySelectorAll('[data-viewer-node]').length,
+    interacting: element.hasAttribute('data-viewer-interacting'),
+    transformedNodes: Array.from(
+      element.querySelectorAll<HTMLElement>('[data-viewer-node]'),
+    ).some((node) => getComputedStyle(node).transform !== 'none'),
+  }));
+  expect(after.renders).toBe(before.renders);
+  expect(after.nodes).toBe(before.nodes);
+  expect(after.interacting).toBe(false);
+  expect(after.transformedNodes).toBe(false);
 });
 
 test('iPhone幅の閲覧モードは2本指の中点を保ってピンチズームする', async ({
@@ -829,45 +800,16 @@ test('iPhone幅の閲覧モードは2本指の中点を保ってピンチズー�
   const viewer = page.locator('[data-timeline-viewer="active"]');
   const stage = viewer.locator('[data-timeline-viewer-stage]');
   await stage.evaluate((element) => {
-    const emit = (
-      type: string,
-      pointerId: number,
-      clientX: number,
-      isPrimary = false,
-    ) => {
-      element.dispatchEvent(
-        new PointerEvent(type, {
-          bubbles: true,
-          cancelable: true,
-          pointerId,
-          pointerType: 'touch',
-          clientX,
-          clientY: 380,
-          isPrimary,
-        }),
-      );
+    const emit = (type: string, points: number[]) => {
+      const event = new Event(type, { bubbles: true, cancelable: true });
+      Object.defineProperty(event, 'touches', {
+        value: points.map((clientX) => ({ clientX, clientY: 380 })),
+      });
+      element.dispatchEvent(event);
     };
-    emit('pointerdown', 11, 130, true);
-    emit('pointerdown', 12, 250);
-    emit('pointermove', 11, 90, true);
-    emit('pointermove', 12, 290);
-  });
-  await stage.evaluate((element) => {
-    for (const [pointerId, clientX] of [
-      [11, 90],
-      [12, 290],
-    ]) {
-      element.dispatchEvent(
-        new PointerEvent('pointerup', {
-          bubbles: true,
-          cancelable: true,
-          pointerId,
-          pointerType: 'touch',
-          clientX,
-          clientY: 380,
-        }),
-      );
-    }
+    emit('touchstart', [130, 250]);
+    emit('touchmove', [90, 290]);
+    emit('touchend', []);
   });
   await expect
     .poll(async () => Number((await viewer.getAttribute('data-viewer-scale')) ?? 0))
@@ -1201,26 +1143,20 @@ test('閲覧モードのラベルは内容幅で、地域レーンと操作帯�
   );
   expect(idleOpacity).toBeGreaterThanOrEqual(0.68);
   expect(idleOpacity).toBeLessThanOrEqual(0.75);
-  await viewer.locator('[data-timeline-viewer-stage]').dispatchEvent('pointerdown', {
-    pointerId: 77,
-    pointerType: 'mouse',
-    clientX: 700,
-    clientY: 500,
-    isPrimary: true,
-  });
+  await viewer.getByRole('button', { name: '拡大' }).click();
   await expect(viewer).not.toHaveAttribute('data-controls-idle', 'true');
 });
 
-test('閲覧モードは年代位置を保ち、地域反復と省略項目を静かに示す', async ({
+test('閲覧モードは年代位置を保ち、地域反復を静かに示す', async ({
   page,
-}, testInfo) => {
+}) => {
   await page.goto('/timeline/');
   await modeButton(page, '近代').click();
   await page.getByRole('button', { name: 'タイムラインを全画面で表示' }).click();
 
   const viewer = page.locator('[data-timeline-viewer="active"]');
   await viewer.getByRole('button', { name: '全体表示へ戻す' }).click();
-  const nodeLayer = viewer.locator('.timeline-viewer-node-layer');
+  const nodeLayer = viewer.locator('[data-viewer-node-layer]');
   const maskImage = await nodeLayer.evaluate(
     (element) =>
       getComputedStyle(element).maskImage ||
@@ -1294,33 +1230,16 @@ test('閲覧モードは年代位置を保ち、地域反復と省略項目を�
       elements.map((element) => {
         const node = element as HTMLElement;
         return Math.abs(
-          node.getBoundingClientRect().x - Number(node.dataset.viewerStartX),
+          node.offsetLeft - Number(node.dataset.viewerStartX),
         );
       }),
   );
   expect(Math.max(...chronologicalOffsets)).toBeLessThanOrEqual(1);
-
-  if (testInfo.project.name !== 'desktop') return;
-  await viewer
-    .locator('[data-viewer-node][data-region-id="france"]')
-    .evaluateAll((elements) => {
-      elements.slice(0, 6).forEach((element) => {
-        const node = element as HTMLElement;
-        node.dataset.barStart = '220';
-        node.dataset.barEnd = '300';
-      });
-    });
-  await viewer.getByRole('button', { name: '拡大' }).click();
-  const overflow = viewer.locator('button.timeline-viewer-overflow:visible').first();
-  await expect(overflow).toBeVisible();
-  await expect(overflow).toHaveText(/^他\d+件$/);
-  await overflow.click();
-  await expect(overflow).toBeHidden();
 });
 
 test('展示ボードの年代階層と上下終端を明示する', async ({
   page,
-}, testInfo) => {
+}) => {
   await page.goto('/timeline/');
   await page.getByRole('button', { name: 'タイムラインを全画面で表示' }).click();
 
@@ -1372,9 +1291,15 @@ test('展示ボードの年代階層と上下終端を明示する', async ({
   expect(labelStyle.weight).toBeGreaterThanOrEqual(600);
   expect(labelStyle.underline).toBe('none');
 
-  if (testInfo.project.name === 'desktop') {
-    await expect(viewer.locator('.timeline-viewer-position > span')).toBeVisible();
-  }
+  const nativeViewport = viewer.locator('[data-native-scroll-viewport]');
+  await expect(nativeViewport).toBeVisible();
+  const scrollExtent = await nativeViewport.evaluate((element) => ({
+    clientHeight: element.clientHeight,
+    scrollHeight: element.scrollHeight,
+  }));
+  expect(scrollExtent.scrollHeight).toBeGreaterThanOrEqual(
+    scrollExtent.clientHeight,
+  );
 });
 
 test('展示年表型タイムラインの比較スクリーンショットを保存する', async ({

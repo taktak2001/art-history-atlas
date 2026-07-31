@@ -51,6 +51,15 @@ export type TimelineViewerTickLabelCandidate = {
   priority: number;
 };
 
+export type TimelineViewerNativeZoom = {
+  scrollLeft: number;
+  anchorX: number;
+  axisInset: number;
+  currentScale: number;
+  nextScale: number;
+  maximumScrollLeft?: number;
+};
+
 export const TIMELINE_VIEWER_MIN_SCALE = 0.6;
 export const TIMELINE_VIEWER_MAX_SCALE = 4;
 export const TIMELINE_VIEWER_MOBILE_MAX_SCALE = 3;
@@ -77,6 +86,40 @@ const TIMELINE_VIEWER_TICK_STEPS = [
 ] as const;
 
 const roundTransformValue = (value: number) => Math.round(value * 1000) / 1000;
+
+export function snapTimelineViewerPixel(value: number, devicePixelRatio = 1) {
+  const ratio = Number.isFinite(devicePixelRatio)
+    ? Math.max(1, devicePixelRatio)
+    : 1;
+  return Math.round(value * ratio) / ratio;
+}
+
+/**
+ * Keeps the same chronological point beneath a viewport anchor when a native
+ * scroll world changes width. This only runs when zoom is committed, never
+ * during one-finger scrolling.
+ */
+export function timelineViewerScrollAfterScale({
+  scrollLeft,
+  anchorX,
+  axisInset,
+  currentScale,
+  nextScale,
+  maximumScrollLeft = Number.POSITIVE_INFINITY,
+}: TimelineViewerNativeZoom) {
+  const safeCurrentScale = Math.max(0.0001, currentScale);
+  const contentPoint =
+    (Math.max(0, scrollLeft) + anchorX - axisInset) / safeCurrentScale;
+  const nextScrollLeft =
+    axisInset + contentPoint * Math.max(0.0001, nextScale) - anchorX;
+
+  return roundTransformValue(
+    Math.min(
+      Math.max(0, maximumScrollLeft),
+      Math.max(0, nextScrollLeft),
+    ),
+  );
+}
 
 export function timelineViewerTickPriority(
   year: number,
