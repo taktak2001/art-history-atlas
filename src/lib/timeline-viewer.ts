@@ -44,6 +44,13 @@ export type TimelineViewerTrackPlacement = TimelineViewerCollisionItem & {
   track: number | null;
 };
 
+export type TimelineViewerTickLabelCandidate = {
+  year: number;
+  x: number;
+  width: number;
+  priority: number;
+};
+
 export const TIMELINE_VIEWER_MIN_SCALE = 0.6;
 export const TIMELINE_VIEWER_MAX_SCALE = 4;
 export const TIMELINE_VIEWER_MOBILE_MAX_SCALE = 3;
@@ -63,13 +70,49 @@ export const TIMELINE_VIEWER_LABEL_GAP = 10;
 // items. Sparse regions keep their natural height because row height is based
 // on the tracks actually occupied, not this ceiling.
 export const TIMELINE_VIEWER_MAX_TRACKS = 5;
-export const TIMELINE_VIEWER_TRACK_PITCH = 50;
+export const TIMELINE_VIEWER_TRACK_PITCH = 52;
 
 const TIMELINE_VIEWER_TICK_STEPS = [
   10, 25, 50, 100, 250, 500, 1000, 2500, 5000, 10000,
 ] as const;
 
 const roundTransformValue = (value: number) => Math.round(value * 1000) / 1000;
+
+export function timelineViewerTickPriority(
+  year: number,
+  mode: TimelineMode,
+) {
+  if (year === mode.start || year === mode.end) return 5;
+  if (year === 0) return 4;
+  if (year % 500 === 0) return 3;
+  if (year % 100 === 0) return 2;
+  return 1;
+}
+
+export function selectTimelineViewerTickLabels(
+  candidates: TimelineViewerTickLabelCandidate[],
+  minimumAnchorGap = 72,
+  minimumLabelGap = 8,
+) {
+  const selected: TimelineViewerTickLabelCandidate[] = [];
+  const prioritized = [...candidates].sort(
+    (a, b) => b.priority - a.priority || a.x - b.x || a.year - b.year,
+  );
+
+  for (const candidate of prioritized) {
+    const conflicts = selected.some((existing) => {
+      const anchorsTooClose =
+        Math.abs(existing.x - candidate.x) < minimumAnchorGap;
+      const labelsOverlap =
+        candidate.x < existing.x + existing.width + minimumLabelGap &&
+        candidate.x + candidate.width + minimumLabelGap > existing.x;
+      return anchorsTooClose || labelsOverlap;
+    });
+    if (!conflicts) selected.push(candidate);
+  }
+
+  return selected.sort((a, b) => a.x - b.x).map(({ year }) => year);
+}
 
 export function timelineViewerMaxScale(viewportWidth: number) {
   return viewportWidth <= 639

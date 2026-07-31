@@ -592,6 +592,92 @@ test('閲覧モードは全画面へ入り、倍率操作・全体表示・終�
   await expect(modeButton(page, '近代')).toHaveAttribute('aria-current', 'true');
 });
 
+test('閲覧モードの年代軸は縮小・拡大時も短い表記を重ねない', async ({
+  page,
+}) => {
+  await page.goto('/timeline/');
+  await page.getByRole('button', { name: 'タイムラインを全画面で表示' }).click();
+
+  const viewer = page.locator('[data-timeline-viewer="active"]');
+  const stage = viewer.locator('[data-timeline-viewer-stage]');
+  const assertReadableTicks = async () => {
+    await viewer.evaluate(
+      () =>
+        new Promise<void>((resolve) => {
+          requestAnimationFrame(() => requestAnimationFrame(() => resolve()));
+        }),
+    );
+    const tickLayout = await viewer
+      .locator('[data-viewer-tick][data-axis-label-visible="true"]')
+      .evaluateAll((elements) => {
+        const originRight =
+          document
+            .querySelector('.timeline-viewer-axis-origin')
+            ?.getBoundingClientRect().right ?? 0;
+        return {
+          originRight,
+          viewportWidth: window.innerWidth,
+          ticks: elements
+            .map((element) => {
+              const rect = element.getBoundingClientRect();
+              return {
+                left: rect.left,
+                right: rect.right,
+                text: element.textContent ?? '',
+              };
+            })
+            .sort((a, b) => a.left - b.left),
+        };
+      });
+    const visibleTicks = tickLayout.ticks;
+    expect(visibleTicks.length).toBeGreaterThan(0);
+
+    for (let index = 1; index < visibleTicks.length; index += 1) {
+      expect(
+        visibleTicks[index].left - visibleTicks[index - 1].left,
+      ).toBeGreaterThanOrEqual(63);
+      expect(visibleTicks[index].left).toBeGreaterThanOrEqual(
+        visibleTicks[index - 1].right + 7,
+      );
+    }
+    expect(visibleTicks.map(({ text }) => text).join('')).not.toContain(
+      '前40,000',
+    );
+    for (const tick of visibleTicks) {
+      expect(tick.left).toBeGreaterThanOrEqual(tickLayout.originRight + 7);
+      expect(tick.right).toBeLessThanOrEqual(tickLayout.viewportWidth - 7);
+    }
+  };
+
+  await expect(viewer.locator('[data-viewer-tick="-40000"]')).toHaveText(
+    '前4万',
+  );
+  await assertReadableTicks();
+
+  const zoomOut = viewer.getByRole('button', { name: '縮小' });
+  await zoomOut.click();
+  await zoomOut.click();
+  await expect
+    .poll(async () => Number(await viewer.getAttribute('data-viewer-scale')))
+    .toBeCloseTo(0.64, 2);
+  await assertReadableTicks();
+  await expect(viewer.locator('[data-viewer-tick="0"]')).toHaveText('0');
+
+  await stage.dispatchEvent('dblclick', { clientX: 260, clientY: 260 });
+  await expect
+    .poll(async () => Number(await viewer.getAttribute('data-viewer-scale')))
+    .toBeCloseTo(1.75, 2);
+  await assertReadableTicks();
+
+  const zoomIn = viewer.getByRole('button', { name: '拡大' });
+  await zoomIn.click();
+  await zoomIn.click();
+  await expect
+    .poll(async () => Number(await viewer.getAttribute('data-viewer-scale')))
+    .toBeGreaterThanOrEqual(2.7);
+  await assertReadableTicks();
+});
+
 test('閲覧モードはマウスパン・ダブルクリック・キーボード操作を共有する', async ({
   page,
 }, testInfo) => {
@@ -1000,6 +1086,7 @@ test('閲覧モードは実年代の期間線と固定寸法の名称ラベル�
         height: nodeRect.height,
         surfaceHeight: surfaceRect.height,
         dateBelowSurface: dateRect.top >= surfaceRect.bottom,
+        dateTop: dateRect.top,
       };
     }),
     period.evaluate((element) => {
@@ -1018,12 +1105,12 @@ test('閲覧モードは実年代の期間線と固定寸法の名称ラベル�
   expect(dimensions[1].height).toBeLessThanOrEqual(2);
   expect(dimensions[1].width).not.toBe(dimensions[0].width);
   expect(Math.abs(dimensions[1].x - dimensions[0].x)).toBeLessThanOrEqual(1);
-  expect(
-    dimensions[1].y - (dimensions[0].y + dimensions[0].height),
-  ).toBeGreaterThanOrEqual(3);
-  expect(
-    dimensions[1].y - (dimensions[0].y + dimensions[0].height),
-  ).toBeLessThanOrEqual(6);
+  expect(dimensions[1].y).toBeGreaterThanOrEqual(
+    dimensions[0].y + dimensions[0].surfaceHeight,
+  );
+  expect(dimensions[1].y + dimensions[1].height).toBeLessThanOrEqual(
+    dimensions[0].dateTop,
+  );
   const periodConnector = await period.evaluate((element) =>
     getComputedStyle(element, '::before').content,
   );
@@ -1074,6 +1161,9 @@ test('閲覧モードのラベルは内容幅で、地域レーンと操作帯�
   expect(Math.max(...oneTrackHeights)).toBeLessThanOrEqual(80);
 
   const controls = viewer.locator('[data-viewer-controls]');
+  const closeControl = viewer.getByRole('button', {
+    name: '閲覧モードを閉じる',
+  });
   const [controlsBox, viewport] = await Promise.all([
     controls.boundingBox(),
     page.evaluate(() => ({ width: innerWidth, height: innerHeight })),
@@ -1083,6 +1173,25 @@ test('閲覧モードのラベルは内容幅で、地域レーンと操作帯�
   expect(
     Math.abs((controlsBox?.x ?? 0) + (controlsBox?.width ?? 0) / 2 - viewport.width / 2),
   ).toBeLessThanOrEqual(2);
+  await expect(closeControl).toBeVisible();
+  expect(
+    await controls.evaluate((element) => getComputedStyle(element).position),
+  ).toBe('fixed');
+  expect(
+    await controls.evaluate((element) => getComputedStyle(element).overflow),
+  ).toBe('visible');
+  const closeHitTarget = await closeControl.evaluate((element) => {
+    const rect = element.getBoundingClientRect();
+    const hitTarget = document.elementFromPoint(
+      rect.left + rect.width / 2,
+      rect.top + rect.height / 2,
+    );
+    return (
+      hitTarget === element ||
+      (hitTarget instanceof Node && element.contains(hitTarget))
+    );
+  });
+  expect(closeHitTarget).toBe(true);
 
   await expect(viewer).toHaveAttribute('data-controls-idle', 'true', {
     timeout: 3200,
@@ -1276,6 +1385,9 @@ test('展示年表型タイムラインの比較スクリーンショットを�
   await page.getByRole('button', { name: 'タイムラインを全画面で表示' }).click();
 
   const viewer = page.locator('[data-timeline-viewer="active"]');
+  await expect(
+    viewer.locator('[data-axis-label-visible="true"]').first(),
+  ).toBeVisible();
   if (testInfo.project.name === 'mobile') {
     await page.screenshot({
       path: 'docs/screenshots/timeline-viewer-exhibition-board-iphone-100.png',

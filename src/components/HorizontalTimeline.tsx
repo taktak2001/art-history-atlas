@@ -29,6 +29,7 @@ import {
   chooseTimelineLabel,
   clipMovementToMode,
   fitTimelineModeToMovements,
+  formatTimelineYearLabel,
   movementOverlapsMode,
   timelineJapaneseShortLabel,
   timelineBarVisualWidth,
@@ -112,8 +113,7 @@ const SURVEY_SUMMARIES = [
 
 const fmtYear = (year: number) => {
   if (year === TIMELINE_NOW) return '現在';
-  if (year === 0) return '紀元境界';
-  return year < 0 ? `前${Math.abs(year).toLocaleString('ja-JP')}` : `${year}`;
+  return formatTimelineYearLabel(year);
 };
 
 export function HorizontalTimeline({

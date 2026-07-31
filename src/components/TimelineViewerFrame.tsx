@@ -15,6 +15,7 @@ import {
   type WheelEvent,
 } from 'react';
 import {
+  formatTimelineYearLabel,
   yearToTimelineX,
   type TimelineMode,
 } from '@/lib/timeline-presentation';
@@ -24,7 +25,9 @@ import {
   fitTimelineViewerRect,
   panTimelineViewer,
   relativeTimelineViewerCompositeTransform,
+  selectTimelineViewerTickLabels,
   semanticTimelineTicks,
+  timelineViewerTickPriority,
   timelineViewerVirtualNodeKeys,
   timelineViewerRegionHeight,
   timelineViewerMaxScale,
@@ -119,11 +122,6 @@ const viewerAxisMetrics = (viewportWidth: number): AxisMetrics => {
     return { regionWidth: 120, timeHeight: 50, controlBottom: 62 };
   }
   return { regionWidth: 144, timeHeight: 52, controlBottom: 62 };
-};
-
-const formatViewerYear = (year: number) => {
-  if (year === 0) return '紀元境界';
-  return year < 0 ? `前${Math.abs(year).toLocaleString('ja-JP')}` : `${year}`;
 };
 
 const viewerTickStrength = (year: number) => {
@@ -263,23 +261,55 @@ export function TimelineViewerFrame({
         setAxisTicks(nextTicks);
       }
 
-      for (const tick of timeAxisRef.current?.querySelectorAll<HTMLElement>(
-        '[data-viewer-tick]',
-      ) ?? []) {
+      const tickElements = Array.from(
+        timeAxisRef.current?.querySelectorAll<HTMLElement>(
+          '[data-viewer-tick]',
+        ) ?? [],
+      );
+      const compactEraBoundary =
+        stage.clientWidth <= 639 || transform.scale < 1;
+      const tickCandidates = tickElements.flatMap((tick) => {
         const year = Number(tick.dataset.viewerTick);
+        tick.textContent = formatTimelineYearLabel(
+          year,
+          compactEraBoundary ? '0' : '紀元境界',
+        );
         const worldX =
           contentOriginX + yearToTimelineX(year, timelineMode, timelineWidth);
         const screen = worldToTimelineViewerScreen(
           { x: worldX, y: 0 },
           transform,
         );
-        const visible =
-          screen.x >=
-            metrics.regionWidth + AXIS_EDGE_PADDING - horizontalBuffer &&
-          screen.x <=
-            stage.clientWidth - AXIS_EDGE_PADDING + horizontalBuffer;
+        const withinViewport =
+          screen.x >= metrics.regionWidth + AXIS_EDGE_PADDING &&
+          screen.x + tick.offsetWidth <=
+            stage.clientWidth - AXIS_EDGE_PADDING;
         tick.style.transform = `translate3d(${screen.x}px, 0, 0)`;
+        if (!withinViewport) {
+          tick.style.visibility = 'hidden';
+          delete tick.dataset.axisLabelVisible;
+          return [];
+        }
+        return [
+          {
+            year,
+            x: screen.x,
+            width: tick.offsetWidth,
+            priority: timelineViewerTickPriority(year, timelineMode),
+          },
+        ];
+      });
+      const visibleTickYears = new Set(
+        selectTimelineViewerTickLabels(
+          tickCandidates,
+          stage.clientWidth <= 639 ? 72 : 64,
+        ),
+      );
+      for (const tick of tickElements) {
+        const visible = visibleTickYears.has(Number(tick.dataset.viewerTick));
         tick.style.visibility = visible ? 'visible' : 'hidden';
+        if (visible) tick.dataset.axisLabelVisible = 'true';
+        else delete tick.dataset.axisLabelVisible;
       }
 
       const periodElements = new Map(
@@ -583,7 +613,10 @@ export function TimelineViewerFrame({
         node.dataset.viewerTrack = String(placement.track);
         if (period) {
           const nodeTop = trackCenterY - node.offsetHeight / 2;
-          const periodY = nodeTop + node.offsetHeight + 4;
+          const surfaceHeight =
+            node.querySelector<HTMLElement>('.timeline-viewer-node__surface')
+              ?.offsetHeight ?? 30;
+          const periodY = nodeTop + surfaceHeight + 2;
           period.style.width = `${Math.max(1, periodRight - periodLeft)}px`;
           period.style.transform = `translate3d(${periodLeft}px, ${periodY}px, 0)`;
           period.style.visibility =
@@ -1285,43 +1318,49 @@ export function TimelineViewerFrame({
     >
       {active && (
         <>
-          <div
-            className="timeline-viewer-controls"
-            aria-label="閲覧モード操作"
-            data-viewer-controls
-            data-idle={controlsIdle || undefined}
-          >
-            <button
-              type="button"
-              onClick={onClose}
-              aria-label="閲覧モードを閉じる"
+          <div className="timeline-viewer-ui-layer" data-viewer-ui-layer>
+            <div
+              className="timeline-viewer-controls"
+              aria-label="閲覧モード操作"
+              data-viewer-controls
+              data-idle={controlsIdle || undefined}
             >
-              <span aria-hidden="true">×</span>
-            </button>
-            <button
-              type="button"
-              onClick={() => zoomFromCenter(0.8)}
-              aria-label="縮小"
-            >
-              <span aria-hidden="true">−</span>
-            </button>
-            <output ref={scaleOutputRef} aria-live="polite" aria-label="現在倍率">
-              100%
-            </output>
-            <button
-              type="button"
-              onClick={() => zoomFromCenter(1.25)}
-              aria-label="拡大"
-            >
-              <span aria-hidden="true">＋</span>
-            </button>
-            <button
-              type="button"
-              onClick={fitContent}
-              aria-label="全体表示へ戻す"
-            >
-              全体
-            </button>
+              <button
+                type="button"
+                onClick={onClose}
+                aria-label="閲覧モードを閉じる"
+              >
+                <span aria-hidden="true">×</span>
+              </button>
+              <button
+                type="button"
+                onClick={() => zoomFromCenter(0.8)}
+                aria-label="縮小"
+              >
+                <span aria-hidden="true">−</span>
+              </button>
+              <output
+                ref={scaleOutputRef}
+                aria-live="polite"
+                aria-label="現在倍率"
+              >
+                100%
+              </output>
+              <button
+                type="button"
+                onClick={() => zoomFromCenter(1.25)}
+                aria-label="拡大"
+              >
+                <span aria-hidden="true">＋</span>
+              </button>
+              <button
+                type="button"
+                onClick={fitContent}
+                aria-label="全体表示へ戻す"
+              >
+                全体
+              </button>
+            </div>
           </div>
 
           <div
@@ -1343,7 +1382,7 @@ export function TimelineViewerFrame({
                     undefined
                   }
                 >
-                  {formatViewerYear(tick)}
+                  {formatTimelineYearLabel(tick)}
                 </span>
               ))}
             </div>
