@@ -229,9 +229,9 @@ describe('timeline viewer geometry', () => {
     expect(placements.map(({ track }) => track)).toEqual([0, 0]);
   });
 
-  it('5段目以降を集約対象として返す', () => {
+  it('密集地域は5段まで使い、6段目以降を集約対象として返す', () => {
     const placements = assignTimelineViewerTracks(
-      Array.from({ length: 5 }, (_, index) => ({
+      Array.from({ length: 6 }, (_, index) => ({
         key: `movement-${index}`,
         regionId: 'france',
         x: 100,
@@ -239,7 +239,14 @@ describe('timeline viewer geometry', () => {
       })),
     );
 
-    expect(placements.map(({ track }) => track)).toEqual([0, 1, 2, 3, null]);
+    expect(placements.map(({ track }) => track)).toEqual([
+      0,
+      1,
+      2,
+      3,
+      4,
+      null,
+    ]);
   });
 
   it('トラック数に応じて地域高と中心位置を調整する', () => {
@@ -247,6 +254,7 @@ describe('timeline viewer geometry', () => {
     expect(timelineViewerRegionHeight(2)).toBe(130);
     expect(timelineViewerRegionHeight(3)).toBe(180);
     expect(timelineViewerRegionHeight(4)).toBe(230);
+    expect(timelineViewerRegionHeight(5)).toBe(280);
     expect(timelineViewerTrackCenter(0, 1)).toBe(40);
     expect(timelineViewerTrackCenter(0, 3)).toBe(40);
     expect(timelineViewerTrackCenter(2, 3)).toBe(140);
