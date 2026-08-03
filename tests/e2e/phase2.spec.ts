@@ -135,3 +135,59 @@ test('02章は解釈ラベルを置かず、章・サブ見出し・本文の3�
   expect(typography.sectionSize).toBeGreaterThan(typography.subsectionSize);
   expect(typography.subsectionSize).toBeGreaterThan(typography.bodySize);
 });
+
+test('02章の転換と継承は同じ階層・同じ強度で並列表示する', async ({ page }) => {
+  await page.goto('/movements/italian-renaissance/');
+
+  const chapter = page.locator('#relation');
+  const paired = chapter.locator('[data-parallel-subsections]');
+  const changed = chapter.getByRole('heading', { level: 3, name: '転換したこと' });
+  const inherited = chapter.getByRole('heading', { level: 3, name: '継承したこと' });
+
+  await expect(paired).toBeVisible();
+  await expect(changed).toHaveClass(await inherited.getAttribute('class') ?? '');
+  await expect(inherited.locator('..')).not.toHaveClass(/border-l|pl-6|pl-8/);
+  await expect(chapter.locator('aside, blockquote')).toHaveCount(0);
+});
+
+test('03章は5つの具体的区分だけを表示し、事実ラベルを置かない', async ({ page }) => {
+  await page.goto('/movements/rinpa/');
+
+  const chapter = page.locator('#visual');
+  for (const title of [
+    '見た目の特徴',
+    '構図・空間',
+    '色彩・光',
+    '技法',
+    '媒体・素材',
+  ]) {
+    await expect(chapter.getByRole('heading', { level: 3, name: title })).toBeVisible();
+  }
+  await expect(chapter.getByRole('heading', { level: 3 })).toHaveCount(5);
+  await expect(chapter.getByText('事実', { exact: true })).toHaveCount(0);
+  await expect(chapter.getByText(/たらし込み/)).toHaveCount(1);
+});
+
+test('04章は導入文を直接表示し、汎用メタ見出しと重複本文を置かない', async ({ page }) => {
+  await page.goto('/movements/rinpa/');
+
+  const chapter = page.locator('#system');
+  const introduction = chapter.locator('[data-chapter-introduction]');
+  await expect(introduction).toHaveText(
+    '邸宅・寺院・茶の湯・衣食住の工芸の中で鑑賞され、近代以降は美術館で再編された。',
+  );
+  await expect(chapter.getByText('事実', { exact: true })).toHaveCount(0);
+  await expect(chapter.getByText('解釈', { exact: true })).toHaveCount(0);
+  await expect(chapter.getByText('補足', { exact: true })).toHaveCount(0);
+  await expect(chapter.getByText('詳細', { exact: true })).toHaveCount(0);
+  await expect(chapter.getByText('情報', { exact: true })).toHaveCount(0);
+  await expect(
+    chapter.getByText(
+      '邸宅・寺院・茶の湯・衣食住の工芸の中で鑑賞され、近代以降は美術館で再編された。',
+      { exact: true },
+    ),
+  ).toHaveCount(1);
+  await expect(
+    chapter.getByRole('heading', { level: 3, name: '芸術家の社会的地位' }),
+  ).toBeVisible();
+});

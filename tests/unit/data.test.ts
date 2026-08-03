@@ -11,6 +11,7 @@ import { artists } from '@/data/artists';
 import { works } from '@/data/works';
 import { relationships } from '@/data/relationships';
 import { sources } from '@/data/sources';
+import { auditMovementContentTaxonomy } from '@/lib/movement-content-taxonomy';
 
 describe('データスキーマ検証', () => {
   it('全ムーブメントがスキーマに適合する', () => {
@@ -133,5 +134,26 @@ describe('収録規模（MVP要件）', () => {
   });
   it('各ムーブメントに鑑賞ポイントがある', () => {
     for (const m of movements) expect(m.viewingPoints.length, m.id).toBeGreaterThan(0);
+  });
+});
+
+describe('Movement詳細の情報分類', () => {
+  it('全54件で技法と媒体・素材が見た目の特徴へ混入していない', () => {
+    expect(movements).toHaveLength(54);
+    expect(auditMovementContentTaxonomy(movements)).toEqual([]);
+  });
+
+  it('琳派は見た目・構図・色彩・技法・媒体を重複なく説明する', () => {
+    const rinpa = movements.find((movement) => movement.id === 'rinpa');
+    expect(rinpa).toMatchObject({
+      visualTraits: '金銀地、平面的な色面、大胆な余白、図様の反復・切断、波や植物のリズム。',
+      compositionSpace:
+        '屏風や器面の連続を生かし、対象を拡大・反復・切断して、装飾と空間を一体化する。',
+      colorLight:
+        '金銀の反射と、群青・緑青・胡粉・墨の対比が、見る位置や自然光によって表情を変える。',
+      technique: 'たらし込み、箔押し、型紙、蒔絵など。',
+      materials:
+        '紙、絹、金銀箔、墨、岩絵具、漆、陶土、染料。屏風、扇面、陶器、染織にも展開した。',
+    });
   });
 });
