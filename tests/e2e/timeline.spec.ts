@@ -794,6 +794,28 @@ test('PC閲覧モードはマウスドラッグで上下左右へパンできる
   await expect(stage).not.toHaveAttribute('data-desktop-dragging', 'true');
 });
 
+test('PC閲覧モードはドラッグしていないムーブメントクリックで詳細へ遷移する', async ({
+  page,
+}, testInfo) => {
+  test.skip(testInfo.project.name !== 'desktop', 'desktop project only');
+  await page.goto('/timeline/');
+  await page
+    .getByRole('group', { name: '表示する範囲' })
+    .getByRole('button', { name: /すべて/ })
+    .click();
+  await page.getByRole('button', { name: 'タイムラインを全画面で表示' }).click();
+
+  const viewer = page.locator('[data-timeline-viewer="active"]');
+  const baroque = viewer
+    .locator('[data-viewer-node][data-movement-id="baroque"]:visible')
+    .first();
+  await expect(baroque).toBeVisible();
+  await baroque.click();
+
+  await expect(page).toHaveURL(/\/movements\/baroque\/$/);
+  await expect(page.getByRole('heading', { name: 'バロック', level: 1 })).toBeVisible();
+});
+
 test('＋／−ズームは中央の年代と地域レーンを維持する', async ({
   page,
 }, testInfo) => {

@@ -731,7 +731,6 @@ export function NativeTimelineViewerFrame({
       scrollTop: event.currentTarget.scrollTop,
       active: false,
     };
-    event.currentTarget.setPointerCapture(event.pointerId);
   };
 
   const handlePointerMove = (event: ReactPointerEvent<HTMLDivElement>) => {
@@ -748,6 +747,7 @@ export function NativeTimelineViewerFrame({
     if (!drag.active) {
       drag.active = true;
       suppressClickRef.current = true;
+      event.currentTarget.setPointerCapture(event.pointerId);
       event.currentTarget.dataset.desktopDragging = 'true';
       wakeControls();
     }
