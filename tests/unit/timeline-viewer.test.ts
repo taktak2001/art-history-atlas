@@ -11,11 +11,14 @@ import {
   selectTimelineViewerTickLabels,
   semanticTimelineTicks,
   snapTimelineViewerPixel,
+  timelineViewerContentViewportAnchor,
   timelineViewerMaxScale,
+  timelineViewerRegionAnchorAt,
   timelineViewerRegionHeight,
   timelineViewerRightGutter,
   timelineViewerSemanticLevel,
   timelineViewerScrollAfterScale,
+  timelineViewerScrollTopForRegionAnchor,
   timelineViewerTickPriority,
   timelineViewerTrackCenter,
   timelineViewerVirtualNodeKeys,
@@ -28,7 +31,9 @@ import {
 } from '@/lib/timeline-viewer';
 import {
   formatTimelineYearLabel,
+  timelineXToYear,
   timelineModeById,
+  yearToTimelineX,
 } from '@/lib/timeline-presentation';
 
 describe('timeline viewer geometry', () => {
@@ -100,6 +105,59 @@ describe('timeline viewer geometry', () => {
         nextScale: 0.6,
       }),
     ).toBe(0);
+  });
+
+  it('固定軸と操作帯を除いた表示領域の中央を返す', () => {
+    expect(
+      timelineViewerContentViewportAnchor(
+        { width: 1440, height: 900 },
+        { top: 52, right: 0, bottom: 90, left: 144 },
+      ),
+    ).toEqual({ x: 792, y: 431 });
+  });
+
+  it('地域IDとレーン内比率から異なる高さの縦アンカーを復元する', () => {
+    const anchor = timelineViewerRegionAnchorAt(
+      [
+        { id: 'america', top: 0, height: 120 },
+        { id: 'japan', top: 120, height: 100 },
+        { id: 'east-asia', top: 220, height: 80 },
+      ],
+      195,
+    );
+    expect(anchor).toEqual({ regionId: 'japan', ratio: 0.75 });
+    expect(
+      timelineViewerScrollTopForRegionAnchor({
+        anchor: anchor!,
+        regions: [
+          { id: 'america', top: 0, height: 180 },
+          { id: 'japan', top: 180, height: 200 },
+          { id: 'east-asia', top: 380, height: 120 },
+        ],
+        anchorY: 200,
+        axisInset: 52,
+      }),
+    ).toBe(182); // 52 + (180 + 150) - 200.
+  });
+
+  it('地域アンカーの復元位置を上下端へ収める', () => {
+    expect(
+      timelineViewerScrollTopForRegionAnchor({
+        anchor: { regionId: 'japan', ratio: 1 },
+        regions: [{ id: 'japan', top: 700, height: 200 }],
+        anchorY: 300,
+        axisInset: 52,
+        maximumScrollTop: 500,
+      }),
+    ).toBe(500);
+  });
+
+  it('通史の非線形座標を年代へ戻して連続ズームの基準にできる', () => {
+    const survey = timelineModeById('survey');
+    for (const year of [-40000, -3000, 0, 1400, 1900, 2026]) {
+      const x = yearToTimelineX(year, survey, 1180);
+      expect(timelineXToYear(x, survey, 1180)).toBeCloseTo(year, 5);
+    }
   });
 
   it('ラベルと罫線の座標をdevice pixelへ揃える', () => {

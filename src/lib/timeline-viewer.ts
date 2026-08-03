@@ -60,6 +60,17 @@ export type TimelineViewerNativeZoom = {
   maximumScrollLeft?: number;
 };
 
+export type TimelineViewerRegionBand = {
+  id: string;
+  top: number;
+  height: number;
+};
+
+export type TimelineViewerRegionAnchor = {
+  regionId: string;
+  ratio: number;
+};
+
 export type TimelineViewerPeriodRail = {
   key: string;
   regionId: string;
@@ -246,6 +257,72 @@ export function timelineViewerScrollAfterScale({
     Math.min(
       Math.max(0, maximumScrollLeft),
       Math.max(0, nextScrollLeft),
+    ),
+  );
+}
+
+export function timelineViewerContentViewportAnchor(
+  viewport: TimelineViewerSize,
+  insets: TimelineViewerInsets,
+): TimelineViewerPoint {
+  const width = Math.max(0, viewport.width - insets.left - insets.right);
+  const height = Math.max(0, viewport.height - insets.top - insets.bottom);
+  return {
+    x: roundTransformValue(insets.left + width / 2),
+    y: roundTransformValue(insets.top + height / 2),
+  };
+}
+
+export function timelineViewerRegionAnchorAt(
+  regions: TimelineViewerRegionBand[],
+  boardY: number,
+): TimelineViewerRegionAnchor | null {
+  if (regions.length === 0) return null;
+  const region =
+    regions.find(
+      (candidate) =>
+        boardY >= candidate.top &&
+        boardY <= candidate.top + Math.max(1, candidate.height),
+    ) ??
+    regions.reduce((closest, candidate) => {
+      const closestCenter = closest.top + closest.height / 2;
+      const candidateCenter = candidate.top + candidate.height / 2;
+      return Math.abs(candidateCenter - boardY) <
+        Math.abs(closestCenter - boardY)
+        ? candidate
+        : closest;
+    });
+  return {
+    regionId: region.id,
+    ratio: Math.min(
+      1,
+      Math.max(0, (boardY - region.top) / Math.max(1, region.height)),
+    ),
+  };
+}
+
+export function timelineViewerScrollTopForRegionAnchor({
+  anchor,
+  regions,
+  anchorY,
+  axisInset,
+  maximumScrollTop = Number.POSITIVE_INFINITY,
+}: {
+  anchor: TimelineViewerRegionAnchor;
+  regions: TimelineViewerRegionBand[];
+  anchorY: number;
+  axisInset: number;
+  maximumScrollTop?: number;
+}) {
+  const region = regions.find(({ id }) => id === anchor.regionId);
+  if (!region) return 0;
+  const boardY =
+    region.top + Math.min(1, Math.max(0, anchor.ratio)) * region.height;
+  const nextScrollTop = axisInset + boardY - anchorY;
+  return roundTransformValue(
+    Math.min(
+      Math.max(0, maximumScrollTop),
+      Math.max(0, nextScrollTop),
     ),
   );
 }
