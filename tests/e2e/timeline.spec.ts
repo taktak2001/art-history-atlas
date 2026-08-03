@@ -1061,6 +1061,109 @@ test('閲覧モードは実年代の期間線と固定寸法の名称ラベル�
   await expect(viewer.locator('[data-movement-inspector]')).toHaveCount(0);
 });
 
+test('同一地域の近接・重複期間線を独立して見せる', async ({ page }) => {
+  await page.goto('/timeline/');
+  await page
+    .getByRole('group', { name: '表示する範囲' })
+    .getByRole('button', { name: /充実/ })
+    .click();
+  await page.getByRole('button', { name: 'タイムラインを全画面で表示' }).click();
+
+  const viewer = page.locator('[data-timeline-viewer="active"]');
+  const periodFor = (movementId: string, regionId: string) =>
+    viewer
+      .locator(
+        `[data-viewer-period][data-movement-id="${movementId}"][data-region-id="${regionId}"]`,
+      )
+      .first();
+  const yamato = periodFor('yamato-e', 'japan');
+  const rinpa = periodFor('rinpa', 'japan');
+  const islamic = periodFor('islamic-art', 'spain');
+  const baroque = periodFor('baroque', 'spain');
+  for (const period of [yamato, rinpa, islamic, baroque]) {
+    await expect(period).toBeVisible();
+  }
+
+  const touching = await Promise.all(
+    [yamato, rinpa].map((period) =>
+      period.evaluate((element) => {
+        const rect = element.getBoundingClientRect();
+        return { left: rect.left, right: rect.right, top: rect.top };
+      }),
+    ),
+  );
+  const horizontalGap = Math.max(
+    touching[1].left - touching[0].right,
+    touching[0].left - touching[1].right,
+  );
+  const verticalGap = Math.abs(touching[1].top - touching[0].top);
+  expect(
+    horizontalGap >= 8 || verticalGap >= 4,
+    '大和絵と琳派の期間線に視覚的な切れ目が必要',
+  ).toBe(true);
+
+  const overlapping = await Promise.all(
+    [islamic, baroque].map((period) =>
+      period.evaluate((element) => {
+        const rect = element.getBoundingClientRect();
+        return { left: rect.left, right: rect.right, top: rect.top };
+      }),
+    ),
+  );
+  expect(
+    overlapping[0].left < overlapping[1].right &&
+      overlapping[0].right > overlapping[1].left,
+  ).toBe(true);
+  expect(Math.abs(overlapping[0].top - overlapping[1].top)).toBeGreaterThanOrEqual(
+    4,
+  );
+});
+
+test('終端gutterとタイトル優先の年代captionを維持する', async ({
+  page,
+}, testInfo) => {
+  await page.goto('/timeline/');
+  await modeButton(page, '現代').click();
+  await page.getByRole('button', { name: 'タイムラインを全画面で表示' }).click();
+
+  const viewer = page.locator('[data-timeline-viewer="active"]');
+  const board = viewer.locator('[data-viewer-board]');
+  const endTick = viewer.locator('[data-axis-edge="end"]');
+  await expect(endTick).toBeVisible();
+  const endSpacing = await Promise.all([
+    board.evaluate((element) => element.getBoundingClientRect().right),
+    endTick.evaluate((element) => element.getBoundingClientRect().right),
+  ]);
+  expect(endSpacing[0] - endSpacing[1]).toBeGreaterThanOrEqual(
+    testInfo.project.name === 'mobile' ? 140 : 170,
+  );
+
+  const node = viewer.locator('[data-viewer-node]:visible').first();
+  const hierarchy = await node.evaluate((element) => {
+    const surface = element.querySelector<HTMLElement>(
+      '.timeline-viewer-node__surface',
+    )!;
+    const title = element.querySelector<HTMLElement>(
+      '.timeline-viewer-node__short:not([style*="display: none"]), .timeline-viewer-node__name, .timeline-viewer-node__formal',
+    )!;
+    const date = element.querySelector<HTMLElement>(
+      '.timeline-viewer-node__date',
+    )!;
+    const surfaceRect = surface.getBoundingClientRect();
+    const dateRect = date.getBoundingClientRect();
+    return {
+      titleSize: Number.parseFloat(getComputedStyle(title).fontSize),
+      dateSize: Number.parseFloat(getComputedStyle(date).fontSize),
+      dateWeight: Number.parseInt(getComputedStyle(date).fontWeight, 10),
+      verticalGap: dateRect.top - surfaceRect.bottom,
+    };
+  });
+  expect(hierarchy.dateSize).toBeLessThan(hierarchy.titleSize);
+  expect(hierarchy.dateSize).toBeLessThanOrEqual(10);
+  expect(hierarchy.dateWeight).toBeLessThanOrEqual(400);
+  expect(hierarchy.verticalGap).toBeGreaterThanOrEqual(10);
+});
+
 test('閲覧モードのラベルは内容幅で、地域レーンと操作帯を軽量に保つ', async ({
   page,
 }, testInfo) => {
@@ -1100,7 +1203,7 @@ test('閲覧モードのラベルは内容幅で、地域レーンと操作帯�
       ),
     );
   expect(oneTrackHeights.length).toBeGreaterThan(0);
-  expect(Math.max(...oneTrackHeights)).toBeLessThanOrEqual(80);
+  expect(Math.max(...oneTrackHeights)).toBeLessThanOrEqual(88);
 
   const controls = viewer.locator('[data-viewer-controls]');
   const closeControl = viewer.getByRole('button', {

@@ -5,6 +5,7 @@ import {
   constrainTimelineViewerVerticalPan,
   fitTimelineViewer,
   fitTimelineViewerRect,
+  layoutTimelineViewerPeriodRails,
   panTimelineViewer,
   relativeTimelineViewerCompositeTransform,
   selectTimelineViewerTickLabels,
@@ -12,6 +13,7 @@ import {
   snapTimelineViewerPixel,
   timelineViewerMaxScale,
   timelineViewerRegionHeight,
+  timelineViewerRightGutter,
   timelineViewerSemanticLevel,
   timelineViewerScrollAfterScale,
   timelineViewerTickPriority,
@@ -104,6 +106,60 @@ describe('timeline viewer geometry', () => {
     expect(snapTimelineViewerPixel(10.26, 2)).toBe(10.5);
     expect(snapTimelineViewerPixel(10.24, 2)).toBe(10);
     expect(snapTimelineViewerPixel(10.6, Number.NaN)).toBe(11);
+  });
+
+  it('接する別ムーブメントの期間線へ10pxの切れ目を作る', () => {
+    const layouts = layoutTimelineViewerPeriodRails([
+      {
+        key: 'yamato-e',
+        regionId: 'japan',
+        track: 0,
+        start: 100,
+        end: 300,
+      },
+      {
+        key: 'rinpa',
+        regionId: 'japan',
+        track: 0,
+        start: 300,
+        end: 420,
+      },
+    ]);
+    const yamato = layouts.find(({ key }) => key === 'yamato-e')!;
+    const rinpa = layouts.find(({ key }) => key === 'rinpa')!;
+
+    expect(rinpa.left - (yamato.left + yamato.width)).toBe(10);
+    expect(yamato.offsetY).toBe(0);
+    expect(rinpa.offsetY).toBe(0);
+  });
+
+  it('実年代が重なる期間線は長さを変えず5pxずらす', () => {
+    const layouts = layoutTimelineViewerPeriodRails([
+      {
+        key: 'islamic-art',
+        regionId: 'spain',
+        track: 0,
+        start: 60,
+        end: 300,
+      },
+      {
+        key: 'baroque',
+        regionId: 'spain',
+        track: 0,
+        start: 240,
+        end: 280,
+      },
+    ]);
+    const islamic = layouts.find(({ key }) => key === 'islamic-art')!;
+    const baroque = layouts.find(({ key }) => key === 'baroque')!;
+
+    expect(islamic).toMatchObject({ left: 60, width: 240, offsetY: 0 });
+    expect(baroque).toMatchObject({ left: 240, width: 40, offsetY: 5 });
+  });
+
+  it('終端にviewport別の固定gutterを確保する', () => {
+    expect(timelineViewerRightGutter(390)).toBe(160);
+    expect(timelineViewerRightGutter(1440)).toBe(192);
   });
 
   it('パン量を現在座標へ加算する', () => {
@@ -352,13 +408,13 @@ describe('timeline viewer geometry', () => {
   });
 
   it('トラック数に応じて地域高と中心位置を調整する', () => {
-    expect(timelineViewerRegionHeight(1)).toBe(80);
-    expect(timelineViewerRegionHeight(2)).toBe(132);
-    expect(timelineViewerRegionHeight(3)).toBe(184);
-    expect(timelineViewerRegionHeight(4)).toBe(236);
-    expect(timelineViewerRegionHeight(5)).toBe(288);
-    expect(timelineViewerTrackCenter(0, 1)).toBe(40);
-    expect(timelineViewerTrackCenter(0, 3)).toBe(40);
-    expect(timelineViewerTrackCenter(2, 3)).toBe(144);
+    expect(timelineViewerRegionHeight(1)).toBe(88);
+    expect(timelineViewerRegionHeight(2)).toBe(152);
+    expect(timelineViewerRegionHeight(3)).toBe(216);
+    expect(timelineViewerRegionHeight(4)).toBe(280);
+    expect(timelineViewerRegionHeight(5)).toBe(344);
+    expect(timelineViewerTrackCenter(0, 1)).toBe(44);
+    expect(timelineViewerTrackCenter(0, 3)).toBe(44);
+    expect(timelineViewerTrackCenter(2, 3)).toBe(172);
   });
 });
