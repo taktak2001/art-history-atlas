@@ -233,6 +233,12 @@ describe('関係ネットワークの表示設定', () => {
       const definition = RELATIONSHIP_DEFINITIONS[kind];
       expect(definition.label).toBeTruthy();
       expect(definition.shortDefinition).toBeTruthy();
+      expect(definition.legendDescription.length).toBeGreaterThanOrEqual(80);
+      expect(definition.legendDescription.length).toBeLessThanOrEqual(120);
+      expect(definition.legendDescription.match(/。/g)).toHaveLength(2);
+      expect(definition.legendDescription).not.toMatch(
+        /実線|破線|点線|鎖線|有向|無向/,
+      );
       expect(definition.fullDefinition).toBeTruthy();
       expect(definition.criteria.length).toBeGreaterThan(0);
       expect(definition.exclusions.length).toBeGreaterThan(0);

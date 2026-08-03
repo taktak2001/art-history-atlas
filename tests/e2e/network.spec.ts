@@ -63,11 +63,17 @@ test('iPhoneでは本体が初期viewport内に入り、線の見方はoverlay�
   await expect(guide.locator('.network-line-guide__panel')).toBeVisible();
   await expect(guide.locator('.network-line-guide__legend li')).toHaveCount(9);
   await expect(
+    guide.locator('[data-relationship-legend-description]'),
+  ).toHaveCount(9);
+  await expect(
     guide.getByText(
-      '中心的な方法や問題意識を、後続運動が直接引き継ぐ関係',
+      '前の運動の中心的な思想や技法を受け継ぎ、発展させた関係です。すべてをそのまま引き継ぐのではなく、新しい時代や地域に合わせて再解釈される変化も含めて丁寧に捉えます。',
       { exact: true },
     ),
   ).toBeVisible();
+  await expect(guide.locator('.network-line-guide__panel')).not.toContainText(
+    /実線|破線|点線|鎖線|有向|無向/,
+  );
   await expect(guide.locator('.network-line-guide__definitions')).toHaveCount(0);
   await expect(page.locator('.network-core-definitions')).toHaveCount(0);
   const after = await graph.boundingBox();
