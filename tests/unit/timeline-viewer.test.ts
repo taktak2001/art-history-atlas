@@ -5,6 +5,7 @@ import {
   constrainTimelineViewerVerticalPan,
   fitTimelineViewer,
   fitTimelineViewerRect,
+  layoutTimelineViewerDateCaptions,
   layoutTimelineViewerPeriodRails,
   panTimelineViewer,
   relativeTimelineViewerCompositeTransform,
@@ -213,6 +214,148 @@ describe('timeline viewer geometry', () => {
 
     expect(islamic).toMatchObject({ left: 60, width: 240, offsetY: 0 });
     expect(baroque).toMatchObject({ left: 240, width: 40, offsetY: 5 });
+  });
+
+  it('期間線から十分離れた年代キャプションは通常位置を維持する', () => {
+    const [layout] = layoutTimelineViewerDateCaptions(
+      [
+        {
+          key: 'symbolism',
+          regionId: 'france',
+          track: 0,
+          left: 120,
+          top: 44,
+          width: 64,
+          height: 11,
+          laneBottom: 88,
+        },
+      ],
+      [
+        {
+          key: 'symbolism',
+          regionId: 'france',
+          track: 0,
+          left: 100,
+          top: 37,
+          width: 120,
+          height: 2,
+        },
+      ],
+    );
+
+    expect(layout).toEqual({ key: 'symbolism', offsetY: 0 });
+  });
+
+  it('年代キャプションと期間線が衝突する項目だけ5px下へ逃がす', () => {
+    const layouts = layoutTimelineViewerDateCaptions(
+      [
+        {
+          key: 'symbolism',
+          regionId: 'france',
+          track: 0,
+          left: 120,
+          top: 44,
+          width: 64,
+          height: 11,
+          laneBottom: 88,
+        },
+        {
+          key: 'unrelated',
+          regionId: 'italy',
+          track: 0,
+          left: 120,
+          top: 44,
+          width: 64,
+          height: 11,
+          laneBottom: 88,
+        },
+      ],
+      [
+        {
+          key: 'fauvism',
+          regionId: 'france',
+          track: 1,
+          left: 100,
+          top: 42,
+          width: 120,
+          height: 2,
+        },
+      ],
+    );
+
+    expect(layouts).toEqual([
+      { key: 'symbolism', offsetY: 5 },
+      { key: 'unrelated', offsetY: 0 },
+    ]);
+  });
+
+  it('高倍率で複数の近接線がある年代キャプションは最大12pxまで段階補正する', () => {
+    const [layout] = layoutTimelineViewerDateCaptions(
+      [
+        {
+          key: 'fauvism',
+          regionId: 'france',
+          track: 2,
+          left: 4020,
+          top: 44,
+          width: 72,
+          height: 11,
+          laneBottom: 88,
+        },
+      ],
+      [
+        {
+          key: 'symbolism',
+          regionId: 'france',
+          track: 1,
+          left: 4000,
+          top: 42,
+          width: 180,
+          height: 2,
+        },
+        {
+          key: 'fauvism',
+          regionId: 'france',
+          track: 2,
+          left: 4010,
+          top: 47,
+          width: 160,
+          height: 2,
+        },
+      ],
+    );
+
+    expect(layout).toEqual({ key: 'fauvism', offsetY: 12 });
+  });
+
+  it('年代キャプションの補正を地域レーン下端で収める', () => {
+    const [layout] = layoutTimelineViewerDateCaptions(
+      [
+        {
+          key: 'origin',
+          regionId: 'origin',
+          track: 0,
+          left: 120,
+          top: 44,
+          width: 64,
+          height: 11,
+          laneBottom: 60,
+        },
+      ],
+      [
+        {
+          key: 'origin-rail',
+          regionId: 'origin',
+          track: 0,
+          left: 100,
+          top: 42,
+          width: 120,
+          height: 2,
+        },
+      ],
+    );
+
+    expect(layout).toEqual({ key: 'origin', offsetY: 3 });
   });
 
   it('終端にviewport別の固定gutterを確保する', () => {

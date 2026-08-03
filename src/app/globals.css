@@ -1515,6 +1515,7 @@ html.dark .relation-badge {
   font-weight: 400;
   line-height: 1.05;
   text-overflow: ellipsis;
+  transform: translateY(var(--timeline-viewer-date-offset-y, 0));
   white-space: nowrap;
 }
 

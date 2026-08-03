@@ -86,6 +86,32 @@ export type TimelineViewerPeriodRailLayout = {
   offsetY: number;
 };
 
+export type TimelineViewerDateCaption = {
+  key: string;
+  regionId: string;
+  track: number;
+  left: number;
+  top: number;
+  width: number;
+  height: number;
+  laneBottom: number;
+};
+
+export type TimelineViewerPeriodSegment = {
+  key: string;
+  regionId: string;
+  track: number;
+  left: number;
+  top: number;
+  width: number;
+  height: number;
+};
+
+export type TimelineViewerDateCaptionLayout = {
+  key: string;
+  offsetY: number;
+};
+
 export const TIMELINE_VIEWER_MIN_SCALE = 0.6;
 export const TIMELINE_VIEWER_MAX_SCALE = 4;
 export const TIMELINE_VIEWER_MOBILE_MAX_SCALE = 3;
@@ -104,6 +130,9 @@ export const TIMELINE_VIEWER_LABEL_GAP = 10;
 export const TIMELINE_VIEWER_PERIOD_GAP = 10;
 export const TIMELINE_VIEWER_PERIOD_MAX_TRIM = 6;
 export const TIMELINE_VIEWER_PERIOD_OVERLAP_OFFSET = 5;
+export const TIMELINE_VIEWER_DATE_OFFSETS = [0, 5, 9, 12] as const;
+export const TIMELINE_VIEWER_DATE_COLLISION_PADDING = 2;
+export const TIMELINE_VIEWER_DATE_RAIL_GAP = 3;
 // Dense regions such as France can use one additional row before collapsing
 // items. Sparse regions keep their natural height because row height is based
 // on the tracks actually occupied, not this ceiling.
@@ -232,6 +261,69 @@ export function layoutTimelineViewerPeriodRails(
       width: roundTransformValue(Math.max(1, width)),
       offsetY,
     }));
+}
+
+/**
+ * Moves only date captions whose final position would collide with a duration
+ * rail. Rail separation is resolved first; this pass therefore accounts for
+ * the small vertical rail offsets without changing cards or track geometry.
+ */
+export function layoutTimelineViewerDateCaptions(
+  captions: TimelineViewerDateCaption[],
+  rails: TimelineViewerPeriodSegment[],
+  offsets: readonly number[] = TIMELINE_VIEWER_DATE_OFFSETS,
+  safetyPadding = TIMELINE_VIEWER_DATE_COLLISION_PADDING,
+  minimumGap = TIMELINE_VIEWER_DATE_RAIL_GAP,
+): TimelineViewerDateCaptionLayout[] {
+  const candidates = offsets.length > 0 ? offsets : [0];
+  const pad = Math.max(0, safetyPadding);
+  const gap = Math.max(0, minimumGap);
+
+  const collides = (
+    caption: TimelineViewerDateCaption,
+    offsetY: number,
+  ) => {
+    const left = caption.left - pad;
+    const right = caption.left + caption.width + pad;
+    const top = caption.top + offsetY - pad;
+    const bottom = caption.top + offsetY + caption.height + pad;
+
+    return rails.some((rail) => {
+      if (
+        rail.regionId !== caption.regionId ||
+        Math.abs(rail.track - caption.track) > 1
+      ) {
+        return false;
+      }
+      const railRight = rail.left + rail.width;
+      if (railRight <= left || rail.left >= right) return false;
+
+      const railBottom = rail.top + rail.height;
+      const verticalGap =
+        railBottom <= top
+          ? top - railBottom
+          : bottom <= rail.top
+            ? rail.top - bottom
+            : -1;
+      return verticalGap < gap;
+    });
+  };
+
+  return captions.map((caption) => {
+    const maximumOffset = Math.max(
+      0,
+      caption.laneBottom - pad - caption.top - caption.height,
+    );
+    const availableOffsets = candidates
+      .map((offset) => Math.min(Math.max(0, offset), maximumOffset))
+      .filter((offset, index, values) => values.indexOf(offset) === index);
+    const offsetY =
+      availableOffsets.find((offset) => !collides(caption, offset)) ??
+      availableOffsets.at(-1) ??
+      0;
+
+    return { key: caption.key, offsetY: roundTransformValue(offsetY) };
+  });
 }
 
 /**
