@@ -9,8 +9,10 @@ import {
   useRef,
   useState,
   type CSSProperties,
+  type DragEvent,
   type KeyboardEvent,
   type MouseEvent,
+  type PointerEvent as ReactPointerEvent,
   type WheelEvent,
 } from 'react';
 import type { TimelineViewerFrameProps } from '@/components/TimelineViewerFrame';
@@ -77,12 +79,22 @@ type PinchGesture = {
   previewScale: number;
 };
 
+type DesktopDragGesture = {
+  pointerId: number;
+  startX: number;
+  startY: number;
+  scrollLeft: number;
+  scrollTop: number;
+  active: boolean;
+};
+
 const CONTROLS_IDLE_DELAY = 2500;
 const LABEL_GAP = 10;
 const NODE_HEIGHT = 60;
 const SURFACE_HEIGHT = 32;
 const PERIOD_OFFSET = 37;
 const BOARD_EDGE_PADDING = 12;
+const DESKTOP_DRAG_THRESHOLD = 6;
 
 const viewerAxisMetrics = (viewportWidth: number): AxisMetrics => {
   if (viewportWidth <= 639) {
@@ -140,6 +152,8 @@ export function NativeTimelineViewerFrame({
   const pendingZoomRef = useRef<PendingZoom | null>(null);
   const controlsIdleTimerRef = useRef<number | null>(null);
   const pinchRef = useRef<PinchGesture | null>(null);
+  const desktopDragRef = useRef<DesktopDragGesture | null>(null);
+  const suppressClickRef = useRef(false);
   const fitModeRef = useRef(false);
   const [scale, setScale] = useState(1);
   const [viewportWidth, setViewportWidth] = useState(1024);
@@ -486,6 +500,8 @@ export function NativeTimelineViewerFrame({
         controlsIdleTimerRef.current = null;
       }
       pinchRef.current = null;
+      desktopDragRef.current = null;
+      suppressClickRef.current = false;
       setControlsIdle(false);
     };
   }, [active, initialScrollLeft]);
@@ -577,6 +593,75 @@ export function NativeTimelineViewerFrame({
       scaleRef.current > 1.05 ? 1 : TIMELINE_VIEWER_DOUBLE_TAP_SCALE,
       event.clientX - rect.left,
     );
+  };
+
+  const handlePointerDown = (event: ReactPointerEvent<HTMLDivElement>) => {
+    if (
+      (event.pointerType !== 'mouse' && event.pointerType !== 'pen') ||
+      event.button !== 0
+    ) {
+      return;
+    }
+    suppressClickRef.current = false;
+    desktopDragRef.current = {
+      pointerId: event.pointerId,
+      startX: event.clientX,
+      startY: event.clientY,
+      scrollLeft: event.currentTarget.scrollLeft,
+      scrollTop: event.currentTarget.scrollTop,
+      active: false,
+    };
+    event.currentTarget.setPointerCapture(event.pointerId);
+  };
+
+  const handlePointerMove = (event: ReactPointerEvent<HTMLDivElement>) => {
+    const drag = desktopDragRef.current;
+    if (!drag || drag.pointerId !== event.pointerId) return;
+    const deltaX = event.clientX - drag.startX;
+    const deltaY = event.clientY - drag.startY;
+    if (
+      !drag.active &&
+      Math.hypot(deltaX, deltaY) < DESKTOP_DRAG_THRESHOLD
+    ) {
+      return;
+    }
+    if (!drag.active) {
+      drag.active = true;
+      suppressClickRef.current = true;
+      event.currentTarget.dataset.desktopDragging = 'true';
+      wakeControls();
+    }
+    event.preventDefault();
+    event.currentTarget.scrollLeft = drag.scrollLeft - deltaX;
+    event.currentTarget.scrollTop = drag.scrollTop - deltaY;
+  };
+
+  const endDesktopDrag = (event: ReactPointerEvent<HTMLDivElement>) => {
+    const drag = desktopDragRef.current;
+    if (!drag || drag.pointerId !== event.pointerId) return;
+    desktopDragRef.current = null;
+    delete event.currentTarget.dataset.desktopDragging;
+    if (event.currentTarget.hasPointerCapture(event.pointerId)) {
+      event.currentTarget.releasePointerCapture(event.pointerId);
+    }
+    if (!drag.active || event.type === 'pointercancel') {
+      suppressClickRef.current = false;
+    } else {
+      window.setTimeout(() => {
+        suppressClickRef.current = false;
+      }, 0);
+    }
+  };
+
+  const handleClickCapture = (event: MouseEvent<HTMLDivElement>) => {
+    if (!suppressClickRef.current) return;
+    suppressClickRef.current = false;
+    event.preventDefault();
+    event.stopPropagation();
+  };
+
+  const handleNativeDragStart = (event: DragEvent<HTMLDivElement>) => {
+    event.preventDefault();
   };
 
   const handleWheel = (event: WheelEvent<HTMLDivElement>) => {
@@ -740,11 +825,19 @@ export function NativeTimelineViewerFrame({
         className="timeline-viewer-stage timeline-viewer-native-viewport"
         tabIndex={0}
         role="application"
-        aria-label="1本指で縦横にスクロールできます。2本指またはコントロールキーとホイールで拡大縮小できます。上部に年代軸、左側に地域軸を固定表示します"
+        aria-label="マウスドラッグまたは1本指で縦横にスクロールできます。2本指またはコントロールキーとホイールで拡大縮小できます。上部に年代軸、左側に地域軸を固定表示します"
         data-timeline-viewer-stage
         data-native-scroll-viewport
+        data-desktop-drag-pan="enabled"
         onDoubleClick={handleDoubleClick}
         onWheel={handleWheel}
+        onPointerDown={handlePointerDown}
+        onPointerMove={handlePointerMove}
+        onPointerUp={endDesktopDrag}
+        onPointerCancel={endDesktopDrag}
+        onLostPointerCapture={endDesktopDrag}
+        onClickCapture={handleClickCapture}
+        onDragStart={handleNativeDragStart}
       >
         <div className="timeline-viewer-native-world">
           <div
