@@ -128,7 +128,7 @@ function Passage({
   kind,
   children,
 }: {
-  kind: '事実' | '学説上の注意' | '鑑賞ポイント';
+  kind: '学説上の注意' | '鑑賞ポイント';
   children: ReactNode;
 }) {
   if (kind === '学説上の注意') {
@@ -328,6 +328,7 @@ export default async function MovementDetailPage({
             <Field label="宗教的背景" value={movement.religiousContext} />
             <Field label="哲学・思想史との関連" value={movement.philosophy} />
             <Field label="技術革新との関連" value={movement.technologyContext} />
+            <Field label="主な主題" value={movement.subjects} />
           </dl>
           {movement.dates.note && (
             <Passage kind="学説上の注意">{movement.dates.note}</Passage>
@@ -336,43 +337,61 @@ export default async function MovementDetailPage({
       </Chapter>
 
       <Chapter id="relation" number="02" title="何が新しかったか" tone="warm">
-        <div className="grid gap-9 md:grid-cols-2 md:gap-12">
+        <div
+          className="grid gap-10 md:grid-cols-2 md:gap-14"
+          data-parallel-subsections
+        >
           <Subsection id="relation-changed" title="転換したこと">
             <p>{toDisplayText(movement.reactionAgainst)}</p>
           </Subsection>
-          <Subsection
-            id="relation-inherited"
-            title="継承したこと"
-            className="border-l hairline pl-6 md:pl-8"
-          >
+          <Subsection id="relation-inherited" title="継承したこと">
             <p>{toDisplayText(movement.inheritedFrom)}</p>
           </Subsection>
         </div>
       </Chapter>
 
       <Chapter id="visual" number="03" title="視覚的特徴と技法" tone="white">
-        <div className="space-y-10">
-          <Passage kind="事実">{movement.visualTraits}</Passage>
-          <dl className="grid gap-x-12 gap-y-8 lg:grid-cols-2">
-            <Field label="構図・空間表現" value={movement.compositionSpace} />
-            <Field label="色彩・光の扱い" value={movement.colorLight} />
-            <Field label="技法" value={movement.technique} />
-            <Field label="素材" value={movement.materials} />
-            <Field label="主な主題" value={movement.subjects} />
-          </dl>
+        <div className="grid gap-x-14 gap-y-10 lg:grid-cols-2">
+          <Subsection id="visual-appearance" title="見た目の特徴">
+            <p>{toDisplayText(movement.visualTraits)}</p>
+          </Subsection>
+          <Subsection id="visual-composition" title="構図・空間">
+            <p>{toDisplayText(movement.compositionSpace)}</p>
+          </Subsection>
+          <Subsection id="visual-color" title="色彩・光">
+            <p>{toDisplayText(movement.colorLight)}</p>
+          </Subsection>
+          <Subsection id="visual-technique" title="技法">
+            <p>{toDisplayText(movement.technique)}</p>
+          </Subsection>
+          <Subsection id="visual-materials" title="媒体・素材">
+            <p>{toDisplayText(movement.materials)}</p>
+          </Subsection>
         </div>
       </Chapter>
 
       <Chapter id="system" number="04" title="制作と受容" tone="paper">
         <div className="space-y-12">
-          <Passage kind="事実">{movement.marketExhibition}</Passage>
-          <dl className="grid gap-x-12 gap-y-8 lg:grid-cols-2">
-            <Field label="芸術家の社会的地位" value={movement.artistStatus} />
-            <Field label="制作制度" value={movement.productionSystem} />
-            <Field label="パトロン・注文主" value={movement.patronage} />
-            <Field label="展示・流通・市場" value={movement.marketExhibition} />
-            <Field label="主な鑑賞者" value={movement.audience} />
-          </dl>
+          <p
+            className="detail-body max-w-[42em] text-[15px] leading-[1.95] text-ink sm:text-base"
+            data-chapter-introduction
+          >
+            {toDisplayText(movement.marketExhibition)}
+          </p>
+          <div className="grid gap-x-14 gap-y-10 lg:grid-cols-2">
+            <Subsection id="system-artist-status" title="芸術家の社会的地位">
+              <p>{toDisplayText(movement.artistStatus)}</p>
+            </Subsection>
+            <Subsection id="system-production" title="制作制度">
+              <p>{toDisplayText(movement.productionSystem)}</p>
+            </Subsection>
+            <Subsection id="system-patronage" title="パトロン・注文主">
+              <p>{toDisplayText(movement.patronage)}</p>
+            </Subsection>
+            <Subsection id="system-audience" title="主な鑑賞者">
+              <p>{toDisplayText(movement.audience)}</p>
+            </Subsection>
+          </div>
 
           <div>
             <h3 className={SUBSECTION_HEADING_CLASS}>主要作家</h3>

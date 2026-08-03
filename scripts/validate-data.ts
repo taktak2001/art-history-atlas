@@ -33,6 +33,7 @@ import {
   filterMovementsByLod,
   hasMovementHierarchyCycle,
 } from '../src/lib/movement-hierarchy';
+import { auditMovementContentTaxonomy } from '../src/lib/movement-content-taxonomy';
 
 let errors = 0;
 const fail = (msg: string) => {
@@ -158,6 +159,13 @@ if (detailedCount !== movements.length) {
   fail(`movements: detailed ${detailedCount}件が全件 ${movements.length}件と一致しない`);
 }
 console.log(`  ✓ LOD件数: core ${coreCount} / standard ${standardCount} / detailed ${detailedCount}`);
+const contentTaxonomyIssues = auditMovementContentTaxonomy(movements);
+for (const issue of contentTaxonomyIssues) {
+  fail(
+    `movement ${issue.movementId}: ${issue.field} に分類外の語「${issue.term}」がある`,
+  );
+}
+console.log(`  ✓ 詳細ページ情報分類: ${movements.length}件`);
 // 作家の参照
 for (const a of artists) {
   for (const m of a.movementIds) if (!movementIds.has(m)) fail(`artist ${a.id}: ムーブメント "${m}" が存在しない`);
