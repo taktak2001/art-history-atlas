@@ -176,6 +176,44 @@ test('ノード選択時は強調線を無関係ノードより前、関連ノ�
   expect(await graph.locator('[data-edge-label]').count()).toBeGreaterThan(0);
   expect(await graph.locator('[data-node-state="related"]').count()).toBeGreaterThan(0);
   expect(await graph.locator('[data-node-state="dimmed"]').count()).toBeGreaterThan(0);
+  const selectedNode = graph.locator('[data-node-state="selected"]');
+  const relatedNode = graph.locator('[data-node-state="related"]').first();
+  const dimmedNode = graph.locator('[data-node-state="dimmed"]').first();
+  const selectedStyle = await selectedNode.evaluate((element) => {
+    const style = getComputedStyle(element);
+    const title = element.querySelector<HTMLElement>('[data-network-node-title]');
+    const date = element.querySelector<HTMLElement>('[data-network-node-date]');
+    return {
+      opacity: Number(style.opacity),
+      borderWidth: style.borderTopWidth,
+      backgroundColor: style.backgroundColor,
+      transform: style.transform,
+      titleWeight: title ? Number(getComputedStyle(title).fontWeight) : 0,
+      dateWeight: date ? Number(getComputedStyle(date).fontWeight) : 0,
+    };
+  });
+  const relatedOpacity = await relatedNode.evaluate((element) =>
+    Number(getComputedStyle(element).opacity),
+  );
+  const dimmedOpacity = await dimmedNode.evaluate((element) =>
+    Number(getComputedStyle(element).opacity),
+  );
+
+  expect(selectedStyle.opacity).toBe(1);
+  expect(selectedStyle.borderWidth).toBe('3px');
+  expect(selectedStyle.transform).not.toBe('none');
+  expect(selectedStyle.titleWeight).toBeGreaterThanOrEqual(700);
+  expect(selectedStyle.dateWeight).toBeGreaterThanOrEqual(500);
+  expect(relatedOpacity).toBeGreaterThanOrEqual(0.75);
+  expect(relatedOpacity).toBeLessThanOrEqual(0.85);
+  expect(dimmedOpacity).toBeGreaterThanOrEqual(0.35);
+  expect(dimmedOpacity).toBeLessThanOrEqual(0.55);
+  expect(selectedStyle.backgroundColor).not.toBe(
+    await relatedNode.evaluate((element) => getComputedStyle(element).backgroundColor),
+  );
+  await expect(
+    graph.locator('[data-edge-label][data-edge-label-anchor="start"], [data-edge-label][data-edge-label-anchor="end"]'),
+  ).toHaveCount(await graph.locator('[data-network-layer="highlighted-edges"] [data-network-edge]').count());
   expect(
     await graph.locator('[data-node-state="dimmed"]').first().evaluate(
       (element) => Number(getComputedStyle(element.parentElement!).zIndex),
@@ -189,6 +227,15 @@ test('ノード選択時は強調線を無関係ノードより前、関連ノ�
     ),
   ).toBeGreaterThan(
     await highlightedLayer.evaluate((element) => Number(getComputedStyle(element).zIndex)),
+  );
+  expect(
+    await selectedNode.evaluate((element) =>
+      Number(getComputedStyle(element.parentElement!).zIndex),
+    ),
+  ).toBeGreaterThan(
+    await relatedNode.evaluate((element) =>
+      Number(getComputedStyle(element.parentElement!).zIndex),
+    ),
   );
 });
 

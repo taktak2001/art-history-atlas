@@ -24,6 +24,7 @@ import {
 import {
   assignTimelineViewerTracks,
   clampTimelineViewerScale,
+  layoutTimelineViewerDateCaptions,
   layoutTimelineViewerPeriodRails,
   selectTimelineViewerTickLabels,
   semanticTimelineTicks,
@@ -57,6 +58,7 @@ type NativeNodeLayout = {
   periodTop: number;
   periodWidth: number;
   periodOffsetY: number;
+  dateOffsetY: number;
   track: number | null;
 };
 
@@ -98,6 +100,10 @@ const LABEL_GAP = 10;
 const NODE_HEIGHT = 60;
 const SURFACE_HEIGHT = 32;
 const PERIOD_OFFSET = 37;
+const DATE_OFFSET = 44;
+const DATE_HEIGHT = 11;
+const DATE_INLINE_INSET = 4;
+const PERIOD_HEIGHT = 2;
 const BOARD_EDGE_PADDING = 12;
 const DESKTOP_DRAG_THRESHOLD = 6;
 
@@ -123,6 +129,15 @@ const estimateLabelWidth = (label: string) => {
     0,
   );
   return Math.min(230, Math.max(72, 28 + units * 15));
+};
+
+const estimateDateWidth = (label: string) => {
+  const units = Array.from(label).reduce(
+    (sum, character) =>
+      sum + (/[\u0000-\u00ff]/.test(character) ? 0.58 : 1),
+    0,
+  );
+  return Math.max(28, 8 + units * 6.25);
 };
 
 const touchDistance = (touches: TouchList) => {
@@ -282,6 +297,7 @@ export function NativeTimelineViewerFrame({
           periodTop: 0,
           periodWidth: 0,
           periodOffsetY: 0,
+          dateOffsetY: 0,
           track: null,
         });
         continue;
@@ -305,6 +321,7 @@ export function NativeTimelineViewerFrame({
           snapTimelineViewerPixel((node.barEnd - node.barStart) * scale),
         ),
         periodOffsetY: 0,
+        dateOffsetY: 0,
         track: placement.track,
       });
     }
@@ -336,6 +353,45 @@ export function NativeTimelineViewerFrame({
         snapTimelineViewerPixel(rail.width),
       );
       nodeLayout.periodOffsetY = rail.offsetY;
+    }
+
+    const dateLayouts = layoutTimelineViewerDateCaptions(
+      nodes.flatMap((node) => {
+        const nodeLayout = nodeLayouts.get(node.key);
+        const region = regionById.get(node.regionId);
+        if (!nodeLayout || nodeLayout.track === null || !region) return [];
+        return [
+          {
+            key: node.key,
+            regionId: node.regionId,
+            track: nodeLayout.track,
+            left: nodeLayout.left + DATE_INLINE_INSET,
+            top: nodeLayout.top + DATE_OFFSET,
+            width: estimateDateWidth(node.dateLabel),
+            height: DATE_HEIGHT,
+            laneBottom: region.top + region.height,
+          },
+        ];
+      }),
+      nodes.flatMap((node) => {
+        const nodeLayout = nodeLayouts.get(node.key);
+        if (!nodeLayout || nodeLayout.track === null) return [];
+        return [
+          {
+            key: node.key,
+            regionId: node.regionId,
+            track: nodeLayout.track,
+            left: nodeLayout.periodLeft,
+            top: nodeLayout.periodTop,
+            width: nodeLayout.periodWidth,
+            height: PERIOD_HEIGHT,
+          },
+        ];
+      }),
+    );
+    for (const dateLayout of dateLayouts) {
+      const nodeLayout = nodeLayouts.get(dateLayout.key);
+      if (nodeLayout) nodeLayout.dateOffsetY = dateLayout.offsetY;
     }
 
     return {
@@ -1094,6 +1150,7 @@ export function NativeTimelineViewerFrame({
                   data-priority={node.priority || undefined}
                   data-region-id={node.regionId}
                   data-period-offset-y={nodeLayout.periodOffsetY}
+                  data-viewer-track={nodeLayout.track}
                   style={
                     {
                       left: nodeLayout.periodLeft,
@@ -1156,6 +1213,7 @@ export function NativeTimelineViewerFrame({
                   data-viewer-start-x={nodeLayout.left}
                   data-viewer-visible="true"
                   data-viewer-track={nodeLayout.track}
+                  data-date-offset-y={nodeLayout.dateOffsetY}
                   data-secondary-occurrence={
                     node.secondaryOccurrence || undefined
                   }
@@ -1193,7 +1251,13 @@ export function NativeTimelineViewerFrame({
                       {node.nameJa}
                     </span>
                   </span>
-                  <span className="timeline-viewer-node__date">
+                  <span
+                    className="timeline-viewer-node__date"
+                    data-viewer-date={node.key}
+                    style={{
+                      '--timeline-viewer-date-offset-y': `${nodeLayout.dateOffsetY}px`,
+                    } as CSSProperties}
+                  >
                     {node.dateLabel}
                   </span>
                 </Link>

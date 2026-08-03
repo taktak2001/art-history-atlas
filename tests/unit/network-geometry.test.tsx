@@ -3,6 +3,7 @@ import { describe, expect, it } from 'vitest';
 import { ArrowMarkerDefs, RelationLine } from '@/components/RelationLine';
 import {
   getNetworkEdgeGeometry,
+  getNetworkEdgeLabelPoint,
   getNetworkEdgeRouteOffset,
   getParallelEdgeRouteOffset,
   getNetworkViewBox,
@@ -45,6 +46,35 @@ describe('network geometry', () => {
   it('描画領域に16pxの安全余白定数を持つ', () => {
     expect(NETWORK_SVG_SAFE_PADDING).toBe(16);
     expect(getNetworkViewBox(1200, 640)).toBe('0 0 1200 640');
+  });
+
+  it('選択ノード寄りの関係ラベル位置を曲線上へ移動する', () => {
+    const geometry = getNetworkEdgeGeometry(
+      { x: 0, y: 20 },
+      { x: 240, y: 100 },
+      100,
+      60,
+      true,
+      undefined,
+      -24,
+    );
+    const startLabel = getNetworkEdgeLabelPoint(geometry, 'start');
+    const middleLabel = getNetworkEdgeLabelPoint(geometry, 'middle');
+    const endLabel = getNetworkEdgeLabelPoint(geometry, 'end');
+
+    expect(startLabel.x).toBeLessThan(middleLabel.x);
+    expect(endLabel.x).toBeGreaterThan(middleLabel.x);
+    expect(
+      Math.hypot(
+        startLabel.x - geometry.start.x,
+        startLabel.y - geometry.start.y,
+      ),
+    ).toBeLessThan(
+      Math.hypot(
+        middleLabel.x - geometry.start.x,
+        middleLabel.y - geometry.start.y,
+      ),
+    );
   });
 
   it('長距離線の途中にノードがある場合は迂回し、近距離線は直線を保つ', () => {
