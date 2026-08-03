@@ -18,6 +18,9 @@
   --c-faint: 107 106 104; /* WCAG AA: 白/紙背景で4.5:1以上を確保 */
   --c-line: 214 210 200;
   --c-accent: 122 60 42; /* 弁柄（アクセント：わずかに用いる） */
+  --c-network-node: 255 255 255;
+  --c-network-selected: 252 248 244;
+  --c-network-shadow: 38 38 42;
 
   --font-serif: 'Hiragino Mincho ProN', 'YuMincho', 'Yu Mincho', 'Noto Serif JP',
     'Georgia', serif;
@@ -35,6 +38,9 @@ html.dark {
   --c-faint: 150 148 143; /* 暗背景で4.5:1以上 */
   --c-line: 58 58 62;
   --c-accent: 210 146 112; /* 暗背景で沈まないアクセント */
+  --c-network-node: 30 30 33;
+  --c-network-selected: 42 40 37;
+  --c-network-shadow: 8 8 10;
 }
 
 @media (prefers-color-scheme: dark) {
@@ -47,6 +53,9 @@ html.dark {
     --c-faint: 150 148 143;
     --c-line: 58 58 62;
     --c-accent: 210 146 112;
+    --c-network-node: 30 30 33;
+    --c-network-selected: 42 40 37;
+    --c-network-shadow: 8 8 10;
   }
 }
 
@@ -2471,22 +2480,40 @@ html.dark .timeline-era-option[aria-current='true'] {
 }
 
 .network-node {
+  border: 1.5px solid rgb(var(--c-ink) / 0.62);
+  background: rgb(var(--c-network-node));
   transform-origin: center;
   transition:
     opacity 160ms ease,
-    transform 160ms ease,
     border-color 160ms ease,
-    background-color 160ms ease;
+    background-color 160ms ease,
+    box-shadow 160ms ease;
+}
+
+.network-node:hover {
+  border-color: rgb(var(--c-ink) / 0.82);
+}
+
+.network-node:focus-visible {
+  outline: 2px solid rgb(var(--c-ink));
+  outline-offset: 2px;
+}
+
+.network-node[data-node-role='source']:not([data-node-state='selected']) {
+  border-width: 2px;
+  border-style: dashed;
+}
+
+.network-node[data-node-role='target']:not([data-node-state='selected']) {
+  border-width: 3px;
+  border-style: double;
 }
 
 .network-node[data-node-state='selected'] {
+  border: 3px solid rgb(var(--c-ink));
   opacity: 1;
-  transform: scale(1.035);
-  background: color-mix(
-    in srgb,
-    rgb(var(--c-raised)) 92%,
-    rgb(var(--c-accent))
-  );
+  background: rgb(var(--c-network-selected));
+  box-shadow: 0 2px 6px rgb(var(--c-network-shadow) / 0.12);
 }
 
 .network-node[data-node-state='selected'] .network-node__title {
@@ -2495,7 +2522,7 @@ html.dark .timeline-era-option[aria-current='true'] {
 
 .network-node[data-node-state='selected'] .network-node__date {
   color: rgb(var(--c-muted));
-  font-weight: 500;
+  font-weight: 400;
 }
 
 .network-node[data-node-state='related'] {
