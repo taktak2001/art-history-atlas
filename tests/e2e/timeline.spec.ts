@@ -1183,6 +1183,84 @@ test('閲覧モードは156%、195%、305%で同一地域のラベルを自動�
   expect(maximumFranceTrackCount).toBeGreaterThan(1);
 });
 
+test('PC 400%でも象徴主義・フォーヴィスムの年代と期間線が重ならない', async ({
+  page,
+}, testInfo) => {
+  test.skip(testInfo.project.name !== 'desktop', 'desktop project only');
+  await page.goto('/timeline/');
+  await page
+    .getByRole('group', { name: '表示する範囲' })
+    .getByRole('button', { name: /充実/ })
+    .click();
+  await modeButton(page, '近代').click();
+  await page.getByRole('button', { name: 'タイムラインを全画面で表示' }).click();
+
+  const viewer = page.locator('[data-timeline-viewer="active"]');
+  const zoomIn = viewer.getByRole('button', { name: '拡大' });
+  while (
+    Number((await viewer.getAttribute('data-viewer-scale')) ?? 0) < 4
+  ) {
+    await zoomIn.click();
+    await expect
+      .poll(async () =>
+        Number((await viewer.getAttribute('data-viewer-scale')) ?? 0),
+      )
+      .toBeGreaterThan(1);
+  }
+  await expect(viewer).toHaveAttribute('data-viewer-scale', '4');
+
+  const appliedOffsets: number[] = [];
+  for (const movementId of ['symbolism', 'fauvism']) {
+    const node = viewer
+      .locator(
+        `[data-viewer-node][data-movement-id="${movementId}"][data-region-id="france"]:visible`,
+      )
+      .first();
+    await expect(node).toBeVisible();
+    const result = await node.evaluate((element) => {
+      const date = element.querySelector<HTMLElement>('[data-viewer-date]');
+      if (!date) throw new Error('date caption missing');
+      const dateRect = date.getBoundingClientRect();
+      const track = Number((element as HTMLElement).dataset.viewerTrack);
+      const rails = [...document.querySelectorAll<HTMLElement>(
+        '[data-viewer-period][data-region-id="france"]',
+      )]
+        .filter(
+          (rail) =>
+            Math.abs(Number(rail.dataset.viewerTrack) - track) <= 1,
+        )
+        .map((rail) => rail.getBoundingClientRect())
+        .filter(
+          (railRect) =>
+            railRect.right > dateRect.left - 2 &&
+            railRect.left < dateRect.right + 2,
+        );
+      const minimumGap = rails.reduce((closest, railRect) => {
+        const verticalGap =
+          railRect.bottom <= dateRect.top
+            ? dateRect.top - railRect.bottom
+            : dateRect.bottom <= railRect.top
+              ? railRect.top - dateRect.bottom
+              : -1;
+        return Math.min(closest, verticalGap);
+      }, Number.POSITIVE_INFINITY);
+      return {
+        minimumGap,
+        offset: Number((element as HTMLElement).dataset.dateOffsetY ?? 0),
+      };
+    });
+
+    expect(result.minimumGap).toBeGreaterThanOrEqual(3);
+    expect(result.offset).toBeGreaterThanOrEqual(0);
+    expect(result.offset).toBeLessThanOrEqual(12);
+    appliedOffsets.push(result.offset);
+  }
+  expect(
+    appliedOffsets.some((offset) => offset > 0),
+    '衝突する年代だけに局所オフセットが適用される',
+  ).toBe(true);
+});
+
 test('閲覧モードは実年代の期間線と固定寸法の名称ラベルを分離する', async ({
   page,
 }) => {
