@@ -21,11 +21,13 @@ import {
 import {
   assignTimelineViewerTracks,
   clampTimelineViewerScale,
+  layoutTimelineViewerPeriodRails,
   selectTimelineViewerTickLabels,
   semanticTimelineTicks,
   snapTimelineViewerPixel,
   timelineViewerMaxScale,
   timelineViewerRegionHeight,
+  timelineViewerRightGutter,
   timelineViewerScrollAfterScale,
   timelineViewerSemanticLevel,
   timelineViewerTickPriority,
@@ -44,8 +46,10 @@ type NativeNodeLayout = {
   key: string;
   left: number;
   top: number;
+  periodLeft: number;
   periodTop: number;
   periodWidth: number;
+  periodOffsetY: number;
   track: number | null;
 };
 
@@ -75,9 +79,9 @@ type PinchGesture = {
 
 const CONTROLS_IDLE_DELAY = 2500;
 const LABEL_GAP = 10;
-const NODE_HEIGHT = 48;
-const SURFACE_HEIGHT = 30;
-const PERIOD_OFFSET = 32;
+const NODE_HEIGHT = 60;
+const SURFACE_HEIGHT = 32;
+const PERIOD_OFFSET = 37;
 const BOARD_EDGE_PADDING = 12;
 
 const viewerAxisMetrics = (viewportWidth: number): AxisMetrics => {
@@ -145,6 +149,7 @@ export function NativeTimelineViewerFrame({
   );
   const semanticLevel = timelineViewerSemanticLevel(scale);
   const metrics = viewerAxisMetrics(viewportWidth);
+  const rightGutter = timelineViewerRightGutter(viewportWidth);
   renderCountRef.current += 1;
 
   const writeScaleOutput = useCallback((nextScale: number) => {
@@ -247,8 +252,10 @@ export function NativeTimelineViewerFrame({
           key: node.key,
           left: 0,
           top: 0,
+          periodLeft: 0,
           periodTop: 0,
           periodWidth: 0,
+          periodOffsetY: 0,
           track: null,
         });
         continue;
@@ -265,18 +272,52 @@ export function NativeTimelineViewerFrame({
         key: node.key,
         left: snapTimelineViewerPixel(node.barStart * scale),
         top,
+        periodLeft: snapTimelineViewerPixel(node.barStart * scale),
         periodTop: snapTimelineViewerPixel(top + PERIOD_OFFSET),
         periodWidth: Math.max(
           1,
           snapTimelineViewerPixel((node.barEnd - node.barStart) * scale),
         ),
+        periodOffsetY: 0,
         track: placement.track,
       });
     }
 
+    const separatedRails = layoutTimelineViewerPeriodRails(
+      nodes.flatMap((node) => {
+        const nodeLayout = nodeLayouts.get(node.key);
+        if (!nodeLayout || nodeLayout.track === null) return [];
+        return [
+          {
+            key: node.key,
+            regionId: node.regionId,
+            track: nodeLayout.track,
+            start: node.barStart * scale,
+            end: node.barEnd * scale,
+          },
+        ];
+      }),
+    );
+    for (const rail of separatedRails) {
+      const nodeLayout = nodeLayouts.get(rail.key);
+      if (!nodeLayout) continue;
+      nodeLayout.periodLeft = snapTimelineViewerPixel(rail.left);
+      nodeLayout.periodTop = snapTimelineViewerPixel(
+        nodeLayout.periodTop + rail.offsetY,
+      );
+      nodeLayout.periodWidth = Math.max(
+        1,
+        snapTimelineViewerPixel(rail.width),
+      );
+      nodeLayout.periodOffsetY = rail.offsetY;
+    }
+
     return {
       boardHeight: Math.max(1, regionTop),
-      contentWidth: Math.max(1, snapTimelineViewerPixel(timelineWidth * scale)),
+      contentWidth: Math.max(
+        1,
+        snapTimelineViewerPixel(timelineWidth * scale + rightGutter),
+      ),
       nodeLayouts,
       regionLayouts,
     };
@@ -284,6 +325,7 @@ export function NativeTimelineViewerFrame({
     expandedRegionIds,
     nodes,
     regions,
+    rightGutter,
     scale,
     semanticLevel,
     timelineWidth,
@@ -370,13 +412,14 @@ export function NativeTimelineViewerFrame({
       1,
       viewport.clientWidth -
         metrics.regionWidth -
+        rightGutter -
         BOARD_EDGE_PADDING * 2,
     );
     commitScale(availableWidth / Math.max(1, timelineWidth), undefined, {
       allowFit: true,
     });
     viewport.scrollTop = 0;
-  }, [commitScale, metrics.regionWidth, timelineWidth]);
+  }, [commitScale, metrics.regionWidth, rightGutter, timelineWidth]);
 
   useLayoutEffect(() => {
     const viewport = viewportRef.current;
@@ -833,9 +876,10 @@ export function NativeTimelineViewerFrame({
                   }
                   data-priority={node.priority || undefined}
                   data-region-id={node.regionId}
+                  data-period-offset-y={nodeLayout.periodOffsetY}
                   style={
                     {
-                      left: nodeLayout.left,
+                      left: nodeLayout.periodLeft,
                       top: nodeLayout.periodTop,
                       width: nodeLayout.periodWidth,
                       '--timeline-region-rgb': node.regionColor,
@@ -889,6 +933,7 @@ export function NativeTimelineViewerFrame({
                   data-viewer-key={node.key}
                   data-movement-id={node.movementId}
                   data-region-id={node.regionId}
+                  data-period-offset-y={nodeLayout.periodOffsetY}
                   data-bar-start={node.barStart}
                   data-bar-end={node.barEnd}
                   data-viewer-start-x={nodeLayout.left}

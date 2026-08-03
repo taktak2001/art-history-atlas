@@ -60,6 +60,21 @@ export type TimelineViewerNativeZoom = {
   maximumScrollLeft?: number;
 };
 
+export type TimelineViewerPeriodRail = {
+  key: string;
+  regionId: string;
+  track: number;
+  start: number;
+  end: number;
+};
+
+export type TimelineViewerPeriodRailLayout = {
+  key: string;
+  left: number;
+  width: number;
+  offsetY: number;
+};
+
 export const TIMELINE_VIEWER_MIN_SCALE = 0.6;
 export const TIMELINE_VIEWER_MAX_SCALE = 4;
 export const TIMELINE_VIEWER_MOBILE_MAX_SCALE = 3;
@@ -75,11 +90,15 @@ export const TIMELINE_VIEWER_SEMANTIC_THRESHOLDS = {
   detailed: 3,
 } as const;
 export const TIMELINE_VIEWER_LABEL_GAP = 10;
+export const TIMELINE_VIEWER_PERIOD_GAP = 10;
+export const TIMELINE_VIEWER_PERIOD_MAX_TRIM = 6;
+export const TIMELINE_VIEWER_PERIOD_OVERLAP_OFFSET = 5;
 // Dense regions such as France can use one additional row before collapsing
 // items. Sparse regions keep their natural height because row height is based
 // on the tracks actually occupied, not this ceiling.
 export const TIMELINE_VIEWER_MAX_TRACKS = 5;
-export const TIMELINE_VIEWER_TRACK_PITCH = 52;
+export const TIMELINE_VIEWER_TRACK_PITCH = 64;
+export const TIMELINE_VIEWER_REGION_BASE_HEIGHT = 88;
 
 const TIMELINE_VIEWER_TICK_STEPS = [
   10, 25, 50, 100, 250, 500, 1000, 2500, 5000, 10000,
@@ -92,6 +111,116 @@ export function snapTimelineViewerPixel(value: number, devicePixelRatio = 1) {
     ? Math.max(1, devicePixelRatio)
     : 1;
   return Math.round(value * ratio) / ratio;
+}
+
+export function timelineViewerRightGutter(viewportWidth: number) {
+  return viewportWidth <= 639 ? 160 : 192;
+}
+
+/**
+ * Keeps independent duration rails visually distinct without changing the
+ * underlying dates. Rails that only touch are inset to create a small break;
+ * genuinely overlapping periods remain true to their range and use a subtle
+ * vertical offset instead.
+ */
+export function layoutTimelineViewerPeriodRails(
+  rails: TimelineViewerPeriodRail[],
+  minimumGap = TIMELINE_VIEWER_PERIOD_GAP,
+  maximumTrim = TIMELINE_VIEWER_PERIOD_MAX_TRIM,
+  overlapOffset = TIMELINE_VIEWER_PERIOD_OVERLAP_OFFSET,
+): TimelineViewerPeriodRailLayout[] {
+  type MutableRail = TimelineViewerPeriodRailLayout & {
+    regionId: string;
+    track: number;
+    right: number;
+  };
+
+  const grouped = new Map<string, MutableRail[]>();
+
+  for (const rail of rails) {
+    const left = Math.min(rail.start, rail.end);
+    const right = Math.max(left + 1, rail.start, rail.end);
+    const item: MutableRail = {
+      key: rail.key,
+      regionId: rail.regionId,
+      track: rail.track,
+      left,
+      right,
+      width: right - left,
+      offsetY: 0,
+    };
+    const groupKey = `${rail.regionId}:${rail.track}`;
+    const group = grouped.get(groupKey) ?? [];
+    group.push(item);
+    grouped.set(groupKey, group);
+  }
+
+  for (const group of grouped.values()) {
+    group.sort(
+      (first, second) =>
+        first.left - second.left ||
+        second.right - first.right ||
+        first.key.localeCompare(second.key),
+    );
+
+    for (let index = 1; index < group.length; index += 1) {
+      const previous = group[index - 1];
+      const current = group[index];
+      const gap = current.left - previous.right;
+      if (gap < 0 || gap >= minimumGap) continue;
+
+      const missingGap = minimumGap - gap;
+      const previousAvailable = Math.max(0, previous.right - previous.left - 1);
+      const currentAvailable = Math.max(0, current.right - current.left - 1);
+      const previousTrim = Math.min(
+        maximumTrim,
+        previousAvailable,
+        missingGap / 2,
+      );
+      const currentTrim = Math.min(
+        maximumTrim,
+        currentAvailable,
+        missingGap - previousTrim,
+      );
+      previous.right -= previousTrim;
+      previous.width = previous.right - previous.left;
+      current.left += currentTrim;
+      current.width = current.right - current.left;
+    }
+
+    const activeEndByOffset = new Map<number, number>();
+    const offsets = [0, overlapOffset, -overlapOffset];
+    for (const rail of group) {
+      const availableOffset = offsets.find(
+        (offset) =>
+          rail.left >=
+          (activeEndByOffset.get(offset) ?? Number.NEGATIVE_INFINITY) +
+            minimumGap,
+      );
+      const offset =
+        availableOffset ??
+        offsets.reduce((best, candidate) =>
+          (activeEndByOffset.get(candidate) ?? Number.NEGATIVE_INFINITY) <
+          (activeEndByOffset.get(best) ?? Number.NEGATIVE_INFINITY)
+            ? candidate
+            : best,
+        );
+      rail.offsetY = offset;
+      activeEndByOffset.set(
+        offset,
+        Math.max(activeEndByOffset.get(offset) ?? rail.right, rail.right),
+      );
+    }
+  }
+
+  return [...grouped.values()]
+    .flat()
+    .map(({ key, left, width, offsetY }) => ({
+      key,
+      left: roundTransformValue(left),
+      width: roundTransformValue(Math.max(1, width)),
+      offsetY,
+    }));
 }
 
 /**
@@ -346,7 +475,7 @@ export function timelineViewerRegionHeight(trackCount: number) {
     Math.min(trackCount, TIMELINE_VIEWER_MAX_TRACKS),
   );
   return (
-    80 +
+    TIMELINE_VIEWER_REGION_BASE_HEIGHT +
     (visibleTrackCount - 1) * TIMELINE_VIEWER_TRACK_PITCH +
     Math.max(0, trackCount - TIMELINE_VIEWER_MAX_TRACKS) *
       TIMELINE_VIEWER_TRACK_PITCH
