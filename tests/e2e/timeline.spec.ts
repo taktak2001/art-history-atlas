@@ -723,6 +723,7 @@ test('閲覧モードはnative scroll・ダブルクリック・キーボード�
   expect(nativeStyles.touchAction).toContain('pan-x');
   expect(nativeStyles.touchAction).toContain('pan-y');
   expect(nativeStyles.pointerMoveHandler).toBeNull();
+  await expect(stage).toHaveAttribute('data-desktop-drag-pan', 'enabled');
   const beforeScrollLeft = await stage.evaluate((element) => element.scrollLeft);
   await stage.evaluate((element) => {
     element.scrollLeft = Math.min(
@@ -744,6 +745,53 @@ test('閲覧モードはnative scroll・ダブルクリック・キーボード�
   await expect
     .poll(async () => Number((await viewer.getAttribute('data-viewer-scale')) ?? 0))
     .toBeGreaterThan(0);
+});
+
+test('PC閲覧モードはマウスドラッグで上下左右へパンできる', async ({
+  page,
+}, testInfo) => {
+  test.skip(testInfo.project.name !== 'desktop', 'desktop project only');
+  await page.goto('/timeline/');
+  await page
+    .getByRole('group', { name: '表示する範囲' })
+    .getByRole('button', { name: /すべて/ })
+    .click();
+  await page.getByRole('button', { name: 'タイムラインを全画面で表示' }).click();
+
+  const stage = page.locator('[data-native-scroll-viewport]');
+  const bounds = await stage.boundingBox();
+  expect(bounds).not.toBeNull();
+  if (!bounds) return;
+
+  await page.waitForTimeout(180);
+  await stage.evaluate((element) => {
+    element.scrollLeft = (element.scrollWidth - element.clientWidth) / 2;
+    element.scrollTop = (element.scrollHeight - element.clientHeight) / 2;
+  });
+  const before = await stage.evaluate((element) => ({
+    left: element.scrollLeft,
+    top: element.scrollTop,
+  }));
+
+  await page.mouse.move(
+    bounds.x + bounds.width * 0.65,
+    bounds.y + bounds.height * 0.65,
+  );
+  await page.mouse.down();
+  await page.mouse.move(
+    bounds.x + bounds.width * 0.65 - 120,
+    bounds.y + bounds.height * 0.65 - 90,
+    { steps: 6 },
+  );
+  await page.mouse.up();
+
+  await expect
+    .poll(() => stage.evaluate((element) => element.scrollLeft))
+    .toBeGreaterThan(before.left + 80);
+  await expect
+    .poll(() => stage.evaluate((element) => element.scrollTop))
+    .toBeGreaterThan(before.top + 50);
+  await expect(stage).not.toHaveAttribute('data-desktop-dragging', 'true');
 });
 
 test('native scroll中はReact render・DOM差替え・compositor transformを発生させない', async ({
