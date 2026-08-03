@@ -6,6 +6,7 @@ import {
 export type RelationshipDefinition = {
   label: string;
   shortDefinition: string;
+  legendDescription: string;
   fullDefinition: string;
   criteria: string[];
   exclusions: string[];
@@ -36,6 +37,8 @@ export const RELATIONSHIP_DEFINITIONS: Record<
     label: RELATION_LABELS.succession,
     shortDefinition:
       '中心的な方法や問題意識を、後続運動が直接引き継ぐ関係',
+    legendDescription:
+      '前の運動の中心的な思想や技法を受け継ぎ、発展させた関係です。すべてをそのまま引き継ぐのではなく、新しい時代や地域に合わせて再解釈される変化も含めて丁寧に捉えます。',
     fullDefinition:
       '前の運動の中心的な方法・問題意識・形式を、次の運動が引き継ぎ、別の条件のもとで発展させた関係です。',
     criteria: [
@@ -70,6 +73,8 @@ export const RELATIONSHIP_DEFINITIONS: Record<
     label: RELATION_LABELS.reaction,
     shortDefinition:
       '後続運動が、先行する価値や表現へ意識的に対抗した関係',
+    legendDescription:
+      '先行する運動への批判や否定から生まれた関係です。表現方法や価値観を意識的に変えることで新しい美術運動が成立し、批判の対象を具体的に資料で確認できる場合に用います。',
     fullDefinition:
       'ある運動が、先行する運動の価値観・制度・形式を問題として捉え、否定、反転、批判を通じて別の表現を提示した関係です。',
     criteria: [
@@ -104,6 +109,8 @@ export const RELATIONSHIP_DEFINITIONS: Record<
     label: RELATION_LABELS.influence,
     shortDefinition:
       '技法・思想・作品の一部が、別の運動へ作用する関係',
+    legendDescription:
+      '思想・技法・作品などの一部が、別の運動へ作用した関係です。直接の後継ではなくても、特定の表現や考え方が受容側で形を変えながら、後世の制作に取り入れられた場合に用います。',
     fullDefinition:
       '特定の技法・思想・作品・作家が、別の運動の一部に作用した関係です。直接的な後継関係である必要はありません。',
     criteria: [
@@ -138,6 +145,8 @@ export const RELATIONSHIP_DEFINITIONS: Record<
     label: RELATION_LABELS.contemporary,
     shortDefinition:
       '同じ時期に並行し、直接の因果を断定しない関係',
+    legendDescription:
+      '同じ時代に並行して存在し、共通する課題や社会状況を別々に扱った関係です。交流の可能性はあっても直接の影響が確認されず、それぞれの違いを比較できる場合に用います。',
     fullDefinition:
       '同じ時期に異なる地域や制度で展開し、共通する歴史条件や問題を別々の方法で扱った関係です。直接の影響や系譜は断定しません。',
     criteria: [
@@ -172,6 +181,8 @@ export const RELATIONSHIP_DEFINITIONS: Record<
     label: RELATION_LABELS['regional-variant'],
     shortDefinition:
       'ある表現や問題が、別の地域条件のもとで展開した関係',
+    legendDescription:
+      'ある地域で生まれた運動が、別の地域の文化や制度に合わせて独自に発展した関係です。同じ名称でも、土地の宗教・市場・素材などに応じて、思想や表現が変化した場合に用います。',
     fullDefinition:
       'ある運動の形式・問題意識・制度が別の地域へ移り、その土地の宗教、政治、市場、素材、伝統に応じて変形した関係です。',
     criteria: [
@@ -206,6 +217,8 @@ export const RELATIONSHIP_DEFINITIONS: Record<
     label: RELATION_LABELS.theoretical,
     shortDefinition:
       '理念や美術観の枠組みが、別の運動へ接続した関係',
+    legendDescription:
+      '共通する哲学・宗教・美術観などを背景にもつ関係です。直接の継承でなくても、同じ理論的な問いから、似た制作や制度への考え方が異なる時代や運動に生まれた場合に用います。',
     fullDefinition:
       '作品の見た目だけでなく、美術とは何か、制作や鑑賞をどう捉えるかという理論的枠組みが別の運動へ接続した関係です。',
     criteria: [
@@ -240,6 +253,8 @@ export const RELATIONSHIP_DEFINITIONS: Record<
     label: RELATION_LABELS.technical,
     shortDefinition:
       '素材・技法・制作工程が、別の運動へ受け渡された関係',
+    legendDescription:
+      '技法・素材・制作方法の受け渡しによって結ばれる関係です。思想や目的は異なっていても、同じ技術や制作工程が受け継がれ、新しい目的や別の文脈で活用された場合に用います。',
     fullDefinition:
       '素材、道具、制作工程、複製や表示の技術が別の運動へ受け渡され、異なる目的や文脈で利用された関係です。',
     criteria: [
@@ -274,6 +289,8 @@ export const RELATIONSHIP_DEFINITIONS: Record<
     label: RELATION_LABELS.revival,
     shortDefinition:
       '過去の運動が、後世の条件から再発見・再解釈された関係',
+    legendDescription:
+      '過去の運動や様式が、時代を隔てて再発見され、新しい意味を与えられた関係です。単なる保存ではなく、後世の価値観から選び直され、制作や評価に用いられた場合に示します。',
     fullDefinition:
       '活動時期が離れた過去の運動、様式、作品群が、後世の価値観や制度のもとで再発見され、新たな規範や資源として読み替えられた関係です。',
     criteria: [
@@ -308,6 +325,8 @@ export const RELATIONSHIP_DEFINITIONS: Record<
     label: RELATION_LABELS['shared-idea'],
     shortDefinition:
       '直接の系譜を断定せず、重要な問題意識を共有する関係',
+    legendDescription:
+      '直接の影響や継承は確認できなくても、重要な問題意識を共有する関係です。時代や地域が異なる運動を、空間・身体・物質などの共通する問いから比較し、理解を深める場合に用います。',
     fullDefinition:
       '時代や地域、制作方法が異なっていても、空間、身体、物質、崇高などの重要な問題意識を共有し、比較によって理解が深まる関係です。',
     criteria: [

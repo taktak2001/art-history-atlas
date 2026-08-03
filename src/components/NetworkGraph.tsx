@@ -706,7 +706,7 @@ export function NetworkGraph({ movements, relationships, eraOrder }: Props) {
               aria-label="関係線の詳しい見方"
             >
               <p className="text-xs leading-relaxed text-muted">
-                色だけでなく、線種・矢印・名称を組み合わせて関係を示します。
+                線の形と説明を見比べながら、ムーブメント同士がなぜ結ばれているかを確認できます。
               </p>
               <ul className="network-line-guide__legend" aria-label="関係タイプの凡例">
                 {ALL_KINDS.map((kind) => (
@@ -716,16 +716,12 @@ export function NetworkGraph({ movements, relationships, eraOrder }: Props) {
                       <span className="block font-bold text-ink">
                         {RELATIONSHIP_DEFINITIONS[kind].label}
                       </span>
-                      <span className="block text-faint">
-                        {RELATIONSHIP_DEFINITIONS[kind].shortDefinition}
+                      <span
+                        className="network-line-guide__description block text-faint"
+                        data-relationship-legend-description
+                      >
+                        {RELATIONSHIP_DEFINITIONS[kind].legendDescription}
                       </span>
-                    </span>
-                    <span className="text-faint">
-                      {RELATIONSHIP_DEFINITIONS[kind].visualEncoding.lineLabel}
-                      {' / '}
-                      {RELATIONSHIP_DEFINITIONS[kind].visualEncoding.arrow
-                        ? '有向'
-                        : '無向'}
                     </span>
                   </li>
                 ))}

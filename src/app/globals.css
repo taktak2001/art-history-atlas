@@ -2372,18 +2372,28 @@ html.dark .timeline-era-option[aria-current='true'] {
 
 .network-line-guide__legend {
   display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
-  gap: 0.35rem 1rem;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 0.7rem 1.25rem;
   margin-top: 0.75rem;
   font-size: 0.75rem;
 }
 
 .network-line-guide__legend li {
   display: grid;
-  grid-template-columns: 3.75rem minmax(0, 1fr) auto;
-  min-height: 2rem;
-  align-items: center;
-  gap: 0.35rem;
+  grid-template-columns: 3.75rem minmax(0, 1fr);
+  min-height: 3rem;
+  align-items: start;
+  gap: 0.5rem;
+  padding-block: 0.25rem;
+}
+
+.network-line-guide__legend li > :first-child {
+  margin-top: 0.3rem;
+}
+
+.network-line-guide__description {
+  margin-top: 0.18rem;
+  line-height: 1.65;
 }
 
 .network-controls__count {
