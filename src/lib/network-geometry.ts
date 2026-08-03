@@ -7,6 +7,8 @@ export type NetworkEdgeGeometry = {
   d: string;
   start: Point;
   end: Point;
+  firstControl: Point;
+  secondControl: Point;
   targetBoundary: Point;
   midX: number;
   midY: number;
@@ -17,6 +19,7 @@ export const NETWORK_SVG_SAFE_PADDING = 16;
 export const NETWORK_ARROW_GAP = 4;
 export const NETWORK_EDGE_CLEARANCE = 12;
 export const NETWORK_PARALLEL_EDGE_SPACING = 24;
+export const NETWORK_SELECTED_LABEL_PROGRESS = 0.3;
 
 type RoutableEdge = {
   id: string;
@@ -119,10 +122,38 @@ export function getNetworkEdgeGeometry(
     d: `M ${start.x} ${start.y} C ${firstControl.x} ${firstControl.y}, ${secondControl.x} ${secondControl.y}, ${end.x} ${end.y}`,
     start,
     end,
+    firstControl,
+    secondControl,
     targetBoundary,
     midX,
     midY,
     routeOffset: curveOffset,
+  };
+}
+
+export function getNetworkEdgeLabelPoint(
+  geometry: NetworkEdgeGeometry,
+  anchor: 'start' | 'middle' | 'end' = 'middle',
+): Point {
+  const t =
+    anchor === 'start'
+      ? NETWORK_SELECTED_LABEL_PROGRESS
+      : anchor === 'end'
+        ? 1 - NETWORK_SELECTED_LABEL_PROGRESS
+        : 0.5;
+  const inverse = 1 - t;
+
+  return {
+    x:
+      inverse ** 3 * geometry.start.x +
+      3 * inverse ** 2 * t * geometry.firstControl.x +
+      3 * inverse * t ** 2 * geometry.secondControl.x +
+      t ** 3 * geometry.end.x,
+    y:
+      inverse ** 3 * geometry.start.y +
+      3 * inverse ** 2 * t * geometry.firstControl.y +
+      3 * inverse * t ** 2 * geometry.secondControl.y +
+      t ** 3 * geometry.end.y,
   };
 }
 

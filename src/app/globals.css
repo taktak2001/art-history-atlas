@@ -2469,6 +2469,48 @@ html.dark .timeline-era-option[aria-current='true'] {
   overscroll-behavior-inline: contain;
 }
 
+.network-node {
+  transform-origin: center;
+  transition:
+    opacity 160ms ease,
+    transform 160ms ease,
+    border-color 160ms ease,
+    background-color 160ms ease;
+}
+
+.network-node[data-node-state='selected'] {
+  opacity: 1;
+  transform: scale(1.035);
+  background: color-mix(
+    in srgb,
+    rgb(var(--c-raised)) 92%,
+    rgb(var(--c-accent))
+  );
+}
+
+.network-node[data-node-state='selected'] .network-node__title {
+  font-weight: 700;
+}
+
+.network-node[data-node-state='selected'] .network-node__date {
+  color: rgb(var(--c-muted));
+  font-weight: 500;
+}
+
+.network-node[data-node-state='related'] {
+  opacity: 0.82;
+}
+
+.network-node[data-node-state='dimmed'] {
+  opacity: 0.42;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .network-node {
+    transition: none;
+  }
+}
+
 /* 縦型年表：静かな常設展示として時代の切り替わりを見せる */
 .chronology-page {
   padding: 0.75rem 0 5rem;

@@ -31,6 +31,7 @@ import {
 } from '@/components/RelationLine';
 import {
   getNetworkEdgeGeometry,
+  getNetworkEdgeLabelPoint,
   getNetworkEdgeRouteOffset,
   getNetworkViewBox,
   getParallelEdgeRouteOffset,
@@ -883,7 +884,15 @@ export function NetworkGraph({ movements, relationships, eraOrder }: Props) {
             return (
               <div
                 key={movement.id}
-                className={`absolute ${dimmed ? 'z-10' : isRelated ? 'z-30' : 'z-20'}`}
+                className={`absolute ${
+                  isSelected
+                    ? 'z-[35]'
+                    : dimmed
+                      ? 'z-10'
+                      : isRelated
+                        ? 'z-30'
+                        : 'z-20'
+                }`}
                 style={{
                   left: position.x,
                   top: position.y,
@@ -900,9 +909,9 @@ export function NetworkGraph({ movements, relationships, eraOrder }: Props) {
                   }}
                   aria-pressed={isSelected}
                   aria-label={`${movement.nameJa}を選択`}
-                  className={`relative flex h-full w-full flex-col justify-center bg-surface px-2 text-left text-xs transition-opacity ${
+                  className={`network-node relative flex h-full w-full flex-col justify-center bg-surface px-2 text-left text-xs ${
                     isSelected
-                      ? 'border-2 border-accent'
+                      ? 'border-[3px] border-accent'
                       : isEdgeSource
                         ? 'border-2 border-dashed border-ink'
                         : isEdgeTarget
@@ -910,7 +919,7 @@ export function NetworkGraph({ movements, relationships, eraOrder }: Props) {
                           : isRelated
                             ? 'border-2 border-ink/70'
                             : 'border hairline hover:border-ink/40'
-                  } ${dimmed ? 'opacity-20' : 'opacity-100'}`}
+                  }`}
                   data-network-node
                   data-node-state={
                     isSelected ? 'selected' : isRelated ? 'related' : dimmed ? 'dimmed' : 'idle'
@@ -924,8 +933,16 @@ export function NetworkGraph({ movements, relationships, eraOrder }: Props) {
                       {isEdgeSource ? '起点' : '到達先'}
                     </span>
                   )}
-                  <span className="truncate pr-7 font-serif text-ink">{movement.nameJa}</span>
-                  <span className="truncate text-[10px] text-faint">
+                  <span
+                    className="network-node__title truncate pr-7 font-serif text-ink"
+                    data-network-node-title
+                  >
+                    {movement.nameJa}
+                  </span>
+                  <span
+                    className="network-node__date truncate text-[10px] text-faint"
+                    data-network-node-date
+                  >
                     {movement.dates.start < 0
                       ? `前${Math.abs(movement.dates.start)}`
                       : movement.dates.start}
@@ -983,12 +1000,22 @@ export function NetworkGraph({ movements, relationships, eraOrder }: Props) {
                     relationship.to === selectedNodeId)) ||
                 (!selectionActive && idleLabelIds.has(relationship.id));
               if (!showLabel) return null;
+              const labelAnchor =
+                selectedNodeId === relationship.from
+                  ? 'start'
+                  : selectedNodeId === relationship.to
+                    ? 'end'
+                    : 'middle';
+              const labelPoint = getNetworkEdgeLabelPoint(
+                geometry,
+                labelAnchor,
+              );
 
               return (
                 <text
                   key={relationship.id}
-                  x={geometry.midX}
-                  y={geometry.midY - 6}
+                  x={labelPoint.x}
+                  y={labelPoint.y - 6}
                   textAnchor="middle"
                   fill={RELATION_COLOR[relationship.kind]}
                   stroke="rgb(var(--c-raised))"
@@ -998,6 +1025,7 @@ export function NetworkGraph({ movements, relationships, eraOrder }: Props) {
                   fontSize="10"
                   fontWeight="700"
                   data-edge-label
+                  data-edge-label-anchor={labelAnchor}
                 >
                   {RELATION_LABELS[relationship.kind]}
                 </text>
