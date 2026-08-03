@@ -197,10 +197,22 @@ test('ノード選択時は強調線を無関係ノードより前、関連ノ�
     return {
       opacity: Number(style.opacity),
       borderWidth: style.borderTopWidth,
+      borderColor: style.borderTopColor,
       backgroundColor: style.backgroundColor,
+      boxShadow: style.boxShadow,
       transform: style.transform,
       titleWeight: title ? Number(getComputedStyle(title).fontWeight) : 0,
+      titleColor: title ? getComputedStyle(title).color : '',
       dateWeight: date ? Number(getComputedStyle(date).fontWeight) : 0,
+    };
+  });
+  const idleNode = graph.locator('[data-node-state="dimmed"]').first();
+  const idleStyle = await idleNode.evaluate((element) => {
+    const style = getComputedStyle(element);
+    return {
+      borderWidth: style.borderTopWidth,
+      backgroundColor: style.backgroundColor,
+      boxShadow: style.boxShadow,
     };
   });
   const relatedOpacity = await relatedNode.evaluate((element) =>
@@ -212,16 +224,21 @@ test('ノード選択時は強調線を無関係ノードより前、関連ノ�
 
   expect(selectedStyle.opacity).toBe(1);
   expect(selectedStyle.borderWidth).toBe('3px');
-  expect(selectedStyle.transform).not.toBe('none');
+  expect(selectedStyle.borderColor).toBe(selectedStyle.titleColor);
+  expect(selectedStyle.transform).toBe('none');
   expect(selectedStyle.titleWeight).toBeGreaterThanOrEqual(700);
-  expect(selectedStyle.dateWeight).toBeGreaterThanOrEqual(500);
+  expect(selectedStyle.dateWeight).toBe(400);
+  expect(selectedStyle.boxShadow).not.toBe('none');
+  expect(selectedStyle.backgroundColor).toBe('rgb(252, 248, 244)');
+  expect(Number.parseFloat(idleStyle.borderWidth)).toBeGreaterThanOrEqual(1);
+  expect(Number.parseFloat(idleStyle.borderWidth)).toBeLessThanOrEqual(1.5);
+  expect(idleStyle.boxShadow).toBe('none');
+  expect(idleStyle.backgroundColor).toBe('rgb(255, 255, 255)');
   expect(relatedOpacity).toBeGreaterThanOrEqual(0.75);
   expect(relatedOpacity).toBeLessThanOrEqual(0.85);
   expect(dimmedOpacity).toBeGreaterThanOrEqual(0.35);
   expect(dimmedOpacity).toBeLessThanOrEqual(0.55);
-  expect(selectedStyle.backgroundColor).not.toBe(
-    await relatedNode.evaluate((element) => getComputedStyle(element).backgroundColor),
-  );
+  expect(selectedStyle.backgroundColor).not.toBe(idleStyle.backgroundColor);
   await expect(
     graph.locator('[data-edge-label][data-edge-label-anchor="start"], [data-edge-label][data-edge-label-anchor="end"]'),
   ).toHaveCount(await graph.locator('[data-network-layer="highlighted-edges"] [data-network-edge]').count());
@@ -401,6 +418,24 @@ test('ダークモードと動きを減らす設定を尊重する', async ({ pa
     .locator('body')
     .evaluate((element) => getComputedStyle(element).transitionDuration);
   expect(['0s', '0.000001s', '1e-06s']).toContain(transitionDuration);
+
+  const graph = page.getByRole('group', { name: '美術運動の関係ネットワーク図' });
+  await graph.getByRole('button', { name: 'イタリア・ルネサンスを選択' }).click();
+  const selectedStyle = await graph
+    .locator('[data-node-state="selected"]')
+    .evaluate((element) => {
+      const style = getComputedStyle(element);
+      const title = element.querySelector<HTMLElement>('[data-network-node-title]');
+      return {
+        borderColor: style.borderTopColor,
+        backgroundColor: style.backgroundColor,
+        boxShadow: style.boxShadow,
+        titleColor: title ? getComputedStyle(title).color : '',
+      };
+    });
+  expect(selectedStyle.borderColor).toBe(selectedStyle.titleColor);
+  expect(selectedStyle.backgroundColor).toBe('rgb(42, 40, 37)');
+  expect(selectedStyle.boxShadow).not.toBe('none');
 });
 
 for (const zoom of [1.25, 1.5]) {

@@ -909,17 +909,7 @@ export function NetworkGraph({ movements, relationships, eraOrder }: Props) {
                   }}
                   aria-pressed={isSelected}
                   aria-label={`${movement.nameJa}を選択`}
-                  className={`network-node relative flex h-full w-full flex-col justify-center bg-surface px-2 text-left text-xs ${
-                    isSelected
-                      ? 'border-[3px] border-accent'
-                      : isEdgeSource
-                        ? 'border-2 border-dashed border-ink'
-                        : isEdgeTarget
-                          ? 'border-[3px] border-double border-accent'
-                          : isRelated
-                            ? 'border-2 border-ink/70'
-                            : 'border hairline hover:border-ink/40'
-                  }`}
+                  className="network-node relative flex h-full w-full flex-col justify-center px-2 text-left text-xs"
                   data-network-node
                   data-node-state={
                     isSelected ? 'selected' : isRelated ? 'related' : dimmed ? 'dimmed' : 'idle'
