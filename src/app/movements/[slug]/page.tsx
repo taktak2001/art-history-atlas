@@ -19,6 +19,7 @@ import type { Movement } from '@/lib/schema';
 import { VerificationBadge, RelationBadge } from '@/components/Badges';
 import { SourceList } from '@/components/SourceList';
 import { CatalogueWorkList } from '@/components/CatalogueWorkList';
+import { MovementSubheading } from '@/components/MovementSubheading';
 
 export function generateStaticParams() {
   return movements.map((movement) => ({ slug: movement.id }));
@@ -43,9 +44,6 @@ const BAND_TONES = {
   warm: 'bg-surface',
   white: 'bg-raised',
 } as const;
-
-const SUBSECTION_HEADING_CLASS =
-  'font-serif text-xl leading-snug text-ink sm:text-[22px]';
 
 function Chapter({
   id,
@@ -102,9 +100,7 @@ function Subsection({
 }) {
   return (
     <section aria-labelledby={`${id}-title`} className={className}>
-      <h3 id={`${id}-title`} className={SUBSECTION_HEADING_CLASS}>
-        {title}
-      </h3>
+      <MovementSubheading id={`${id}-title`}>{title}</MovementSubheading>
       <div className="detail-body mt-4 max-w-[38em] text-[15px] leading-[1.95] text-ink sm:text-base">
         {children}
       </div>
@@ -115,12 +111,12 @@ function Subsection({
 function Field({ label, value }: { label: string; value?: string }) {
   if (!value) return null;
   return (
-    <div>
-      <dt className="text-[13px] font-bold text-muted">{label}</dt>
-      <dd className="mt-2 max-w-[38em] whitespace-pre-line leading-[1.95] text-ink">
+    <section aria-labelledby={`field-${label}`}>
+      <MovementSubheading id={`field-${label}`}>{label}</MovementSubheading>
+      <div className="detail-body mt-4 max-w-[38em] whitespace-pre-line text-[15px] leading-[1.95] text-ink sm:text-base">
         {toDisplayText(value)}
-      </dd>
-    </div>
+      </div>
+    </section>
   );
 }
 
@@ -134,11 +130,11 @@ function Passage({
   if (kind === '学説上の注意') {
     return (
       <aside
-        aria-label={kind}
+        aria-labelledby="scholarly-note-title"
         className="max-w-[42em] border-l-2 border-accent/55 bg-surface/70 px-5 py-4 sm:px-6"
       >
-        <p className="text-[13px] font-bold text-muted">{kind}</p>
-        <div className="mt-2 leading-[1.9] text-ink">
+        <MovementSubheading id="scholarly-note-title">{kind}</MovementSubheading>
+        <div className="detail-body mt-4 text-[15px] leading-[1.95] text-ink sm:text-base">
           {typeof children === 'string' ? toDisplayText(children) : children}
         </div>
       </aside>
@@ -146,12 +142,12 @@ function Passage({
   }
 
   return (
-    <div className="max-w-[42em]">
-      <p className="text-[13px] font-bold text-muted">{kind}</p>
-      <div className="mt-2 leading-[1.95] text-ink">
+    <section aria-labelledby="viewing-points-title" className="max-w-[42em]">
+      <MovementSubheading id="viewing-points-title">{kind}</MovementSubheading>
+      <div className="detail-body mt-4 text-[15px] leading-[1.95] text-ink sm:text-base">
         {typeof children === 'string' ? toDisplayText(children) : children}
       </div>
-    </div>
+    </section>
   );
 }
 
@@ -322,14 +318,14 @@ export default async function MovementDetailPage({
           <Subsection id="context-core-idea" title="中心となる考え">
             <p>{toDisplayText(movement.coreIdea)}</p>
           </Subsection>
-          <dl className="grid gap-x-12 gap-y-8 lg:grid-cols-2">
+          <div className="grid gap-x-12 gap-y-10 lg:grid-cols-2">
             <Field label="社会的背景" value={movement.socialContext} />
             <Field label="政治的背景" value={movement.politicalContext} />
             <Field label="宗教的背景" value={movement.religiousContext} />
             <Field label="哲学・思想史との関連" value={movement.philosophy} />
             <Field label="技術革新との関連" value={movement.technologyContext} />
             <Field label="主な主題" value={movement.subjects} />
-          </dl>
+          </div>
           {movement.dates.note && (
             <Passage kind="学説上の注意">{movement.dates.note}</Passage>
           )}
@@ -394,7 +390,7 @@ export default async function MovementDetailPage({
           </div>
 
           <div>
-            <h3 className={SUBSECTION_HEADING_CLASS}>主要作家</h3>
+            <MovementSubheading>主要作家</MovementSubheading>
             {artists.length > 0 ? (
               <ul className="mt-5 grid gap-x-10 gap-y-8 sm:grid-cols-2">
                 {artists.map((artist) => (
@@ -441,9 +437,9 @@ export default async function MovementDetailPage({
             <div className="grid gap-10 lg:grid-cols-2 lg:gap-14">
               {outgoing.length > 0 && (
                 <section aria-labelledby="outgoing-title">
-                  <h3 id="outgoing-title" className={SUBSECTION_HEADING_CLASS}>
+                  <MovementSubheading id="outgoing-title">
                     この運動から
-                  </h3>
+                  </MovementSubheading>
                   <ul className="mt-5 space-y-7">
                     {outgoing.map((relation) => {
                       const to = getMovement(relation.to);
@@ -470,9 +466,9 @@ export default async function MovementDetailPage({
               )}
               {incoming.length > 0 && (
                 <section aria-labelledby="incoming-title">
-                  <h3 id="incoming-title" className={SUBSECTION_HEADING_CLASS}>
+                  <MovementSubheading id="incoming-title">
                     この運動へ
-                  </h3>
+                  </MovementSubheading>
                   <ul className="mt-5 space-y-7">
                     {incoming.map((relation) => {
                       const from = getMovement(relation.from);

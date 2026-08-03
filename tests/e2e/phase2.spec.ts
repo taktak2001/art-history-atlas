@@ -150,6 +150,64 @@ test('02章の転換と継承は同じ階層・同じ強度で並列表示する
   await expect(chapter.locator('aside, blockquote')).toHaveCount(0);
 });
 
+test('詳細本文の小見出しは全章でセリフ体に統一し、UIメタ情報はサンセリフを維持する', async ({
+  page,
+}) => {
+  await page.goto('/movements/italian-renaissance/');
+
+  for (const title of [
+    '中心となる考え',
+    '社会的背景',
+    '技術革新との関連',
+    '主な主題',
+    '転換したこと',
+    '継承したこと',
+    '見た目の特徴',
+    '色彩・光',
+    '制作制度',
+    '学説上の注意',
+  ]) {
+    await expect(
+      page.getByRole('heading', { level: 3, name: title }),
+    ).toHaveAttribute('data-movement-subheading');
+  }
+
+  const typography = await page.evaluate(() => {
+    const section = document.querySelector<HTMLElement>('#context h2');
+    const subheadings = Array.from(
+      document.querySelectorAll<HTMLElement>('[data-movement-subheading]'),
+    );
+    const body = document.querySelector<HTMLElement>('#context .detail-body');
+    const metadata = Array.from(document.querySelectorAll<HTMLElement>('dt')).find(
+      (element) => element.textContent === '年代',
+    );
+
+    return {
+      sectionFamily: section ? getComputedStyle(section).fontFamily : '',
+      subsectionFamilies: subheadings.map(
+        (heading) => getComputedStyle(heading).fontFamily,
+      ),
+      subsectionWeights: subheadings.map(
+        (heading) => getComputedStyle(heading).fontWeight,
+      ),
+      bodyFamily: body ? getComputedStyle(body).fontFamily : '',
+      metadataFamily: metadata ? getComputedStyle(metadata).fontFamily : '',
+    };
+  });
+
+  expect(typography.subsectionFamilies.length).toBeGreaterThan(10);
+  expect(
+    typography.subsectionFamilies.every(
+      (family) => family === typography.sectionFamily,
+    ),
+  ).toBe(true);
+  expect(
+    typography.subsectionWeights.every((weight) => Number(weight) >= 500),
+  ).toBe(true);
+  expect(typography.bodyFamily).not.toBe(typography.sectionFamily);
+  expect(typography.metadataFamily).toBe(typography.bodyFamily);
+});
+
 test('03章は5つの具体的区分だけを表示し、事実ラベルを置かない', async ({ page }) => {
   await page.goto('/movements/rinpa/');
 

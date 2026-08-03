@@ -14,7 +14,21 @@ import type { Work } from '@/lib/schema';
 import { LodControl } from '@/components/LodControl';
 import { MatrixView } from '@/components/MatrixView';
 import { MovementsExplorer } from '@/components/MovementsExplorer';
+import { MovementSubheading } from '@/components/MovementSubheading';
 import { movements, activeRegions } from '@/lib/dataset';
+
+describe('MovementSubheading', () => {
+  it('詳細本文用のセリフ見出し規則を一元化する', () => {
+    render(<MovementSubheading>社会的背景</MovementSubheading>);
+
+    const heading = screen.getByRole('heading', {
+      level: 3,
+      name: '社会的背景',
+    });
+    expect(heading).toHaveAttribute('data-movement-subheading');
+    expect(heading).toHaveClass('font-serif', 'font-medium', 'text-xl');
+  });
+});
 
 describe('MovementCard', () => {
   it('ムーブメント名・英名・要約を表示する', () => {
