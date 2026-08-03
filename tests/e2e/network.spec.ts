@@ -179,6 +179,17 @@ test('ノード選択時は強調線を無関係ノードより前、関連ノ�
   const selectedNode = graph.locator('[data-node-state="selected"]');
   const relatedNode = graph.locator('[data-node-state="related"]').first();
   const dimmedNode = graph.locator('[data-node-state="dimmed"]').first();
+  // Wait for the short focus transition before asserting its settled visual hierarchy.
+  await expect
+    .poll(() =>
+      relatedNode.evaluate((element) => Number(getComputedStyle(element).opacity)),
+    )
+    .toBeLessThanOrEqual(0.85);
+  await expect
+    .poll(() =>
+      dimmedNode.evaluate((element) => Number(getComputedStyle(element).opacity)),
+    )
+    .toBeLessThanOrEqual(0.55);
   const selectedStyle = await selectedNode.evaluate((element) => {
     const style = getComputedStyle(element);
     const title = element.querySelector<HTMLElement>('[data-network-node-title]');
