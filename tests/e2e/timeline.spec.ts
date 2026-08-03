@@ -1183,10 +1183,9 @@ test('閲覧モードは156%、195%、305%で同一地域のラベルを自動�
   expect(maximumFranceTrackCount).toBeGreaterThan(1);
 });
 
-test('PC 400%でも象徴主義・フォーヴィスムの年代と期間線が重ならない', async ({
+test('PC 400%・iPhone高倍率でも象徴主義とフォーヴィスムの年代が期間線と重ならない', async ({
   page,
 }, testInfo) => {
-  test.skip(testInfo.project.name !== 'desktop', 'desktop project only');
   await page.goto('/timeline/');
   await page
     .getByRole('group', { name: '表示する範囲' })
@@ -1197,8 +1196,9 @@ test('PC 400%でも象徴主義・フォーヴィスムの年代と期間線が�
 
   const viewer = page.locator('[data-timeline-viewer="active"]');
   const zoomIn = viewer.getByRole('button', { name: '拡大' });
+  const targetScale = testInfo.project.name === 'mobile' ? 3 : 4;
   while (
-    Number((await viewer.getAttribute('data-viewer-scale')) ?? 0) < 4
+    Number((await viewer.getAttribute('data-viewer-scale')) ?? 0) < targetScale
   ) {
     await zoomIn.click();
     await expect
@@ -1207,7 +1207,10 @@ test('PC 400%でも象徴主義・フォーヴィスムの年代と期間線が�
       )
       .toBeGreaterThan(1);
   }
-  await expect(viewer).toHaveAttribute('data-viewer-scale', '4');
+  await expect(viewer).toHaveAttribute(
+    'data-viewer-scale',
+    String(targetScale),
+  );
 
   const appliedOffsets: number[] = [];
   for (const movementId of ['symbolism', 'fauvism']) {
