@@ -794,6 +794,151 @@ test('PC閲覧モードはマウスドラッグで上下左右へパンできる
   await expect(stage).not.toHaveAttribute('data-desktop-dragging', 'true');
 });
 
+test('＋／−ズームは中央の年代と地域レーンを維持する', async ({
+  page,
+}, testInfo) => {
+  if (testInfo.project.name === 'desktop') {
+    await page.setViewportSize({ width: 900, height: 800 });
+  }
+  await page.goto('/timeline/');
+  await page
+    .getByRole('group', { name: '表示する範囲' })
+    .getByRole('button', { name: /すべて/ })
+    .click();
+  await page.getByRole('button', { name: 'タイムラインを全画面で表示' }).click();
+
+  const viewer = page.locator('[data-timeline-viewer="active"]');
+  const stage = viewer.locator('[data-native-scroll-viewport]');
+  const zoomOut = viewer.getByRole('button', { name: '縮小' });
+  const zoomIn = viewer.getByRole('button', { name: '拡大' });
+  await zoomOut.click();
+  await zoomOut.click();
+  await expect
+    .poll(async () => Number(await viewer.getAttribute('data-viewer-scale')))
+    .toBeCloseTo(0.64, 2);
+
+  const centerOnJapanAnd1900 = async () =>
+    stage.evaluate((element) => {
+      const viewerElement = element.closest<HTMLElement>(
+        '[data-timeline-viewer="active"]',
+      );
+      const region = viewerElement?.querySelector<HTMLElement>(
+        '[data-viewer-region-id="japan"]',
+      );
+      const tick = viewerElement?.querySelector<HTMLElement>(
+        '[data-viewer-gridline="1900"]',
+      );
+      const controls = viewerElement?.querySelector<HTMLElement>(
+        '[data-viewer-controls]',
+      );
+      if (!viewerElement || !region || !tick || !controls) return;
+      const stageRect = element.getBoundingClientRect();
+      const regionRect = region.getBoundingClientRect();
+      const tickRect = tick.getBoundingClientRect();
+      const controlsRect = controls.getBoundingClientRect();
+      const styles = getComputedStyle(viewerElement);
+      const regionWidth = Number.parseFloat(
+        styles.getPropertyValue('--timeline-viewer-region-axis-width'),
+      );
+      const timeHeight = Number.parseFloat(
+        styles.getPropertyValue('--timeline-viewer-time-axis-height'),
+      );
+      const anchorX = regionWidth + (element.clientWidth - regionWidth) / 2;
+      const contentBottom = Math.min(
+        element.clientHeight,
+        controlsRect.top - stageRect.top - 12,
+      );
+      const anchorY = timeHeight + (contentBottom - timeHeight) / 2;
+      element.scrollLeft += tickRect.left - (stageRect.left + anchorX);
+      element.scrollTop +=
+        regionRect.top + regionRect.height / 2 - (stageRect.top + anchorY);
+    });
+
+  const measureAnchorOffsets = async () =>
+    stage.evaluate((element) => {
+      const viewerElement = element.closest<HTMLElement>(
+        '[data-timeline-viewer="active"]',
+      )!;
+      const region = viewerElement.querySelector<HTMLElement>(
+        '[data-viewer-region-id="japan"]',
+      )!;
+      const tick = viewerElement.querySelector<HTMLElement>(
+        '[data-viewer-gridline="1900"]',
+      )!;
+      const controls = viewerElement.querySelector<HTMLElement>(
+        '[data-viewer-controls]',
+      )!;
+      const stageRect = element.getBoundingClientRect();
+      const regionRect = region.getBoundingClientRect();
+      const tickRect = tick.getBoundingClientRect();
+      const controlsRect = controls.getBoundingClientRect();
+      const styles = getComputedStyle(viewerElement);
+      const regionWidth = Number.parseFloat(
+        styles.getPropertyValue('--timeline-viewer-region-axis-width'),
+      );
+      const timeHeight = Number.parseFloat(
+        styles.getPropertyValue('--timeline-viewer-time-axis-height'),
+      );
+      const anchorX = stageRect.left +
+        regionWidth +
+        (element.clientWidth - regionWidth) / 2;
+      const contentBottom = Math.min(
+        element.clientHeight,
+        controlsRect.top - stageRect.top - 12,
+      );
+      const anchorY =
+        stageRect.top + timeHeight + (contentBottom - timeHeight) / 2;
+      return {
+        x: tickRect.left - anchorX,
+        y: regionRect.top + regionRect.height / 2 - anchorY,
+        regionHeight: regionRect.height,
+        viewportWidth: element.clientWidth,
+      };
+    });
+
+  await centerOnJapanAnd1900();
+  const before = await measureAnchorOffsets();
+  for (const expectedScale of [0.8, 1, 1.25]) {
+    await zoomIn.click();
+    await expect
+      .poll(async () => Number(await viewer.getAttribute('data-viewer-scale')))
+      .toBeCloseTo(expectedScale, 2);
+    const after = await measureAnchorOffsets();
+    expect(Math.abs(after.x - before.x)).toBeLessThanOrEqual(
+      after.viewportWidth * 0.05,
+    );
+    expect(Math.abs(after.y - before.y)).toBeLessThanOrEqual(
+      after.regionHeight * 0.1,
+    );
+    await expect(viewer).toHaveAttribute(
+      'data-last-zoom-anchor-region',
+      'japan',
+    );
+    await expect
+      .poll(async () =>
+        Number(await viewer.getAttribute('data-last-zoom-anchor-year')),
+      )
+      .toBeGreaterThanOrEqual(1898);
+    await expect
+      .poll(async () =>
+        Number(await viewer.getAttribute('data-last-zoom-anchor-year')),
+      )
+      .toBeLessThanOrEqual(1902);
+  }
+
+  await zoomOut.click();
+  await expect
+    .poll(async () => Number(await viewer.getAttribute('data-viewer-scale')))
+    .toBeCloseTo(1, 2);
+  const afterZoomOut = await measureAnchorOffsets();
+  expect(Math.abs(afterZoomOut.x - before.x)).toBeLessThanOrEqual(
+    afterZoomOut.viewportWidth * 0.05,
+  );
+  expect(Math.abs(afterZoomOut.y - before.y)).toBeLessThanOrEqual(
+    afterZoomOut.regionHeight * 0.1,
+  );
+});
+
 test('native scroll中はReact render・DOM差替え・compositor transformを発生させない', async ({
   page,
 }, testInfo) => {

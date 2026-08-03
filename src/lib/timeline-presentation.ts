@@ -269,6 +269,33 @@ export function yearToTimelineX(year: number, mode: TimelineMode, width: number)
   return progress * width;
 }
 
+export function timelineXToYear(
+  x: number,
+  mode: TimelineMode,
+  width: number,
+) {
+  const safeWidth = Math.max(1, width);
+  const progress = clamp(x / safeWidth, 0, 1);
+  if (mode.id !== 'survey') {
+    return mode.start + progress * (mode.end - mode.start);
+  }
+
+  let elapsedWeight = 0;
+  for (const segment of SURVEY_SEGMENTS) {
+    const segmentEnd = elapsedWeight + segment.weight;
+    if (progress <= segmentEnd) {
+      const localProgress =
+        (progress - elapsedWeight) / Math.max(0.0001, segment.weight);
+      return (
+        segment.start +
+        clamp(localProgress, 0, 1) * (segment.end - segment.start)
+      );
+    }
+    elapsedWeight = segmentEnd;
+  }
+  return mode.end;
+}
+
 const niceMultiplier = (minimum: number) => {
   for (const multiplier of [1, 2, 4, 5, 10, 20, 50, 100]) {
     if (multiplier >= minimum) return multiplier;
