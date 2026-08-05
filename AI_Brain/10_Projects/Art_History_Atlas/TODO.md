@@ -45,8 +45,15 @@
 
 ## 画像「引用(quotation)」フォローアップ（2026-08）
 
-- [ ] image:null 作品の個別監査（保護期間/Open Access 再確認・具体的な引用目的・必要性・掲載量・出典/提供元・利用条件）。条件を満たすものだけ quotation 候補化。
+- [x] image:null 作品の個別監査（保護期間/Open Access 再確認・具体的な引用目的・必要性・掲載量・出典/提供元・利用条件）。→ 最終 image:null 38点すべてに `imageReference` を付与（PR #62）。全件表: `docs/image-reference-audit.md`。条件を満たすものだけ quotation 候補化。
 - [ ] 引用候補 5点以内をユーザーへ提示 → 承認 → `reviewStatus: editorial-approved` + `isPublished: true` で本番反映。
 - [ ] （任意）既存の確認済み画像へ `usageBasis` を明示バックフィル。
 - [ ] 重要作品の本番掲載前に IP 専門家レビュー。
 - [ ] Compare に「画像に対応した具体的な比較分析」を伴う compare-analysis サーフェスを実装する場合の設計。
+
+## imageReference フォローアップ（2026-08-06、PR #62 後）
+
+- [ ] `unresolved` 2点（work-son-of-man 個人蔵 / work-kounellis-horses 1969上演）の作品単独ページを継続調査。
+- [ ] 各 `sourcePageUrl` の `termsUrl`（利用条件ページ）を可能な範囲で補完（現状は AIC のみ設定）。
+- [ ] PD候補2点の画像調達: 藍瑛=AIC の CC0 画像を `image` へ昇格検討 / ミュシャ=© Mucha Trust 以外の PD スキャン（美術館/Commons）を探索。
+- [ ] `quotation-candidate` 5点は PR #61 の法務レビュー完了まで `image:null` を維持。

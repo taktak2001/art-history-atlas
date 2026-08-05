@@ -84,3 +84,14 @@
 - `scripts/validate-data.ts` に引用要件チェックを追加。unit テスト `tests/unit/image-usage.test.ts`（12件）。
 - **仕組みのみ実装**。image:null 作品は自動 quotation 化していない。引用候補（5点以内）は別途一覧提示 → ユーザー承認後に本番反映。
 - 検証: typecheck / lint 0件 / unit（image-usage 12件含む）/ validate:data 成功。
+
+## imageReference 全件監査（2026-08-06・PR [#62](https://github.com/taktak2001/art-history-atlas/pull/62)）
+
+- 最終 `image === null` の**38作品すべて**に調査・審査用の `Work.imageReference` を付与（URL未発見 0）。
+  本番表示とは分離（画像は null のまま、詳細ページに「提供元で作品を見る ↗」外部リンクのみ）。
+- 内訳: 公式作品ページあり 36 / PD候補 2（藍瑛=AIC CC0 確認済・ミュシャ=要レビュー）/ 引用候補 5（PR #61）
+  / 許諾必要 29 / 権利不明 2 / 未解決 2。捏造URLなし・`candidateFileUrl` は AIC IIIF の1点のみ。
+- 追加物: `src/data/expansion/image-references.ts` / `docs/image-reference-audit.md`（自動生成）
+  / `scripts/gen-image-reference-audit.ts` / `tests/unit/image-reference.test.ts`（10件）。スキーマ・
+  `validate-data.ts` に検証を追加。
+- 検証: typecheck / lint / validate:data / unit **204** / E2E+axe **250** / 静的ビルド すべて成功。

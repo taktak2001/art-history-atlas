@@ -55,7 +55,13 @@ export default async function WorkPage({ params }: { params: Promise<{ slug: str
       </nav>
 
       <div className="grid gap-8 sm:grid-cols-2">
-        <WorkImage work={w} className="w-full" sizes="(max-width: 640px) 92vw, 400px" showCredit />
+        <WorkImage
+          work={w}
+          className="w-full"
+          sizes="(max-width: 640px) 92vw, 400px"
+          showCredit
+          showReferenceLink
+        />
         <div>
           <h1 className="font-serif text-3xl leading-tight">{w.titleJa}</h1>
           {w.titleOriginal && <p className="mt-1 text-sm text-faint">{w.titleOriginal}</p>}

@@ -270,6 +270,103 @@ console.log('▶ 同一画像URLの重複');
   }
 }
 
+console.log('▶ imageReference（画像未収録作品の調査・審査用参照）チェック');
+{
+  // 第一出典に用いてはならないホスト（Wikipedia/SNS/販売/画像収集）。
+  const disallowedSourceHosts = [
+    'wikipedia.org',
+    'pinterest.',
+    'instagram.com',
+    'facebook.com',
+    'twitter.com',
+    'x.com',
+    'tumblr.com',
+    'flickr.com',
+    'etsy.com',
+    'amazon.',
+    'ebay.',
+    '1stdibs.com',
+    'artsy.net',
+    'wikiart.org',
+  ];
+  const hostOf = (u: string) => {
+    try {
+      return new URL(u).host.toLowerCase();
+    } catch {
+      return '';
+    }
+  };
+
+  const refSourceUrls: string[] = [];
+
+  for (const w of works) {
+    const ref = w.imageReference;
+
+    // image が null の作品は imageReference（または明示的な未解決記録）を持つべき。
+    if (w.image === null && !ref) {
+      fail(`work ${w.id}: image が null だが imageReference が無い`);
+      continue;
+    }
+    if (!ref) continue;
+
+    // imageReference は未収録作品専用（image があってはならない）。
+    if (w.image !== null) {
+      fail(`work ${w.id}: image があるのに imageReference を持っている`);
+    }
+
+    // URL は https かつ空白なし（スキーマでも担保するが二重に確認）。
+    const urls: Array<[string, string | undefined]> = [
+      ['sourcePageUrl', ref.sourcePageUrl],
+      ['imagePageUrl', ref.imagePageUrl],
+      ['candidateFileUrl', ref.candidateFileUrl],
+      ['termsUrl', ref.termsUrl],
+    ];
+    for (const [field, url] of urls) {
+      if (!url) continue;
+      if (!url.startsWith('https://')) fail(`work ${w.id}: ${field} が https でない`);
+      if (/\s/.test(url)) fail(`work ${w.id}: ${field} に空白が含まれる`);
+    }
+
+    // sourcePageUrl は必須（candidateFileUrl だけで sourcePageUrl 無しは禁止）。
+    if (!ref.sourcePageUrl) {
+      fail(`work ${w.id}: imageReference に sourcePageUrl が無い`);
+    } else {
+      const host = hostOf(ref.sourcePageUrl);
+      if (disallowedSourceHosts.some((bad) => host.includes(bad))) {
+        fail(`work ${w.id}: sourcePageUrl に第一出典として不適切なホスト(${host})を使用`);
+      }
+      refSourceUrls.push(ref.sourcePageUrl);
+    }
+
+    // PD/Open Access 候補は判定根拠（note）が必須。
+    if (
+      (ref.rightsStatus === 'public-domain-candidate' ||
+        ref.rightsStatus === 'open-access-candidate') &&
+      ref.verificationNote.trim().length === 0
+    ) {
+      fail(`work ${w.id}: ${ref.rightsStatus} には判定根拠(verificationNote)が必須`);
+    }
+
+    // quotation-candidate / rights-review-required は本番画像へ昇格させない
+    //（＝ image は null のまま）。上の image!==null チェックで担保済みだが明示。
+    if (
+      (ref.rightsStatus === 'quotation-candidate' ||
+        ref.verificationStatus === 'rights-review-required') &&
+      w.image !== null
+    ) {
+      fail(`work ${w.id}: 権利レビュー中/引用候補の参照が本番画像に昇格している`);
+    }
+  }
+
+  // 同一 sourcePageUrl の誤った大量流用を検出（3件以上の重複は要確認）。
+  const counts = new Map<string, number>();
+  for (const u of refSourceUrls) counts.set(u, (counts.get(u) ?? 0) + 1);
+  for (const [u, c] of counts) {
+    if (c >= 3) fail(`sourcePageUrl の過剰な使い回し(${c}件): ${u}`);
+  }
+  console.log(`  ✓ imageReference: ${refSourceUrls.length}件を検証`);
+}
+
 console.log('');
 if (errors > 0) {
   console.error(`✗ 検証失敗: ${errors}件のエラー`);
