@@ -382,6 +382,80 @@ export const ImageMeta = z
   });
 export type ImageMeta = z.infer<typeof ImageMeta>;
 
+/**
+ * 画像未収録（image === null）作品の「調査・審査用」参照情報。
+ *
+ * 重要：`image`（本番表示できる権利確認済み画像）とは役割が異なる。
+ * `imageReference` は原典ページ・画像候補・権利確認状況を蓄積するためのメタデータであり、
+ * これが存在しても本番画面で画像を表示してはならない（UIはプレースホルダーのまま、
+ * 「提供元で作品を見る」外部リンク導線のみ許可）。
+ */
+export const RightsStatus = z.enum([
+  'public-domain-candidate', // 作品自体がPD候補（忠実な二次元複製が前提）
+  'open-access-candidate', // 提供元がOpen Access/CC0を明示
+  'licensed-candidate', // 許諾ライセンスで利用できる可能性
+  'quotation-candidate', // 著作権法上の「引用」候補（本番表示は審査後・限定サーフェスのみ）
+  'permission-required', // 権利者・提供元の許諾が必要
+  'rights-unclear', // 権利関係を確定できない
+]);
+export type RightsStatus = z.infer<typeof RightsStatus>;
+
+/** imageReference の確認状況。 */
+export const ReferenceVerificationStatus = z.enum([
+  'url-verified', // URL先を実際に取得し、作品・提供元・権利を確認済み
+  'metadata-verified', // 提供元ページのメタデータ一致を確認（本文取得は限定的）
+  'rights-review-required', // URLは妥当だが、本番表示前に権利レビューが必須
+  'unresolved', // 作品単独ページ／安定画像ページを確認できず、追加調査が必要
+]);
+export type ReferenceVerificationStatus = z.infer<typeof ReferenceVerificationStatus>;
+
+/** https かつ空白を含まない URL。 */
+const referenceUrl = z
+  .string()
+  .url()
+  .refine((u) => u.startsWith('https://'), { message: 'URLはhttpsでなければならない' })
+  .refine((u) => !/\s/.test(u), { message: 'URLに空白を含めてはならない' });
+
+export const ImageReference = z
+  .object({
+    /** 作品情報を伴う原典ページ（所蔵館・財団・公的機関の作品ページを最優先）。 */
+    sourcePageUrl: referenceUrl,
+    /** 提供元（所蔵館・財団・アーカイブ等）。 */
+    provider: z.string().min(1),
+    /** 画像が sourcePageUrl と別ページにある場合の画像掲載ページ。 */
+    imagePageUrl: referenceUrl.optional(),
+    /** 特定できた場合のみの直接画像ファイルURL（推測で作らない）。 */
+    candidateFileUrl: referenceUrl.optional(),
+    /** 利用条件・ライセンス・著作権表示のページ。 */
+    termsUrl: referenceUrl.optional(),
+    /** 権利確認状況。 */
+    rightsStatus: RightsStatus,
+    /** 著作権表示（提供元が明示している場合）。 */
+    copyrightNotice: z.string().optional(),
+    /** クレジット表記。 */
+    creditLine: z.string().optional(),
+    /** 参照日 (YYYY-MM-DD)。 */
+    accessed: z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
+    /** 確認状況。 */
+    verificationStatus: ReferenceVerificationStatus,
+    /** 判断根拠・確認の限界・未解決事項の注記（必須）。 */
+    verificationNote: z.string().min(1),
+  })
+  .superRefine((ref, ctx) => {
+    // PD/Open Access候補は判定根拠（note）を必須にする。
+    if (
+      (ref.rightsStatus === 'public-domain-candidate' ||
+        ref.rightsStatus === 'open-access-candidate') &&
+      ref.verificationNote.trim().length === 0
+    ) {
+      ctx.addIssue({
+        code: 'custom',
+        message: 'public-domain/open-access候補には判定根拠(verificationNote)が必須',
+      });
+    }
+  });
+export type ImageReference = z.infer<typeof ImageReference>;
+
 /** 作品 */
 export const Work = z.object({
   id: slug,
@@ -395,8 +469,24 @@ export const Work = z.object({
   movementIds: z.array(slug).min(1),
   description: z.string().min(1),
   image: ImageMeta.nullable(),
+  /**
+   * 画像未収録時の調査・審査用の参照情報。`image` が null の作品にのみ付与し、
+   * 本番画面での画像表示には決して用いない（プレースホルダー + 外部リンク導線のみ）。
+   */
+  imageReference: ImageReference.optional(),
   sourceIds: z.array(slug).min(1),
   verification: VerificationStatus,
+})
+.superRefine((work, ctx) => {
+  // imageReference は「画像未収録作品」専用。image があるなら付与しない
+  // （＝権利未確認の参照情報が、本番表示可能な image と混同されるのを防ぐ）。
+  if (work.imageReference && work.image !== null) {
+    ctx.addIssue({
+      code: 'custom',
+      path: ['imageReference'],
+      message: 'imageReference は image が null の作品にのみ付与できる',
+    });
+  }
 });
 export type Work = z.infer<typeof Work>;
 
