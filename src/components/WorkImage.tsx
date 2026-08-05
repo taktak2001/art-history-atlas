@@ -27,6 +27,7 @@ export function WorkImage({
   sizes = '(max-width: 640px) 92vw, 360px',
   showCredit = false,
   surface = 'work-analysis',
+  showReferenceLink = false,
 }: {
   work: Work;
   className?: string;
@@ -34,6 +35,12 @@ export function WorkImage({
   showCredit?: boolean;
   /** 表示コンテキスト。quotation画像はこのサーフェスが許可された場所でのみ表示される。 */
   surface?: ImageSurface;
+  /**
+   * 画像未収録時のプレースホルダーに「提供元で作品を見る」外部リンクを出すか。
+   * 作品詳細でのみ true。一覧カード・Timeline・Network・Chronology では表示しない。
+   * 画像の転載ではなく、提供元ページへの遷移導線のみを提供する。
+   */
+  showReferenceLink?: boolean;
 }) {
   const [failed, setFailed] = useState(false);
   const img = work.image;
@@ -142,6 +149,20 @@ export function WorkImage({
         <p className="text-xs text-muted">画像は権利確認後に順次収録</p>
         <p className="text-[11px] text-faint">{work.medium}</p>
       </div>
+      {showReferenceLink && work.imageReference?.sourcePageUrl && (
+        // 画像の転載ではなく、提供元の作品ページへの外部導線のみ。詳細ページ限定。
+        <p className="mt-2 text-xs leading-relaxed text-faint">
+          <a
+            href={work.imageReference.sourcePageUrl}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="prose-link"
+          >
+            提供元で作品を見る ↗
+          </a>
+          <span className="ml-1 text-faint">（{work.imageReference.provider}／外部サイト）</span>
+        </p>
+      )}
     </div>
   );
 }
