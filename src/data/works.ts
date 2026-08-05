@@ -1,6 +1,7 @@
 import type { Work, ImageMeta } from '@/lib/schema';
 import { coreExpansionWorks } from './expansion/core-works';
 import { finalExpansionWorks } from './expansion/final-works';
+import { applyImageReferences } from './expansion/image-references';
 import { applyImageSupplements } from './expansion/image-supplements';
 import { standardOneExpansionWorks } from './expansion/standard-one-works';
 
@@ -1505,4 +1506,6 @@ const workRecords: Work[] = [
   ...finalExpansionWorks,
 ];
 
-export const works: Work[] = applyImageSupplements(workRecords);
+// applyImageSupplements で最終的に画像が付く作品を先に確定させ、
+// それでも image === null の作品にだけ調査・審査用の imageReference を付与する。
+export const works: Work[] = applyImageReferences(applyImageSupplements(workRecords));
