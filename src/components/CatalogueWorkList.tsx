@@ -58,6 +58,7 @@ export function CatalogueWorkList({ works }: { works: Work[] }) {
         >
           <WorkImage
             work={featured}
+            surface="gallery"
             sizes="(max-width: 1024px) 92vw, 720px"
             className="transition-opacity duration-200 group-hover:opacity-90"
           />
@@ -97,6 +98,7 @@ export function CatalogueWorkList({ works }: { works: Work[] }) {
                 >
                   <WorkImage
                     work={work}
+                    surface="gallery"
                     sizes="(max-width: 768px) 92vw, 440px"
                     className="transition-opacity duration-200 group-hover:opacity-90"
                   />

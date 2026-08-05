@@ -33,7 +33,9 @@ const licenseCounts = new Map<string, number>();
 for (const work of imageWorks) {
   const image = work.image!;
   providerCounts.set(image.provider, (providerCounts.get(image.provider) ?? 0) + 1);
-  licenseCounts.set(image.license, (licenseCounts.get(image.license) ?? 0) + 1);
+  // quotation画像は許諾ライセンスを持たないため、利用根拠区分で集計する
+  const licenseLabel = image.license ?? 'quotation';
+  licenseCounts.set(licenseLabel, (licenseCounts.get(licenseLabel) ?? 0) + 1);
 }
 
 const sortCounts = (counts: Map<string, number>) =>

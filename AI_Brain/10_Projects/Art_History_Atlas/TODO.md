@@ -42,3 +42,11 @@
 - 機能変更はその都度作業ブランチへ push し、必要な検証が成功したPRは `main` へ自動マージしてよい。競合・意図しない差分・検証失敗時はマージしない。
 - データ変更後は `npm run validate:data`。PR 前に `npm run check` + `npm run build`。
 - 画像・出典は推測URL禁止。ライセンス確認できないものは `image:null` / `single-source` / `needs-review` で明示。
+
+## 画像「引用(quotation)」フォローアップ（2026-08）
+
+- [ ] image:null 作品の個別監査（保護期間/Open Access 再確認・具体的な引用目的・必要性・掲載量・出典/提供元・利用条件）。条件を満たすものだけ quotation 候補化。
+- [ ] 引用候補 5点以内をユーザーへ提示 → 承認 → `reviewStatus: editorial-approved` + `isPublished: true` で本番反映。
+- [ ] （任意）既存の確認済み画像へ `usageBasis` を明示バックフィル。
+- [ ] 重要作品の本番掲載前に IP 専門家レビュー。
+- [ ] Compare に「画像に対応した具体的な比較分析」を伴う compare-analysis サーフェスを実装する場合の設計。

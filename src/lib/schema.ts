@@ -159,6 +159,75 @@ export const ImageLicense = z.enum([
 ]);
 export type ImageLicense = z.infer<typeof ImageLicense>;
 
+/**
+ * 画像の利用根拠（法的・編集上の区分）。
+ * - public-domain: 保護期間満了/CC0。全画面で使用可。
+ * - licensed: CC BY 等、許諾条件の範囲で使用可。
+ * - quotation: 著作権法上の「引用」。具体的な分析本文と一体の場合だけ、限定された場所でのみ表示。
+ * - unavailable: 画像を表示せず作品情報のみ（= image を持たない扱いと同等）。
+ * 「教育目的だから」「出典を書けば」「低解像度なら」「外部埋め込みなら」使える、という前提は取らない。
+ */
+export const UsageBasis = z.enum([
+  'public-domain',
+  'licensed',
+  'quotation',
+  'unavailable',
+]);
+export type UsageBasis = z.infer<typeof UsageBasis>;
+
+/** 引用画像の審査状態。editorial-approved 未満は本番表示しない。 */
+export const ReviewStatus = z.enum([
+  'pending',
+  'editorial-approved',
+  'legal-review-required',
+  'rejected',
+]);
+export type ReviewStatus = z.infer<typeof ReviewStatus>;
+
+/**
+ * 引用目的。装飾・代表作品の展示・分かりやすさは引用目的として認めない。
+ * 具体的な批評・分析に必要な資料としての目的のみを列挙する。
+ */
+export const QuotationPurpose = z.enum([
+  'composition-analysis', // 構図の分析
+  'color-light-analysis', // 色彩・光の分析
+  'technique-comparison', // 技法の比較
+  'movement-visual-difference', // ムーブメント間の視覚的差異の説明
+  'iconography-critique', // 図像・主題の批評
+]);
+export type QuotationPurpose = z.infer<typeof QuotationPurpose>;
+
+/** 引用画像に必須の編集・法務メタデータ。 */
+export const QuotationMeta = z.object({
+  /** 原典（作品の出所ページ）URL */
+  sourcePageUrl: z.string().url(),
+  /** デジタル画像の提供元（美術館・アーカイブ等） */
+  provider: z.string().min(1),
+  /** 作者 */
+  creator: z.string().min(1),
+  /** 作品名 */
+  workTitle: z.string().min(1),
+  /** 制作年（表記のまま） */
+  workDate: z.string().min(1),
+  /** 参照日 (YYYY-MM-DD) */
+  accessed: z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
+  /** 引用目的（限定列挙） */
+  quotationPurpose: QuotationPurpose,
+  /** この画像と一体となる分析セクションの識別子（本文への紐付け） */
+  quotationContext: z.string().min(1),
+  /** なぜこの画像がなければ説明できないか（必要性の根拠） */
+  quotationRationale: z.string().min(1),
+  /** クレジット表記（提供元の指定に従う） */
+  sourceCredit: z.string().min(1),
+  /** 原典が公表済みの著作物か */
+  isPublished: z.boolean(),
+  /** 審査状態 */
+  reviewStatus: ReviewStatus,
+  /** 審査メモ（加工の有無・判断根拠・提供元条件など） */
+  reviewNote: z.string().min(1),
+});
+export type QuotationMeta = z.infer<typeof QuotationMeta>;
+
 /** 関係タイプ（ムーブメント間のエッジ） */
 export const RelationKind = z.enum([
   'succession', // 継承
@@ -231,6 +300,22 @@ export const Source = z.object({
 });
 export type Source = z.infer<typeof Source>;
 
+/**
+ * 画像の利用根拠を解決する。usageBasis が明示されていればそれを、
+ * なければ既存の license / isPublicDomain から public-domain / licensed を導出する。
+ * （権利確認済みの既存画像は usageBasis 未指定でも安全側に解決される。）
+ */
+export function resolveUsageBasis(img: {
+  usageBasis?: UsageBasis;
+  isPublicDomain?: boolean;
+  license?: ImageLicense;
+}): UsageBasis {
+  if (img.usageBasis) return img.usageBasis;
+  if (img.isPublicDomain) return 'public-domain';
+  if (img.license) return 'licensed';
+  return 'unavailable';
+}
+
 /** 画像メタデータ（権利処理のためのフィールドを必須化） */
 export const ImageMeta = z
   .object({
@@ -246,23 +331,54 @@ export const ImageMeta = z
     sourceUrl: z.string().url(),
     /** 直接の画像ファイルURL（Wikimedia Commons Special:FilePath 等の安定エンドポイント） */
     fileUrl: z.string().url().optional(),
-    license: ImageLicense,
+    /** 利用根拠。省略時は license / isPublicDomain から導出（resolveUsageBasis）。 */
+    usageBasis: UsageBasis.optional(),
+    /** 確認済みライセンス（public-domain / licensed 用。quotation では持たない）。 */
+    license: ImageLicense.optional(),
     /** クレジット表記 */
     credit: z.string().min(1),
-    isPublicDomain: z.boolean(),
+    /** public-domain / licensed 用。quotation では持たない。 */
+    isPublicDomain: z.boolean().optional(),
     /** 代替テキスト（スクリーンリーダー向け・必須） */
     alt: z.string().min(1),
     /** 最終確認日 */
     verifiedOn: z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
     /** 確認方法の注記（例: 取得経路・検証の限界） */
     verificationNote: z.string().optional(),
+    /** usageBasis === 'quotation' のとき必須の引用メタデータ */
+    quotation: QuotationMeta.optional(),
   })
-  // Public Domain判定とライセンスの整合性を強制する
-  .refine((img) => (img.isPublicDomain ? img.license === 'public-domain' || img.license === 'cc0' : true), {
-    message: 'isPublicDomain=true のライセンスは public-domain または cc0 でなければならない',
-  })
-  .refine((img) => (img.license === 'cc-by' || img.license === 'cc-by-sa' ? img.isPublicDomain === false : true), {
-    message: 'CC BY / CC BY-SA は isPublicDomain=false でなければならない',
+  .superRefine((img, ctx) => {
+    const basis = resolveUsageBasis(img);
+    if (basis === 'quotation') {
+      if (!img.quotation) {
+        ctx.addIssue({ code: 'custom', message: 'quotation画像には quotation メタデータが必須' });
+      }
+      if (img.license !== undefined) {
+        ctx.addIssue({ code: 'custom', message: '引用は許諾ライセンスではないため quotation画像に license を指定できない' });
+      }
+      if (img.isPublicDomain === true) {
+        ctx.addIssue({ code: 'custom', message: 'public-domain と quotation を同時指定できない' });
+      }
+    } else if (basis === 'public-domain' || basis === 'licensed') {
+      if (img.quotation) {
+        ctx.addIssue({ code: 'custom', message: '非quotation画像に quotation メタデータを付与できない' });
+      }
+      if (!img.license) {
+        ctx.addIssue({ code: 'custom', message: `${basis}画像には license が必須` });
+      }
+      if (basis === 'public-domain') {
+        if (img.isPublicDomain !== true) {
+          ctx.addIssue({ code: 'custom', message: 'public-domain は isPublicDomain=true が必須' });
+        }
+        if (img.license && img.license !== 'public-domain' && img.license !== 'cc0') {
+          ctx.addIssue({ code: 'custom', message: 'public-domain のライセンスは public-domain / cc0 でなければならない' });
+        }
+      }
+      if (basis === 'licensed' && img.isPublicDomain === true) {
+        ctx.addIssue({ code: 'custom', message: 'ライセンス確認画像を public-domain として登録できない' });
+      }
+    }
   });
 export type ImageMeta = z.infer<typeof ImageMeta>;
 

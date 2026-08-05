@@ -76,3 +76,11 @@
 - 実装は `window.history` ベース（`useLodState` と同方針）で静的export/basePathを保つ。`src/lib/network.ts` に純粋関数を分離し単体テスト化。
 - 検証: unit 146件 / E2E 226件成功・12 skipped / 本番ビルド成功。作業ブランチ `claude/art-history-atlas-o632td`（現行 `main` a914298 基点）。
 - 既知の運用リスク: Codex と並行作業で `main` の進行が速い。ブランチ/PR取り違えに注意。
+
+## 追加機能: 画像「引用(quotation)」利用根拠の仕組み（2026-08-05）
+
+- `ImageMeta` に `usageBasis`（public-domain / licensed / quotation / unavailable）と `QuotationMeta`（必須13フィールド）・`ReviewStatus`・`QuotationPurpose` を追加。整合性は superRefine で強制。
+- 表示ポリシー `src/lib/image-usage.ts`（`canDisplayImageOnSurface` / `isQuotationPublishable`）。`WorkImage` は許可サーフェスでのみ quotation を「画像引用」クレジット付きで描画。詳細ページ＝分析、Movement カタログ＝gallery（quotation非表示）。
+- `scripts/validate-data.ts` に引用要件チェックを追加。unit テスト `tests/unit/image-usage.test.ts`（12件）。
+- **仕組みのみ実装**。image:null 作品は自動 quotation 化していない。引用候補（5点以内）は別途一覧提示 → ユーザー承認後に本番反映。
+- 検証: typecheck / lint 0件 / unit（image-usage 12件含む）/ validate:data 成功。

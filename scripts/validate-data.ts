@@ -19,6 +19,7 @@ import {
   Work,
   Relationship,
   Source,
+  resolveUsageBasis,
 } from '../src/lib/schema';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
@@ -186,35 +187,60 @@ for (const s of sources) {
   if (!/^https?:\/\//.test(s.url)) fail(`source ${s.id}: httpスキームでない`);
 }
 
-console.log('▶ 画像メタデータのライセンス必須チェック');
+console.log('▶ 画像メタデータ（利用根拠・引用要件）チェック');
 const PD_LICENSES = ['public-domain', 'cc0'];
 const fileUrlSchema = z.string().url();
 for (const w of works) {
-  if (w.image) {
-    const img = w.image;
-    if (!img.license) fail(`work ${w.id}: 画像ライセンス未指定`);
-    if (!img.credit) fail(`work ${w.id}: 画像クレジット未指定`);
-    if (!img.sourceUrl) fail(`work ${w.id}: 画像原典URL未指定`);
-    if (!img.alt || img.alt.trim().length === 0) fail(`work ${w.id}: 画像altが空`);
-    // Public Domain 判定とライセンスの整合
-    if (img.isPublicDomain && !PD_LICENSES.includes(img.license)) {
+  if (!w.image) continue;
+  const img = w.image;
+  const basis = resolveUsageBasis(img);
+
+  // 共通（識別情報・URL形式。到達性は検査しない）
+  if (!img.credit) fail(`work ${w.id}: 画像クレジット未指定`);
+  if (!img.sourceUrl) fail(`work ${w.id}: 画像原典URL未指定`);
+  if (!img.alt || img.alt.trim().length === 0) fail(`work ${w.id}: 画像altが空`);
+  if (img.sourceUrl && !fileUrlSchema.safeParse(img.sourceUrl).success)
+    fail(`work ${w.id}: 画像sourceUrlの形式不正`);
+  if (img.fileUrl) {
+    if (img.fileUrl.startsWith('/')) {
+      const p = join(__dirname, '..', 'public', img.fileUrl.replace(/^\//, ''));
+      if (!existsSync(p)) fail(`work ${w.id}: ローカル画像が存在しない ${img.fileUrl}`);
+    } else if (!fileUrlSchema.safeParse(img.fileUrl).success) {
+      fail(`work ${w.id}: 画像fileUrlの形式不正`);
+    }
+  }
+
+  if (basis === 'public-domain' || basis === 'licensed') {
+    if (!img.license) fail(`work ${w.id}: ${basis}画像に license 未指定`);
+    if (img.quotation) fail(`work ${w.id}: 非quotation画像に quotation メタデータ`);
+    if (img.isPublicDomain && img.license && !PD_LICENSES.includes(img.license)) {
       fail(`work ${w.id}: isPublicDomain=true だがライセンスが ${img.license}`);
     }
     if ((img.license === 'cc-by' || img.license === 'cc-by-sa') && img.isPublicDomain) {
-      fail(`work ${w.id}: ${img.license} なのに isPublicDomain=true`);
+      fail(`work ${w.id}: ${img.license} なのに isPublicDomain=true（未確認画像を public-domain 登録不可）`);
     }
-    // 原典URL・画像URLの形式（到達性は検査しない。ネットワーク不通と URL 不存在は区別する）
-    if (img.sourceUrl && !fileUrlSchema.safeParse(img.sourceUrl).success)
-      fail(`work ${w.id}: 画像sourceUrlの形式不正`);
-    if (img.fileUrl) {
-      if (img.fileUrl.startsWith('/')) {
-        // ローカル画像パスの場合は public/ 配下の実在を確認
-        const p = join(__dirname, '..', 'public', img.fileUrl.replace(/^\//, ''));
-        if (!existsSync(p)) fail(`work ${w.id}: ローカル画像が存在しない ${img.fileUrl}`);
-      } else if (!fileUrlSchema.safeParse(img.fileUrl).success) {
-        fail(`work ${w.id}: 画像fileUrlの形式不正`);
-      }
+  } else if (basis === 'quotation') {
+    const q = img.quotation;
+    if (!q) {
+      fail(`work ${w.id}: quotation画像に quotation メタデータが無い`);
+      continue;
     }
+    if (img.license !== undefined) fail(`work ${w.id}: quotation と license を同時指定できない`);
+    if (img.isPublicDomain === true) fail(`work ${w.id}: public-domain と quotation を同時指定できない`);
+    if (!q.quotationPurpose) fail(`work ${w.id}: quotationに引用目的が無い`);
+    if (!q.quotationContext) fail(`work ${w.id}: quotationに分析セクションの紐付けが無い`);
+    if (!q.quotationRationale) fail(`work ${w.id}: quotationに必要性の根拠が無い`);
+    if (!q.sourcePageUrl || !fileUrlSchema.safeParse(q.sourcePageUrl).success) {
+      fail(`work ${w.id}: quotationの原典URLが無い/不正`);
+    }
+    if (!q.reviewNote) fail(`work ${w.id}: quotationに審査メモが無い`);
+    // 本番表示（isPublished=true）は editorial-approved のときだけ許す
+    if (q.isPublished && q.reviewStatus !== 'editorial-approved') {
+      fail(`work ${w.id}: quotationが reviewStatus=${q.reviewStatus} のまま本番表示（isPublished=true）`);
+    }
+  } else {
+    // unavailable: 画像オブジェクトを持つべきでない（image:null を使う）
+    fail(`work ${w.id}: usageBasis=unavailable の画像は image:null で表現する`);
   }
 }
 

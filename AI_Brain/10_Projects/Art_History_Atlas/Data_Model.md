@@ -65,3 +65,9 @@
 ## 現在の件数（2026-07-24, 作業ブランチ）
 
 movements 30 / artists 64 / works 75（画像41, プレースホルダー34） / relationships 46 / sources 58。
+
+---
+
+## ImageMeta の利用根拠拡張（2026-08）
+
+`ImageMeta` に `usageBasis`（`public-domain | licensed | quotation | unavailable`）を追加。省略時は `resolveUsageBasis()` が `isPublicDomain`/`license` から `public-domain`/`licensed` を導出する（既存の権利確認済み画像は無移行で安全側に解決）。`license` と `isPublicDomain` は任意化し、`quotation` の場合は付与しない。`quotation` 用に `QuotationMeta`（必須13フィールド）、`QuotationPurpose`（限定列挙）、`ReviewStatus` を追加。整合性は `ImageMeta.superRefine` で強制（quotation は license/isPublicDomain と排他、PD は license 必須かつ PD/cc0、licensed を PD 登録不可 等）。表示可否は `src/lib/image-usage.ts` の `canDisplayImageOnSurface` / `isQuotationPublishable`。データ検証（`scripts/validate-data.ts`）に引用要件チェックを追加。
