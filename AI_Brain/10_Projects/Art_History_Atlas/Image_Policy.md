@@ -52,3 +52,49 @@ The Met Open Access / Art Institute of Chicago Open Access / Rijksmuseum Open Da
 - インターネットに到達できるのは **WebSearch** のみ（検索バックエンド。画像バイナリは取得不可）。
 - よって画像の**ダウンロード・WebP/AVIF最適化・バイト検証・ファイルページのライセンス直接確認**は本環境では実行できない。回避策は取らない（README指示）。
 - 本番（GitHub Pages）では利用者のブラウザが Commons から直接画像を取得するため、hotlink 方式で表示自体は成立する見込み（実表示は実機/本番で最終確認するのが望ましい＝要確認）。
+
+---
+
+## 画像の利用根拠（usageBasis）と「引用」の扱い（2026-08 追加）
+
+画像は次の4区分（`usageBasis`）で管理する。権利未確認画像を一律掲載せず、法的・編集上の根拠をデータとして区別する。
+
+| 区分 | 用途 |
+|---|---|
+| `public-domain` | 保護期間満了 / CC0。全画面で使用可 |
+| `licensed` | CC BY 等、許諾条件の範囲で使用可 |
+| `quotation` | 著作権法上の「引用」。具体的な分析本文と一体の場合だけ、限定サーフェスで表示 |
+| `unavailable` | 画像を表示せず作品情報のみ（= `image: null`） |
+
+### 明確に否定する誤ったルール
+
+次はいずれも**誤り**であり、これらを根拠に画像を掲載しない。
+
+- 「教育目的・非営利だから利用可能」— ❌ 目的だけでは自由利用にならない。
+- 「出典を書けば利用可能」— ❌ 出典明記は引用要件の一部にすぎない。
+- 「低解像度なら利用可能」— ❌ サイズ縮小だけで引用要件は満たさない。
+- 「外部埋め込み（ホットリンク）なら利用可能」— ❌ 配信方法は適法性を保証しない。
+
+### 「引用」として成立させる条件
+
+引用は、画像が本文の**従**、独自の批評・分析が**主**である関係が必要（公表済み著作物・公正な慣行・目的上正当な範囲・出典明記・本文との明確な区別）。したがって、以下は引用として扱わない：ホーム/Timeline/Network/Chronology のアイキャッチ、一覧カード、OGP、背景画像、Compare の単なる画像横並び、分析文を伴わない代表作品ギャラリー、出典だけ付けて具体的分析のない掲載。
+
+### 表示してよい場所（quotation のみ）
+
+`movement-analysis`（Movement 詳細の作品分析）/ `work-analysis`（Work 詳細の視覚分析）/ `compare-analysis`（画像を直接分析する比較）だけ。上記以外（home / timeline / chronology / network / movement-card / search / ogp / background / gallery）では表示しない。実装上は `canDisplayImageOnSurface(img, surface)`（`src/lib/image-usage.ts`）で強制し、`WorkImage` は許可サーフェスでのみ quotation を描画する。
+
+### 引用画像の必須フィールド（`quotation`）
+
+`sourcePageUrl / provider / creator / workTitle / workDate / accessed / quotationPurpose / quotationContext / quotationRationale / sourceCredit / isPublished / reviewStatus / reviewNote`。`quotationPurpose` は「構図の分析 / 色彩・光の分析 / 技法の比較 / ムーブメント間の視覚的差異 / 図像・主題の批評」の限定列挙のみ。「代表作品を見せるため」「分かりやすさ」「装飾」は目的として認めない。
+
+### 審査状態と本番表示
+
+`reviewStatus`: `pending / editorial-approved / legal-review-required / rejected`。**`editorial-approved` かつ `isPublished=true` のときだけ本番表示**（`isQuotationPublishable`）。現存作家・死後70年以内の可能性・権利者明示・提供元の再利用制限・作品全体の高視認性掲載・中心コンテンツ化・引用可否が分かれる場合は `legal-review-required` とする。
+
+### サイズ・加工
+
+一覧用の quotation サムネイルを作らない／ダウンロードボタンを付けない／原寸表示を標準にしない。分析に必要な視認性は確保するが、必要性・相当性を超えた高解像度配布はしない。トリミング・色調変更・文字入れ・合成は原則禁止（必要な場合も `reviewNote` に理由を記録）。
+
+### 限界（重要）
+
+この仕組みを入れても**適法性は自動的に保証されない**。重要作品の本番掲載前には、知的財産権に詳しい専門家によるレビューが最も確実。
