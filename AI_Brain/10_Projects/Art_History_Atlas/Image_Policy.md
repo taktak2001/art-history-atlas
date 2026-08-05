@@ -98,3 +98,47 @@ The Met Open Access / Art Institute of Chicago Open Access / Rijksmuseum Open Da
 ### 限界（重要）
 
 この仕組みを入れても**適法性は自動的に保証されない**。重要作品の本番掲載前には、知的財産権に詳しい専門家によるレビューが最も確実。
+
+---
+
+## imageReference — 画像未収録作品の調査・審査用参照（2026-08-06 追加）
+
+**「URLを付けること」と「画像を本番表示可能にすること」を分離**する仕組み。
+`applyImageSupplements` 適用後に最終的に `image === null` となる全作品（**38点**）へ、
+`Work.imageReference`（`src/lib/schema.ts` の `ImageReference`）を付与した。
+
+- `image`（権利確認済み・本番表示可）と `imageReference`（調査・審査用URL）は**役割が別**。
+  `imageReference` が存在しても本番では画像を表示しない（プレースホルダー + 外部リンク導線のみ）。
+- データは `src/data/expansion/image-references.ts`。`works.ts` で
+  `applyImageReferences(applyImageSupplements(workRecords))` として最後に適用。
+- フィールド: `sourcePageUrl`（必須・https）/ `provider` / `imagePageUrl?` / `candidateFileUrl?`
+  / `termsUrl?` / `rightsStatus` / `copyrightNotice?` / `creditLine?` / `accessed`
+  / `verificationStatus` / `verificationNote`（必須）。
+- `rightsStatus`: `public-domain-candidate | open-access-candidate | licensed-candidate
+  | quotation-candidate | permission-required | rights-unclear`。
+- `verificationStatus`: `url-verified | metadata-verified | rights-review-required | unresolved`。
+
+### 本監査での判断
+
+- **捏造URLなし。** 所蔵館・財団・公的機関の作品ページを最優先で WebSearch/WebFetch により調査。
+  Wikipedia・SNS・販売サイト・WikiArt 等は第一 `sourcePageUrl` にしない（`validate-data.ts` で拒否）。
+- `candidateFileUrl` は安定エンドポイントを特定できた **1点のみ**（藍瑛《倪瓚に倣う山水》= AIC の IIIF。
+  AIC 公開 API で `is_public_domain=true`/CC0 を確認）。拡張子変更・CDN 推測・サムネ→原寸推測はしない。
+- **PD候補は2点のみ**（二次元・提供元がPD/OA明示）: 藍瑛（AIC, CC0 確認済）と ミュシャ《椿姫》
+  （作品自体はPDだが掲載画像は © Mucha Trust のため要レビュー）。
+- 20世紀・現代美術は原則 `permission-required` / `rights-unclear` / `quotation-candidate`、
+  `verificationStatus` は `rights-review-required` を維持。彫刻・建築・インスタレーション・
+  パフォーマンスは撮影者の権利も別途判定（写真を自動的にPD扱いしない）。
+- **PR #61 の引用審査5点**（コスース／ジャッド／ヘーヒ／白髪／関根）は `quotation-candidate`・
+  `image:null` を保持し、legal-review-required 相当のまま。
+- 《人の子》（個人蔵）と 《12頭の馬》（1969年の上演）は作品単独ページが存在せず `unresolved`。
+
+### 監査レポートと再生成
+
+- 全件表・集計: `docs/image-reference-audit.md`。
+- 再生成: `npx tsx scripts/gen-image-reference-audit.ts`（実データから生成、手動更新不要）。
+
+### 前提の更新（egress）
+
+本環境では WebSearch に加え **WebFetch / 外部 API 取得が可能**で、museum サイトや AIC API に到達できた
+（上の「サンドボックス制約」は当時の記録。画像バイナリのローカル最適化は本監査の対象外）。

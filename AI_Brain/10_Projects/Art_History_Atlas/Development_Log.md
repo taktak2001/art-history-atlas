@@ -88,3 +88,24 @@ Phase 2 現在の件数: movements 30 / artists **64** / works **75**（画像41
 ### 注意（ユーザーへ要共有）
 
 - **Codex と Claude Code が同一リポジトリで並行作業**しており `main` の進行が速い。ブランチ/PRの取り違え・上書きリスクがあるため、担当範囲かブランチの分離を推奨。
+
+## imageReference 全件監査（2026-08-06）
+
+ブランチ `claude/image-reference-audit`、PR [#62](https://github.com/taktak2001/art-history-atlas/pull/62)。
+
+- `applyImageSupplements` 適用後の最終 `works`（139点）を基準に、`image === null` の **38点**を抽出。
+- 各作品を WebSearch / WebFetch / 公開API で調査し、所蔵館・財団・公的機関の作品ページを最優先で
+  `imageReference` に記録（`src/data/expansion/image-references.ts`）。捏造URLなし。
+- スキーマに `ImageReference`（`RightsStatus` / `ReferenceVerificationStatus`）を追加し、`Work` に
+  optional で付与。`image` があるときは付与不可（superRefine）。`works.ts` で
+  `applyImageReferences(applyImageSupplements(...))` として最後に適用。
+- `validate-data.ts` に検証を追加（image:null は参照必須 / https・空白なし / Wikipedia・SNS・販売サイト
+  を第一出典に不可 / quotation・rights-review は本番画像へ昇格不可 / 同一URLの過剰流用検出）。
+- UI: `WorkImage` に `showReferenceLink`（詳細ページのみ）を追加。静的エクスポートで **38件の
+  詳細ページのみ**に「提供元で作品を見る ↗」が出力され、一覧/Timeline/Network/Chronology には
+  出ないことを確認。
+- 監査レポート `docs/image-reference-audit.md` を `scripts/gen-image-reference-audit.ts` で自動生成。
+- 検証: typecheck / lint / validate:data / unit **204**（image-reference 10件含む）/ E2E+axe **250** /
+  静的ビルド すべて成功。
+- 未解決2点（work-son-of-man 個人蔵 / work-kounellis-horses 1969上演）は作品単独ページ未確認として
+  監査に記録。PD候補は藍瑛（AIC CC0 確認済）とミュシャ（作品PD・画像は © Mucha Trust）の2点のみ。
