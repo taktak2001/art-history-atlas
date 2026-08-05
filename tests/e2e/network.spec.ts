@@ -184,12 +184,21 @@ test('ノード選択時は強調線を無関係ノードより前、関連ノ�
     .poll(() =>
       relatedNode.evaluate((element) => Number(getComputedStyle(element).opacity)),
     )
-    .toBeLessThanOrEqual(0.85);
+    .toBeGreaterThanOrEqual(0.95);
   await expect
     .poll(() =>
       dimmedNode.evaluate((element) => Number(getComputedStyle(element).opacity)),
     )
-    .toBeLessThanOrEqual(0.55);
+    .toBeLessThanOrEqual(0.25);
+  // 選択トランジションが完全に収束してから確定した見た目を検証する
+  await expect
+    .poll(() =>
+      selectedNode.evaluate((element) => {
+        const title = element.querySelector<HTMLElement>('[data-network-node-title]');
+        return title ? getComputedStyle(title).color : '';
+      }),
+    )
+    .toBe('rgb(28, 28, 30)');
   const selectedStyle = await selectedNode.evaluate((element) => {
     const style = getComputedStyle(element);
     const title = element.querySelector<HTMLElement>('[data-network-node-title]');
@@ -228,16 +237,17 @@ test('ノード選択時は強調線を無関係ノードより前、関連ノ�
   expect(selectedStyle.transform).toBe('none');
   expect(selectedStyle.titleWeight).toBeGreaterThanOrEqual(700);
   expect(selectedStyle.dateWeight).toBe(400);
-  expect(selectedStyle.boxShadow).not.toBe('none');
+  // 主ノードは3px濃チャコールの単線のみ（影・二重線なし）
+  expect(selectedStyle.boxShadow).toBe('none');
   expect(selectedStyle.backgroundColor).toBe('rgb(252, 248, 244)');
   expect(Number.parseFloat(idleStyle.borderWidth)).toBeGreaterThanOrEqual(1);
   expect(Number.parseFloat(idleStyle.borderWidth)).toBeLessThanOrEqual(1.5);
   expect(idleStyle.boxShadow).toBe('none');
   expect(idleStyle.backgroundColor).toBe('rgb(255, 255, 255)');
-  expect(relatedOpacity).toBeGreaterThanOrEqual(0.75);
-  expect(relatedOpacity).toBeLessThanOrEqual(0.85);
-  expect(dimmedOpacity).toBeGreaterThanOrEqual(0.35);
-  expect(dimmedOpacity).toBeLessThanOrEqual(0.55);
+  // 関係ノードは不透明度100%、背景ノードは0.15〜0.2まで沈める
+  expect(relatedOpacity).toBeGreaterThanOrEqual(0.95);
+  expect(dimmedOpacity).toBeGreaterThanOrEqual(0.12);
+  expect(dimmedOpacity).toBeLessThanOrEqual(0.25);
   expect(selectedStyle.backgroundColor).not.toBe(idleStyle.backgroundColor);
   await expect(
     graph.locator('[data-edge-label][data-edge-label-anchor="start"], [data-edge-label][data-edge-label-anchor="end"]'),
@@ -435,7 +445,7 @@ test('ダークモードと動きを減らす設定を尊重する', async ({ pa
     });
   expect(selectedStyle.borderColor).toBe(selectedStyle.titleColor);
   expect(selectedStyle.backgroundColor).toBe('rgb(42, 40, 37)');
-  expect(selectedStyle.boxShadow).not.toBe('none');
+  expect(selectedStyle.boxShadow).toBe('none');
 });
 
 for (const zoom of [1.25, 1.5]) {

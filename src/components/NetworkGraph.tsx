@@ -938,7 +938,7 @@ export function NetworkGraph({ movements, relationships, eraOrder }: Props) {
                       : movement.dates.start}
                     〜
                   </span>
-                  {(relationshipCountByNode.get(movement.id) ?? 0) > 1 && (
+                  {isSelected && (relationshipCountByNode.get(movement.id) ?? 0) > 1 && (
                     <span className="truncate text-[9px] font-bold text-muted">
                       関連 {relationshipCountByNode.get(movement.id)}
                     </span>
