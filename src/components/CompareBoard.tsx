@@ -290,14 +290,33 @@ export function CompareBoard() {
                           style={accentStyle(m.id)}
                         >
                           <div className="grid grid-cols-2 gap-2">
-                            {reps.map((w) => (
-                              <Link key={w.id} href={`/works/${w.id}/`} className="group block">
-                                <WorkImage work={w} sizes="140px" />
-                                <span className="mt-1 line-clamp-1 block text-[11px] text-muted group-hover:text-ink">
-                                  {w.titleJa}
-                                </span>
-                              </Link>
-                            ))}
+                            {reps.map((w) => {
+                              // 画像なし かつ imageReference あり → 画像は外部リンク（<a>）になるため
+                              // 内部リンクで包まない（<a> のネスト回避）。作品名を別の内部リンクにする。
+                              const external =
+                                !w.image && Boolean(w.imageReference?.sourcePageUrl);
+                              if (external) {
+                                return (
+                                  <div key={w.id}>
+                                    <WorkImage work={w} sizes="140px" showReferenceLink />
+                                    <Link
+                                      href={`/works/${w.id}/`}
+                                      className="mt-1 line-clamp-1 block text-[11px] text-muted hover:text-ink"
+                                    >
+                                      {w.titleJa}
+                                    </Link>
+                                  </div>
+                                );
+                              }
+                              return (
+                                <Link key={w.id} href={`/works/${w.id}/`} className="group block">
+                                  <WorkImage work={w} sizes="140px" />
+                                  <span className="mt-1 line-clamp-1 block text-[11px] text-muted group-hover:text-ink">
+                                    {w.titleJa}
+                                  </span>
+                                </Link>
+                              );
+                            })}
                           </div>
                         </td>
                       );

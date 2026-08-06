@@ -8,6 +8,7 @@ import {
   QUOTATION_PURPOSE_LABELS,
   type ImageSurface,
 } from '@/lib/image-usage';
+import { shortProviderName } from '@/lib/provider-display';
 
 /**
  * 作品画像。
@@ -124,7 +125,51 @@ export function WorkImage({
     );
   }
 
-  // 画像が無い／表示不可／読み込み失敗：架空画像を用いずプレースホルダー
+  // 画像が無い／表示不可／読み込み失敗：架空画像を用いずプレースホルダー。
+  // 権利未確認のサムネイル（sourcePageUrl先の画像・OGP・candidateFileUrl 等）は一切表示しない。
+  const placeholderIcon = (
+    <svg
+      width="32"
+      height="32"
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="1"
+      className="text-faint transition-colors group-hover:text-muted"
+      aria-hidden="true"
+    >
+      <rect x="3" y="4" width="18" height="16" rx="1" />
+      <circle cx="9" cy="10" r="1.6" />
+      <path d="M3 17l5-4 4 3 3-2 6 5" strokeLinejoin="round" />
+    </svg>
+  );
+
+  // imageReference があり、外部導線を出す面（作品詳細 / ムーブメント代表作品 / 比較）では、
+  // プレースホルダー全面を1つの外部リンク（<a>）にする。内部に別のリンク/ボタンは入れない。
+  if (showReferenceLink && work.imageReference?.sourcePageUrl) {
+    const provider = shortProviderName(work.imageReference.provider);
+    return (
+      <div className={className}>
+        <a
+          href={work.imageReference.sourcePageUrl}
+          target="_blank"
+          rel="noopener noreferrer"
+          aria-label={`${work.titleJa}を${provider}の提供元ページで見る（外部サイト）`}
+          className="group flex aspect-[4/3] w-full flex-col items-center justify-center gap-2 border hairline bg-surface p-4 text-center no-underline transition-colors hover:border-ink/40 hover:bg-raised focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent"
+        >
+          {placeholderIcon}
+          <span className="font-serif text-sm leading-snug text-muted transition-colors group-hover:text-ink">
+            画像は提供元で確認
+          </span>
+          <span className="text-[11px] leading-snug text-faint transition-colors group-hover:text-muted">
+            {provider}で作品を見る <span aria-hidden="true">↗</span>
+          </span>
+        </a>
+      </div>
+    );
+  }
+
+  // 通常のプレースホルダー（クリック不可）。
   return (
     <div className={className}>
       <div
@@ -132,37 +177,10 @@ export function WorkImage({
         aria-label={`${work.titleJa}の画像は未収録（プレースホルダー）`}
         className="flex aspect-[4/3] w-full flex-col items-center justify-center gap-2 border hairline bg-surface p-4 text-center"
       >
-        <svg
-          width="36"
-          height="36"
-          viewBox="0 0 24 24"
-          fill="none"
-          stroke="currentColor"
-          strokeWidth="1"
-          className="text-faint"
-          aria-hidden="true"
-        >
-          <rect x="3" y="4" width="18" height="16" rx="1" />
-          <circle cx="9" cy="10" r="1.6" />
-          <path d="M3 17l5-4 4 3 3-2 6 5" strokeLinejoin="round" />
-        </svg>
-        <p className="text-xs text-muted">画像は権利確認後に順次収録</p>
+        {placeholderIcon}
+        <p className="text-xs text-muted">画像は権利確認後に収録予定</p>
         <p className="text-[11px] text-faint">{work.medium}</p>
       </div>
-      {showReferenceLink && work.imageReference?.sourcePageUrl && (
-        // 画像の転載ではなく、提供元の作品ページへの外部導線のみ。詳細ページ限定。
-        <p className="mt-2 text-xs leading-relaxed text-faint">
-          <a
-            href={work.imageReference.sourcePageUrl}
-            target="_blank"
-            rel="noopener noreferrer"
-            className="prose-link"
-          >
-            提供元で作品を見る ↗
-          </a>
-          <span className="ml-1 text-faint">（{work.imageReference.provider}／外部サイト）</span>
-        </p>
-      )}
     </div>
   );
 }
