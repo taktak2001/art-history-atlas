@@ -19,7 +19,11 @@ const ACCESSED = '2026-08-06';
 
 const references: Record<string, ImageReference> = {
   /* ---------------------------------------------------------------- *
-   * 古典・東アジア（PD / Open Access 候補）
+   * 注記: work-mucha-camelias（Wikimedia Commons のPDスキャン）は
+   * パブリックドメイン確定のため image-supplements.ts で本番画像へ昇格済み。
+   * よってここには含めない。
+   * ---------------------------------------------------------------- *
+   * 古典・東アジア（PD だがホットリンク不可のため参照のみ）
    * ---------------------------------------------------------------- */
   'work-lan-ying-after-ni-zan': {
     sourcePageUrl:
@@ -34,18 +38,7 @@ const references: Record<string, ImageReference> = {
     accessed: ACCESSED,
     verificationStatus: 'url-verified',
     verificationNote:
-      'AIC公開API(api.artic.edu artworks/204587)で is_public_domain=true・藍瑛(1585–c.1664)・17世紀前半・倪瓚に倣う山水を確認。二次元作品の忠実な複製で、提供元がPD/CC0を明示。IIIFは公式配信エンドポイント。',
-  },
-  'work-mucha-camelias': {
-    sourcePageUrl: 'https://www.muchafoundation.org/en/gallery/browse-works/object/23',
-    provider: 'Mucha Foundation (Mucha Trust Collection)',
-    rightsStatus: 'public-domain-candidate',
-    copyrightNotice: '© Mucha Trust（作品自体はミュシャ没後PD、掲載画像は財団が権利表示）',
-    creditLine: 'Mucha Foundation',
-    accessed: ACCESSED,
-    verificationStatus: 'rights-review-required',
-    verificationNote:
-      'ミュシャ(d.1939)により作品自体はPD候補（1896年カラーリトグラフ・二次元）。ただし財団掲載画像は「© Mucha Trust」表示のため、本番使用には美術館/Wikimedia CommonsのPDスキャン等、別途クリーンなPD画像の調達が必要。',
+      'AIC公開API(artworks/204587)で is_public_domain=true・藍瑛(1585–c.1664)・17世紀前半・倪瓚に倣う山水を確認。作品自体はPD/CC0だが、AICのIIIFはクロスオリジンのホットリンクを403で拒否するため本番表示（image昇格）はできない。表示するには当該CC0画像の自ホスティングが必要。',
   },
 
   /* ---------------------------------------------------------------- *

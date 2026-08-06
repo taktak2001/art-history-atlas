@@ -109,3 +109,15 @@ Phase 2 現在の件数: movements 30 / artists **64** / works **75**（画像41
   静的ビルド すべて成功。
 - 未解決2点（work-son-of-man 個人蔵 / work-kounellis-horses 1969上演）は作品単独ページ未確認として
   監査に記録。PD候補は藍瑛（AIC CC0 確認済）とミュシャ（作品PD・画像は © Mucha Trust）の2点のみ。
+
+### 追記（2026-08-06）: PD確定作品の本番表示
+
+ユーザー要望「画像をそのまま表示」に対し、**著作権保護期間内の36点は本番転載しない**（侵害リスク・
+サイト方針・元タスクに反するため）方針を維持しつつ、**パブリックドメイン確定分のみ**を表示に昇格。
+
+- **ミュシャ《椿姫》(1896)** → 表示。Wikimedia Commons のPDスキャン（Library of Congress 由来、
+  `Special:FilePath` が width=800 で image/jpeg 200 を返すことを確認）を `image-supplements.ts` で収録。
+- **藍瑛《倪瓚風山水》** → PD(AIC CC0)だが、AIC IIIF が **クロスオリジンのホットリンクを403で拒否**
+  （github.io の Referer で 403 を確認）。本番表示できないため `imageReference` のまま（自ホスティングが必要）。
+- 結果: 表示画像 101 → **102**、`imageReference` 38 → **37**。詳細ページの「提供元で作品を見る」導線は 37 件。
+- 検証: check（typecheck/lint/validate:data/unit 204）+ 静的ビルド + 実HTMLでミュシャ画像描画/リンク非表示を確認。

@@ -226,7 +226,7 @@ export const standardOneExpansionSources: Source[] = [
     'La Dame aux camélias',
     'Wikimedia Commons — file page',
     'https://commons.wikimedia.org/wiki/File:Alfons_Mucha_-_La_Dame_aux_cam%C3%A9lias.jpg',
-    '作品名・作者・制作年の参考。画像の再利用条件は今回の検証では確定せず、画像は収録しない',
+    '作品名・作者・制作年の参考。本番画像は別ファイル（Library of Congress 由来のPDスキャン、commons-mucha-camelias-loc）で収録',
     'archive',
   ),
   commons(

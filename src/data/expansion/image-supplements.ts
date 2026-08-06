@@ -145,6 +145,29 @@ const supplements: Record<string, Supplement> = {
       alt: '曲げた鋼管の骨組みに黒い帯状の座面、背、肘掛けを張った軽量な椅子',
     }),
   },
+  // パブリックドメイン確定作品を本番表示へ昇格（2026-08-06）。
+  // 二次元作品の忠実な複製で、提供元(Library of Congress由来)がPDを明示。
+  // 注: 藍瑛《倪瓚風山水》もPD(AIC CC0)だが、AICのIIIFはクロスオリジンの
+  // ホットリンクを403で拒否するため本番表示できず、imageReference のままとした。
+  'work-mucha-camelias': {
+    sourceId: 'commons-mucha-camelias-loc',
+    image: {
+      ...commonsPublicDomainImage(
+        'Alfons Mucha - 1896 - La Dame aux Camélias - Sarah Bernhardt.jpg',
+        {
+          title: '椿姫',
+          creator: 'アルフォンス・ミュシャ',
+          date: '1896年',
+          alt: '縦長のポスター。星を散らした背景の前に白い衣の女性が佇み、上部に半円の光輪、足元に椿の花',
+        },
+      ),
+      verifiedOn: '2026-08-06',
+      credit:
+        'アルフォンス・ミュシャ《椿姫》1896. Library of Congress 所蔵のスキャン、パブリックドメイン、via Wikimedia Commons',
+      verificationNote:
+        'Wikimedia Commonsのファイルページで、作者ミュシャ(d.1939)により本国でPD・米国でも1931年以前公表としてPD、原典はLibrary of Congress、2928×7804pxを2026-08-06に確認。Special:FilePath が width=800 で image/jpeg 200 を返すことも確認。',
+    },
+  },
   'work-mondrian-composition': {
     sourceId: 'commons-mondrian-composition',
     image: commonsPublicDomainImage(
@@ -163,9 +186,10 @@ export const supplementalImageSources: Source[] = Object.entries(supplements).ma
   ([workId, supplement]) => ({
     id: supplement.sourceId,
     title: supplement.image.title,
-    publisher: 'Wikimedia Commons — verified file page',
+    // 提供元（Wikimedia Commons / AIC 等）から publisher を導出する。
+    publisher: `${supplement.image.provider} — verified file page`,
     url: supplement.image.sourceUrl,
-    accessed: '2026-07-30',
+    accessed: supplement.image.verifiedOn,
     kind: 'archive',
     reliability: 'high',
     supports: `${workId}の作品同定、作者、画像、ライセンス`,
