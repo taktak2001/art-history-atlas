@@ -124,8 +124,11 @@ The Met Open Access / Art Institute of Chicago Open Access / Rijksmuseum Open Da
   Wikipedia・SNS・販売サイト・WikiArt 等は第一 `sourcePageUrl` にしない（`validate-data.ts` で拒否）。
 - `candidateFileUrl` は安定エンドポイントを特定できた **1点のみ**（藍瑛《倪瓚に倣う山水》= AIC の IIIF。
   AIC 公開 API で `is_public_domain=true`/CC0 を確認）。拡張子変更・CDN 推測・サムネ→原寸推測はしない。
-- **PD候補は2点のみ**（二次元・提供元がPD/OA明示）: 藍瑛（AIC, CC0 確認済）と ミュシャ《椿姫》
-  （作品自体はPDだが掲載画像は © Mucha Trust のため要レビュー）。
+- **PD候補は2点のみ**（二次元・提供元がPD/OA明示）: 藍瑛（AIC, CC0 確認済）と ミュシャ《椿姫》。
+  - **本番表示への昇格（2026-08-06）**: ミュシャ《椿姫》は Wikimedia Commons のPDスキャン
+    （Library of Congress 由来、Special:FilePath が 200/image で応答）で `image` に昇格し表示。
+  - 藍瑛はPD(AIC CC0)だが、**AICのIIIFがクロスオリジンのホットリンクを403で拒否**するため
+    本番表示できず、`imageReference` のまま（表示には当該CC0画像の自ホスティングが必要）。
 - 20世紀・現代美術は原則 `permission-required` / `rights-unclear` / `quotation-candidate`、
   `verificationStatus` は `rights-review-required` を維持。彫刻・建築・インスタレーション・
   パフォーマンスは撮影者の権利も別途判定（写真を自動的にPD扱いしない）。

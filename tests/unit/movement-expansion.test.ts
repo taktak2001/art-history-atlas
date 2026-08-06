@@ -72,6 +72,8 @@ describe('第1弾ムーブメント拡張: core 8件', () => {
     );
     expect(expansionWorks.filter((work) => work.image)).toHaveLength(22);
     expect(works.find((work) => work.id === 'work-brandt-tea-infuser')?.image).toBeNull();
+    // 藍瑛《倪瓚風山水》はPD(AIC CC0)だが、AIC IIIFがホットリンクを拒否するため image は null。
+    expect(works.find((work) => work.id === 'work-lan-ying-after-ni-zan')?.image).toBeNull();
   });
 
   it('作家と作品の相互参照が一致する', () => {
@@ -123,15 +125,18 @@ describe('第1弾ムーブメント拡張: standard前半8件', () => {
     }
   });
 
-  it('権利確認済み画像を23点追加し、不明な画像はnullにする', () => {
+  it('権利確認済み画像を24点追加し、不明な画像はnullにする', () => {
     const expansionWorks = works.filter((work) =>
       work.movementIds.some((id) =>
         STANDARD_ONE_IDS.includes(id as (typeof STANDARD_ONE_IDS)[number]),
       ),
     );
     expect(expansionWorks).toHaveLength(24);
-    expect(expansionWorks.filter((work) => work.image)).toHaveLength(23);
-    expect(works.find((work) => work.id === 'work-mucha-camelias')?.image).toBeNull();
+    // ミュシャ《椿姫》を Wikimedia Commons のPDスキャンとして追加（23 → 24）。
+    expect(expansionWorks.filter((work) => work.image)).toHaveLength(24);
+    const mucha = works.find((work) => work.id === 'work-mucha-camelias');
+    expect(mucha?.image).not.toBeNull();
+    expect(mucha?.image?.isPublicDomain).toBe(true);
   });
 
   it('作家・作品・関係の参照方向が一致する', () => {

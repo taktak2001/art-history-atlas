@@ -12,13 +12,13 @@
 | 指標 | 件数 |
 | --- | ---: |
 | 総作品数 | 139 |
-| 最終的に画像あり | 101 |
-| 最終的に画像なし（監査対象） | 38 |
-| URL追加済み（imageReference あり） | 38 |
-| 公式作品ページあり（unresolved 以外） | 36 |
+| 最終的に画像あり | 102 |
+| 最終的に画像なし（監査対象） | 37 |
+| URL追加済み（imageReference あり） | 37 |
+| 公式作品ページあり（unresolved 以外） | 35 |
 | 直接画像URL候補あり（candidateFileUrl） | 1 |
 | 利用条件URLあり（termsUrl） | 1 |
-| PD/Open Access 候補 | 2 |
+| PD/Open Access 候補 | 1 |
 | 引用候補（quotation-candidate） | 5 |
 | 許諾必要（permission-required） | 29 |
 | 権利不明（rights-unclear） | 2 |
@@ -30,7 +30,7 @@
 | --- | ---: |
 | url-verified | 1 |
 | metadata-verified | 0 |
-| rights-review-required | 35 |
+| rights-review-required | 34 |
 | unresolved | 2 |
 
 ## 未解決事項
@@ -66,7 +66,6 @@
 | work-maciunas-fluxkit | フラックスキット | ジョージ・マチューナスほか | null | [link](https://www.moma.org/collection/works/126323) | — | — | The Museum of Modern Art (MoMA), New York | permission-required | — | rights-review-required | 本番表示前に権利レビュー必須 |
 | work-marilyn-diptych | マリリン・ディプティック | アンディ・ウォーホル | null | [link](https://www.tate.org.uk/art/artworks/warhol-marilyn-diptych-t03093) | — | — | Tate | permission-required | — | rights-review-required | 本番表示前に権利レビュー必須 |
 | work-merz-igloo | イグルー（連作） | マリオ・メルツ | null | [link](https://www.fondazionemerz.org/en/mario-merz/) | — | — | Fondazione Merz, Turin（作家財団） | permission-required | — | rights-review-required | 本番表示前に権利レビュー必須 |
-| work-mucha-camelias | 椿姫 | アルフォンス・ミュシャ | null | [link](https://www.muchafoundation.org/en/gallery/browse-works/object/23) | — | — | Mucha Foundation (Mucha Trust Collection) | public-domain-candidate | — | rights-review-required | PD候補（本番表示は別途レビュー） |
 | work-murakami-727 | 727 | 村上隆 | null | [link](https://www.moma.org/collection/works/88960) | — | — | The Museum of Modern Art (MoMA), New York | permission-required | — | rights-review-required | 本番表示前に権利レビュー必須 |
 | work-murakami-flowers | お花（スーパーフラットの花） | 村上隆 | null | [link](https://www.kaikaikiki.com/en/projects/murakami-flowers/) | — | — | Kaikai Kiki Co., Ltd.（作家スタジオ公式） | permission-required | — | rights-review-required | 本番表示前に権利レビュー必須 |
 | work-one-and-three-chairs | 一つと三つの椅子 | ジョセフ・コスース | null | [link](https://www.moma.org/collection/works/81435) | — | — | The Museum of Modern Art (MoMA), New York | quotation-candidate | — | rights-review-required | 引用審査中（PR #61）・本番未表示 |
