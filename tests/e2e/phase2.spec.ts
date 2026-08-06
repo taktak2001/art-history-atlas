@@ -75,8 +75,15 @@ test('もの派の画像未登録作品も図録レイアウトと権利案内�
   await page.goto('/movements/mono-ha/');
 
   await expect(page.getByText('作品 01')).toBeVisible();
-  await expect(page.getByText('画像は権利確認後に順次収録').first()).toBeVisible();
-  await expect(page.getByText(/画像は権利確認後に収録予定/).first()).toBeVisible();
+  // もの派の代表作（関根/李）は image:null かつ imageReference あり → 全面が外部リンクのプレースホルダー。
+  await expect(page.getByText('画像は提供元で確認').first()).toBeVisible();
+  const sourceLink = page
+    .getByRole('link', { name: /提供元ページで見る（外部サイト）/ })
+    .first();
+  await expect(sourceLink).toBeVisible();
+  await expect(sourceLink).toHaveAttribute('target', '_blank');
+  await expect(sourceLink).toHaveAttribute('rel', /noopener/);
+  // 作品詳細への内部導線（権利案内）も引き続き存在する。
   await expect(page.getByRole('link', { name: /作品詳細で確認/ }).first()).toBeVisible();
 });
 

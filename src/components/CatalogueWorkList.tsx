@@ -26,6 +26,44 @@ function WorkMetadata({ work }: { work: Work }) {
   );
 }
 
+/**
+ * 代表作品のサムネイル領域。
+ * - 画像あり／(画像なし かつ imageReference なし) → 作品詳細への内部リンクで包む。
+ * - 画像なし かつ imageReference あり → プレースホルダー全面が外部リンク（WorkImage が <a> を持つ）。
+ *   内部リンクで包むと <a> がネストするため、この場合は包まない。
+ */
+function WorkThumb({
+  work,
+  sizes,
+  className,
+}: {
+  work: Work;
+  sizes: string;
+  className?: string;
+}) {
+  const external = !work.image && Boolean(work.imageReference?.sourcePageUrl);
+  if (external) {
+    return (
+      <WorkImage
+        work={work}
+        surface="gallery"
+        sizes={sizes}
+        className={className}
+        showReferenceLink
+      />
+    );
+  }
+  return (
+    <Link
+      href={`/works/${work.id}/`}
+      aria-label={`${work.titleJa}の作品詳細を見る`}
+      className="group block focus-visible:outline-none"
+    >
+      <WorkImage work={work} surface="gallery" sizes={sizes} className={className} />
+    </Link>
+  );
+}
+
 function RightsLink({ work }: { work: Work }) {
   return (
     <p className="mt-5 text-xs leading-relaxed text-faint">
@@ -51,18 +89,11 @@ export function CatalogueWorkList({ works }: { works: Work[] }) {
   return (
     <ol aria-label="代表作品">
       <li className="grid gap-8 lg:grid-cols-[minmax(0,1.5fr)_minmax(280px,0.75fr)] lg:gap-12">
-        <Link
-          href={`/works/${featured.id}/`}
-          aria-label={`${featured.titleJa}の作品詳細を見る`}
-          className="group block focus-visible:outline-none"
-        >
-          <WorkImage
-            work={featured}
-            surface="gallery"
-            sizes="(max-width: 1024px) 92vw, 720px"
-            className="transition-opacity duration-200 group-hover:opacity-90"
-          />
-        </Link>
+        <WorkThumb
+          work={featured}
+          sizes="(max-width: 1024px) 92vw, 720px"
+          className="transition-opacity duration-200 group-hover:opacity-90"
+        />
         <div className="self-end border-t hairline pt-5">
           <p className="text-[13px] font-bold text-muted">作品 01</p>
           <h3 className="mt-3 font-serif text-2xl leading-snug text-ink sm:text-3xl">
@@ -91,18 +122,11 @@ export function CatalogueWorkList({ works }: { works: Work[] }) {
                 <p className="mb-4 text-[13px] font-bold text-muted">
                   作品 {String(index + 2).padStart(2, '0')}
                 </p>
-                <Link
-                  href={`/works/${work.id}/`}
-                  aria-label={`${work.titleJa}の作品詳細を見る`}
-                  className="group block focus-visible:outline-none"
-                >
-                  <WorkImage
-                    work={work}
-                    surface="gallery"
-                    sizes="(max-width: 768px) 92vw, 440px"
-                    className="transition-opacity duration-200 group-hover:opacity-90"
-                  />
-                </Link>
+                <WorkThumb
+                  work={work}
+                  sizes="(max-width: 768px) 92vw, 440px"
+                  className="transition-opacity duration-200 group-hover:opacity-90"
+                />
                 <h3 className="mt-5 font-serif text-xl leading-snug text-ink sm:text-2xl">
                   <Link href={`/works/${work.id}/`} className="hover:text-accent">
                     {toDisplayText(work.titleJa)}

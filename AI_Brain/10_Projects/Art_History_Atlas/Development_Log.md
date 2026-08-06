@@ -121,3 +121,20 @@ Phase 2 現在の件数: movements 30 / artists **64** / works **75**（画像41
   （github.io の Referer で 403 を確認）。本番表示できないため `imageReference` のまま（自ホスティングが必要）。
 - 結果: 表示画像 101 → **102**、`imageReference` 38 → **37**。詳細ページの「提供元で作品を見る」導線は 37 件。
 - 検証: check（typecheck/lint/validate:data/unit 204）+ 静的ビルド + 実HTMLでミュシャ画像描画/リンク非表示を確認。
+
+### 追記（2026-08-06）: プレースホルダーUIを全面リンク化
+
+小さなテキストリンクをやめ、**プレースホルダー全面を1つの外部リンク**にした（未承認サムネイルは一切出さない方針は維持）。
+
+- 対象: `image===null` かつ `imageReference?.sourcePageUrl` あり、かつ導線を出す面。
+  - 表示面: **作品詳細 / ムーブメント代表作品（CatalogueWorkList）/ 比較（CompareBoard）**。
+  - 非表示面: Timeline / Network / Chronology / ムーブメント一覧 / 検索 / OGP（従来どおり非リンクのプレースホルダー）。
+- 文言: 主「画像は提供元で確認」＋補「{短縮provider}で作品を見る ↗」。provider短縮は `src/lib/provider-display.ts`
+  （データの provider は不変、UI表示のみ短縮: MoMA / The Met / AIC / Tate / …）。
+- 実装上の要点: `WorkImage` が `<a target=_blank rel=noopener>` を持つため、代表作品カード/比較では
+  **内部 `<Link>` で包まない**（`<a>` のネスト回避）。作品名は別の内部リンクとして残す。
+- a11y: `aria-label={「{作品名}を{provider}の提供元ページで見る（外部サイト）」}`、`↗` は aria-hidden、
+  focus-visible アウトライン、色のみに依存しない。
+- 非リンクのプレースホルダー文言は「画像は権利確認後に収録予定」に統一。
+- 検証: check（unit 210）+ 静的ビルドで面ごとの出力（詳細/ムーブメント=外部リンク、Timeline/Network/Chronology=0）
+  と `<a>` 非ネストを確認 + Playwright/axe **250 passed**。

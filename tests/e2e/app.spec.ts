@@ -23,8 +23,12 @@ test('検索から作品を表示できる', async ({ page }) => {
   await expect(popCard).toBeVisible();
   await popCard.click();
   await expect(page).toHaveURL(/\/movements\/pop-art\/?$/);
-  // 代表作品からキャンベルのスープ缶へ
-  await page.getByRole('link', { name: /キャンベルのスープ缶/ }).first().click();
+  // 代表作品からキャンベルのスープ缶へ（作品名の内部リンクで作品詳細へ。
+  // 画像プレースホルダーは提供元への外部リンクなので exact 一致でタイトルリンクを選ぶ）
+  await page
+    .getByRole('link', { name: 'キャンベルのスープ缶', exact: true })
+    .first()
+    .click();
   await expect(page).toHaveURL(/\/works\/work-campbells-soup\/?$/);
   await expect(page.getByRole('heading', { level: 1 })).toContainText('キャンベルのスープ缶');
 });
