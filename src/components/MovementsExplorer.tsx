@@ -21,10 +21,8 @@ import {
   type Movement,
 } from '@/lib/schema';
 import {
-  MOVEMENT_GROUPS,
   filterMovementsByLod,
   getMovementParent,
-  groupMovementsForDisplay,
   isMovementVisibleAtLod,
 } from '@/lib/movement-hierarchy';
 import { useLodState } from '@/lib/use-lod-state';
@@ -33,7 +31,6 @@ import { MovementCard } from './MovementCard';
 
 const CLASSIFICATIONS = Object.keys(CLASSIFICATION_LABELS) as ClassificationKind[];
 const VERIFICATIONS = Object.keys(VERIFICATION_LABELS) as VerificationStatus[];
-type ViewMode = 'flat' | 'hierarchy';
 type HierarchyScope = 'all' | 'parent' | 'child';
 
 function ResultCard({
@@ -87,8 +84,8 @@ export function MovementsExplorer() {
   const [region, setRegion] = useState<RegionId | 'all'>('all');
   const [cls, setCls] = useState<ClassificationKind | 'all'>('all');
   const [ver, setVer] = useState<VerificationStatus | 'all'>('all');
-  const [viewMode, setViewMode] = useState<ViewMode>('flat');
   const [hierarchyScope, setHierarchyScope] = useState<HierarchyScope>('all');
+  const [advancedOpen, setAdvancedOpen] = useState(false);
   const { lod, setLod } = useLodState('core');
   const regions = activeRegions();
 
@@ -149,10 +146,48 @@ export function MovementsExplorer() {
     setLod('core');
   };
 
+  // iOSのフォーカス時オートズームを避けるため、フォーム部品は16px以上にする
   const selectClass =
-    'min-h-11 w-full rounded-sm border hairline bg-raised px-2 py-2 text-sm text-ink';
-  const { grouped, ungrouped } = groupMovementsForDisplay(filtered);
+    'min-h-11 w-full rounded-sm border hairline bg-raised px-2 py-2 text-base text-ink';
   const queryActive = Boolean(query.trim());
+
+  /** 詳細条件のうち現在設定されているもの（閉じていても分かるように要約・チップで示す） */
+  const activeFilters: { key: string; label: string; clear: () => void }[] = [
+    era !== 'all' && {
+      key: 'era',
+      label: ERA_LABELS[era as EraId],
+      clear: () => setEra('all'),
+    },
+    region !== 'all' && {
+      key: 'region',
+      label: REGION_LABELS[region as RegionId],
+      clear: () => setRegion('all'),
+    },
+    cls !== 'all' && {
+      key: 'cls',
+      label: CLASSIFICATION_LABELS[cls as ClassificationKind],
+      clear: () => setCls('all'),
+    },
+    ver !== 'all' && {
+      key: 'ver',
+      label: VERIFICATION_LABELS[ver as VerificationStatus],
+      clear: () => setVer('all'),
+    },
+    hierarchyScope !== 'all' && {
+      key: 'hierarchy',
+      label: hierarchyScope === 'parent' ? '親・代表のみ' : '子・内訳のみ',
+      clear: () => setHierarchyScope('all'),
+    },
+  ].filter(Boolean) as { key: string; label: string; clear: () => void }[];
+
+  const advancedSummary =
+    activeFilters.length === 0
+      ? '条件なし'
+      : `${activeFilters.slice(0, 3).map((filter) => filter.label).join('・')}${
+          activeFilters.length > 3 ? `ほか${activeFilters.length - 3}件` : ''
+        }`;
+
+  const hasAnyCondition = queryActive || activeFilters.length > 0 || lod !== 'core';
 
   return (
     <div>
@@ -167,98 +202,130 @@ export function MovementsExplorer() {
         catalogue
       />
 
-      <div className="mt-5 grid gap-3 border hairline bg-surface p-4 sm:grid-cols-2 lg:grid-cols-3">
-        <div className="sm:col-span-2 lg:col-span-3">
-          <label htmlFor="q" className="mb-1 block text-xs text-muted">
-            検索（ムーブメント名・作家・作品・地域・思想・技法・素材・キーワード）
-          </label>
-          <input
-            id="q"
-            type="search"
-            value={query}
-            onChange={(event) => setQuery(event.target.value)}
-            placeholder="例：遠近法、もの派、光、ウォーホル、油彩"
-            className="min-h-11 w-full rounded-sm border hairline bg-raised px-3 py-2.5 text-sm text-ink placeholder:text-faint"
-          />
-        </div>
+      {/* 名前・キーワード検索は常時表示。詳細条件はアコーディオン内へ畳む */}
+      <div className="movements-search">
+        <label htmlFor="q" className="movements-search__label">
+          ムーブメントを検索
+        </label>
+        <input
+          id="q"
+          type="search"
+          value={query}
+          onChange={(event) => setQuery(event.target.value)}
+          placeholder="ムーブメント名・作家・作品など"
+          aria-describedby="q-help"
+          className="movements-search__input"
+        />
+        <p id="q-help" className="movements-search__help">
+          名称・別名のほか、作家・作品・地域・思想・技法・素材・キーワードを対象に検索します。
+        </p>
+      </div>
 
-        <div>
-          <label htmlFor="f-era" className="mb-1 block text-xs text-muted">時代区分</label>
-          <select id="f-era" value={era} onChange={(event) => setEra(event.target.value as EraId | 'all')} className={selectClass}>
-            <option value="all">すべての時代</option>
-            {ERA_ORDER.map((item) => <option key={item} value={item}>{ERA_LABELS[item]}</option>)}
-          </select>
-        </div>
+      <div className="movements-advanced">
+        <button
+          type="button"
+          onClick={() => setAdvancedOpen((open) => !open)}
+          aria-expanded={advancedOpen}
+          aria-controls="advanced-filters"
+          className="movements-advanced__toggle"
+        >
+          <span className="movements-advanced__title">詳細条件</span>
+          <span className="movements-advanced__summary">{advancedSummary}</span>
+          <span className="movements-advanced__icon" aria-hidden="true">
+            {advancedOpen ? '−' : '＋'}
+          </span>
+        </button>
 
-        <div>
-          <label htmlFor="f-region" className="mb-1 block text-xs text-muted">地域</label>
-          <select id="f-region" value={region} onChange={(event) => setRegion(event.target.value as RegionId | 'all')} className={selectClass}>
-            <option value="all">すべての地域</option>
-            {regions.map((item) => <option key={item} value={item}>{REGION_LABELS[item]}</option>)}
-          </select>
-        </div>
+        {activeFilters.length > 0 && (
+          <ul className="movements-chips">
+            {activeFilters.slice(0, 3).map((filter) => (
+              <li key={filter.key}>
+                <span className="movements-chip">
+                  {filter.label}
+                  <button
+                    type="button"
+                    onClick={filter.clear}
+                    aria-label={`絞り込み条件「${filter.label}」を解除`}
+                    className="movements-chip__clear"
+                  >
+                    ×
+                  </button>
+                </span>
+              </li>
+            ))}
+            {activeFilters.length > 3 && (
+              <li className="movements-chips__more">ほか{activeFilters.length - 3}件</li>
+            )}
+          </ul>
+        )}
 
-        <div>
-          <label htmlFor="f-cls" className="mb-1 block text-xs text-muted">分類</label>
-          <select id="f-cls" value={cls} onChange={(event) => setCls(event.target.value as ClassificationKind | 'all')} className={selectClass}>
-            <option value="all">すべての分類</option>
-            {CLASSIFICATIONS.map((item) => <option key={item} value={item}>{CLASSIFICATION_LABELS[item]}</option>)}
-          </select>
-        </div>
+        <div
+          id="advanced-filters"
+          hidden={!advancedOpen}
+          className="movements-advanced__panel"
+        >
+          <div>
+            <label htmlFor="f-era" className="mb-1 block text-xs text-muted">時代区分</label>
+            <select id="f-era" value={era} onChange={(event) => setEra(event.target.value as EraId | 'all')} className={selectClass}>
+              <option value="all">すべての時代</option>
+              {ERA_ORDER.map((item) => <option key={item} value={item}>{ERA_LABELS[item]}</option>)}
+            </select>
+          </div>
 
-        <div>
-          <label htmlFor="f-ver" className="mb-1 block text-xs text-muted">情報確認状態</label>
-          <select id="f-ver" value={ver} onChange={(event) => setVer(event.target.value as VerificationStatus | 'all')} className={selectClass}>
-            <option value="all">すべて</option>
-            {VERIFICATIONS.map((item) => <option key={item} value={item}>{VERIFICATION_LABELS[item]}</option>)}
-          </select>
-        </div>
+          <div>
+            <label htmlFor="f-region" className="mb-1 block text-xs text-muted">地域</label>
+            <select id="f-region" value={region} onChange={(event) => setRegion(event.target.value as RegionId | 'all')} className={selectClass}>
+              <option value="all">すべての地域</option>
+              {regions.map((item) => <option key={item} value={item}>{REGION_LABELS[item]}</option>)}
+            </select>
+          </div>
 
-        <div>
-          <label htmlFor="f-hierarchy" className="mb-1 block text-xs text-muted">階層</label>
-          <select id="f-hierarchy" value={hierarchyScope} onChange={(event) => setHierarchyScope(event.target.value as HierarchyScope)} className={selectClass}>
-            <option value="all">すべて</option>
-            <option value="parent">親・代表のみ</option>
-            <option value="child">子・内訳のみ</option>
-          </select>
-        </div>
+          <div>
+            <label htmlFor="f-cls" className="mb-1 block text-xs text-muted">分類</label>
+            <select id="f-cls" value={cls} onChange={(event) => setCls(event.target.value as ClassificationKind | 'all')} className={selectClass}>
+              <option value="all">すべての分類</option>
+              {CLASSIFICATIONS.map((item) => <option key={item} value={item}>{CLASSIFICATION_LABELS[item]}</option>)}
+            </select>
+          </div>
 
-        <div className="flex items-end justify-between gap-2">
-          <p className="text-sm text-muted" aria-live="polite">{filtered.length}件表示</p>
-          <button type="button" onClick={reset} className="min-h-11 rounded-sm border hairline px-3 py-2 text-xs text-muted hover:text-ink">
-            条件をリセット
-          </button>
+          <div>
+            <label htmlFor="f-ver" className="mb-1 block text-xs text-muted">情報確認状態</label>
+            <select id="f-ver" value={ver} onChange={(event) => setVer(event.target.value as VerificationStatus | 'all')} className={selectClass}>
+              <option value="all">すべて</option>
+              {VERIFICATIONS.map((item) => <option key={item} value={item}>{VERIFICATION_LABELS[item]}</option>)}
+            </select>
+          </div>
+
+          <div>
+            <label htmlFor="f-hierarchy" className="mb-1 block text-xs text-muted">階層</label>
+            <select id="f-hierarchy" value={hierarchyScope} onChange={(event) => setHierarchyScope(event.target.value as HierarchyScope)} className={selectClass}>
+              <option value="all">すべて</option>
+              <option value="parent">親・代表のみ</option>
+              <option value="child">子・内訳のみ</option>
+            </select>
+          </div>
         </div>
       </div>
 
-      <div className="mt-5 border-y hairline py-3">
-        <p className="mb-2 text-xs font-bold text-ink">表示形式</p>
-        <div role="group" aria-label="表示形式" className="inline-grid grid-cols-2 overflow-hidden rounded-sm border hairline">
-          {([
-            ['flat', 'フラット'],
-            ['hierarchy', '階層'],
-          ] as const).map(([value, label], index) => (
-            <button
-              key={value}
-              type="button"
-              onClick={() => setViewMode(value)}
-              aria-pressed={viewMode === value}
-              className={`min-h-11 px-5 text-sm ${index ? 'border-l hairline' : ''} ${
-                viewMode === value ? 'bg-ink text-paper' : 'bg-raised text-muted'
-              }`}
-            >
-              {label}
-            </button>
-          ))}
-        </div>
+      <div className="movements-resultbar">
+        <p className="movements-resultbar__count" aria-live="polite">
+          {filtered.length}件のムーブメント
+        </p>
+        {hasAnyCondition && (
+          <button type="button" onClick={reset} className="movements-resultbar__clear">
+            条件をクリア
+          </button>
+        )}
       </div>
 
       {filtered.length === 0 ? (
         <p className="mt-8 text-center text-sm text-muted">
           条件に一致するムーブメントがありません。
-          <button type="button" onClick={reset} className="ml-2 prose-link">条件をリセット</button>
+          <button type="button" onClick={reset} className="ml-2 prose-link">条件をクリア</button>
         </p>
-      ) : viewMode === 'flat' ? (
+      ) : (
+        // 表示形式の切り替えは廃止し、一覧は1種類に統一する。
+        // 親子関係は ResultCard 内の控えめな親カテゴリ表記で示す。
         <ul className="mt-6 grid gap-4 sm:grid-cols-2 lg:grid-cols-3" data-movement-view="flat">
           {filtered.map((movement) => (
             <li key={movement.id}>
@@ -266,37 +333,6 @@ export function MovementsExplorer() {
             </li>
           ))}
         </ul>
-      ) : (
-        <div className="mt-6 space-y-8" data-movement-view="hierarchy">
-          {[...grouped.entries()].map(([groupId, members]) => {
-            const definition = MOVEMENT_GROUPS.find((group) => group.id === groupId);
-            return (
-              <section key={groupId} className="border-t hairline pt-4">
-                <p className="text-xs uppercase tracking-[0.18em] text-faint">Group</p>
-                <h2 className="mt-1 font-serif text-2xl">{definition?.label ?? groupId}</h2>
-                <ul className="mt-4 grid gap-4 border-l-2 border-accent/35 pl-4 sm:grid-cols-2 lg:grid-cols-3">
-                  {members.map((movement) => (
-                    <li key={movement.id}>
-                      <ResultCard movement={movement} lod={lod} queryActive={queryActive} onReveal={setLod} />
-                    </li>
-                  ))}
-                </ul>
-              </section>
-            );
-          })}
-          {ungrouped.length > 0 && (
-            <section className="border-t hairline pt-4">
-              <h2 className="font-serif text-2xl">独立した項目</h2>
-              <ul className="mt-4 grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-                {ungrouped.map((movement) => (
-                  <li key={movement.id}>
-                    <ResultCard movement={movement} lod={lod} queryActive={queryActive} onReveal={setLod} />
-                  </li>
-                ))}
-              </ul>
-            </section>
-          )}
-        </div>
       )}
 
       <p className="mt-6 text-xs text-faint">

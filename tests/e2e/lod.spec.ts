@@ -95,11 +95,16 @@ test('マトリクスはセル内件数を制限し、+Nでそのセルだけ展
   );
 });
 
-test('一覧は階層表示でグループ文脈を示す', async ({ page }) => {
-  await page.goto('/movements/?lod=core');
-  await page.getByRole('button', { name: '階層' }).click();
-  await expect(page.locator('[data-movement-view="hierarchy"]')).toBeVisible();
-  await expect(page.getByRole('heading', { name: '印象派周辺' })).toBeVisible();
+test('一覧は表示形式を持たず、親子関係はカード内の上位分類で示す', async ({ page }) => {
+  // 旧「表示形式」クエリが残っていてもエラーにならず通常表示へフォールバックする
+  await page.goto('/movements/?lod=detailed&view=hierarchy');
+
+  await expect(page.getByRole('group', { name: '表示形式' })).toHaveCount(0);
+  await expect(page.getByRole('button', { name: '階層', exact: true })).toHaveCount(0);
+  await expect(page.getByRole('button', { name: 'フラット', exact: true })).toHaveCount(0);
+  await expect(page.locator('[data-movement-view="hierarchy"]')).toHaveCount(0);
+  await expect(page.locator('[data-movement-view="flat"]')).toBeVisible();
+  await expect(page.getByText('上位分類：').first()).toBeVisible();
 });
 
 test('PCの通史coreは一時インスペクタを出さず代表項目から詳細へ移動する', async ({
