@@ -187,22 +187,45 @@ function MovementEntry({
           </div>
 
           {work ? (
-            <Link
-              href={`/works/${work.id}/`}
-              className="chronology-work"
-              aria-label={`${work.titleJa}の作品詳細を見る`}
-            >
-              <WorkImage
-                work={work}
-                className="chronology-work__image"
-                sizes="(max-width: 640px) 100vw, 320px"
-              />
-              <span className="chronology-work__caption">
-                <span className="font-bold text-ink">{work.titleJa}</span>
-                <span>{work.creatorName}</span>
-                <span>{work.year}</span>
-              </span>
-            </Link>
+            !work.image && work.imageReference?.sourcePageUrl ? (
+              // 画像未収録：プレースホルダー全面が提供元への外部リンクになる。
+              // WorkImage 自身が <a> を持つため内部リンクで包まず、
+              // キャプションを作品詳細への内部リンクにする（<a>のネスト回避）。
+              <div className="chronology-work">
+                <WorkImage
+                  work={work}
+                  className="chronology-work__image"
+                  sizes="(max-width: 640px) 100vw, 320px"
+                  showReferenceLink
+                />
+                <Link
+                  href={`/works/${work.id}/`}
+                  className="chronology-work__caption"
+                  aria-label={`${work.titleJa}の作品詳細を見る`}
+                >
+                  <span className="font-bold text-ink">{work.titleJa}</span>
+                  <span>{work.creatorName}</span>
+                  <span>{work.year}</span>
+                </Link>
+              </div>
+            ) : (
+              <Link
+                href={`/works/${work.id}/`}
+                className="chronology-work"
+                aria-label={`${work.titleJa}の作品詳細を見る`}
+              >
+                <WorkImage
+                  work={work}
+                  className="chronology-work__image"
+                  sizes="(max-width: 640px) 100vw, 320px"
+                />
+                <span className="chronology-work__caption">
+                  <span className="font-bold text-ink">{work.titleJa}</span>
+                  <span>{work.creatorName}</span>
+                  <span>{work.year}</span>
+                </span>
+              </Link>
+            )
           ) : (
             <div
               className="chronology-work chronology-work--empty"
