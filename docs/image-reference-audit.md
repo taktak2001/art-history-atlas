@@ -28,9 +28,9 @@
 
 | 状態 | 件数 |
 | --- | ---: |
-| url-verified | 1 |
+| url-verified | 3 |
 | metadata-verified | 0 |
-| rights-review-required | 34 |
+| rights-review-required | 32 |
 | unresolved | 2 |
 
 ## 未解決事項
@@ -51,7 +51,7 @@
 | work-cut-with-kitchen-knife | 台所ナイフで切り裂く（ダダ・フォトモンタージュ） | ハンナ・ヘーヒ | null | [link](https://search.smb.museum/object/obj-961048) | — | — | Nationalgalerie, Staatliche Museen zu Berlin | quotation-candidate | — | rights-review-required | 引用審査中（PR #61）・本番未表示 |
 | work-demoiselles-avignon | アヴィニョンの娘たち | パブロ・ピカソ | null | [link](https://www.moma.org/collection/works/79766) | — | — | The Museum of Modern Art (MoMA), New York | permission-required | — | rights-review-required | 本番表示前に権利レビュー必須 |
 | work-dynamism-dog | 鎖につながれた犬のダイナミズム | ジャコモ・バッラ | null | [link](https://buffaloakg.org/artworks/196416-dinamismo-di-un-cane-al-guinzaglio-dynamism-dog-leash) | — | — | Buffalo AKG Art Museum (Albright-Knox) | permission-required | — | rights-review-required | 本番表示前に権利レビュー必須 |
-| work-electric-dress | 電気服 | 田中敦子 | null | [link](https://artplatform.go.jp/collections/W411501) | — | — | Art Platform Japan（所蔵：高松市美術館） | permission-required | — | rights-review-required | 本番表示前に権利レビュー必須 |
+| work-electric-dress | 電気服 | 田中敦子 | null | [link](https://www.centrepompidou.fr/en/pompidou-plus/magazine/article/focus-on-denkifuku-atsuko-tanakas-electric-dress) | [link](https://artplatform.go.jp/collections/W411501) | — | Centre Pompidou | permission-required | — | url-verified | 本番表示前に権利レビュー必須 |
 | work-fautrier-hostage | 人質（シリーズ） | ジャン・フォートリエ | null | [link](https://www.centrepompidou.fr/fr/ressources/oeuvre/c6b98Ez) | — | — | Centre Pompidou — Musée national d’art moderne, Paris | permission-required | — | rights-review-required | 本番表示前に権利レビュー必須 |
 | work-flavin-monument | V・タトリンのための「記念碑」 | ダン・フレイヴィン | null | [link](https://www.moma.org/collection/works/81337) | — | — | The Museum of Modern Art (MoMA), New York | permission-required | — | rights-review-required | 本番表示前に権利レビュー必須 |
 | work-fountain | 泉 | マルセル・デュシャン（R. Mutt名義） | null | [link](https://www.tate.org.uk/art/artworks/duchamp-fountain-t07573) | — | — | Tate | permission-required | — | rights-review-required | 本番表示前に権利レビュー必須 |
@@ -80,7 +80,7 @@
 | work-tapies-grey-green | 灰色と緑の絵画 | アントニ・タピエス | null | [link](https://www.tate.org.uk/art/artworks/tapies-grey-and-green-painting-t00471) | — | — | Tate | permission-required | — | rights-review-required | 本番表示前に権利レビュー必須 |
 | work-teamlab-borderless | teamLab Borderless（境界のない世界） | teamLab | null | [link](https://www.teamlab.art/e/tokyo/) | — | — | teamLab（公式） | permission-required | — | rights-review-required | 本番表示前に権利レビュー必須 |
 | work-teamlab-crystal | クリスタル・ワールド／花と人の森 | teamLab | null | [link](https://www.teamlab.art/w/crystalworld/) | [link](https://www.teamlab.art/ew/flowerforest/) | — | teamLab（公式） | permission-required | — | rights-review-required | 本番表示前に権利レビュー必須 |
-| work-turrell-ganzfeld | ガンツフェルト（光の空間） | ジェームズ・タレル | null | [link](https://jamesturrell.com/) | — | — | James Turrell（公式サイト／アーカイブ） | permission-required | — | rights-review-required | 本番表示前に権利レビュー必須 |
+| work-turrell-ganzfeld | ガンツフェルト（光の空間） | ジェームズ・タレル | null | [link](https://www.jmberlin.de/en/exhibition-james-turrell-aural) | — | — | Jewish Museum Berlin | permission-required | — | url-verified | 本番表示前に権利レビュー必須 |
 
 ## 方針メモ
 
