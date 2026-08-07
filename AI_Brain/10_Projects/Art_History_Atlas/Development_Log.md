@@ -182,3 +182,17 @@ Phase 2 現在の件数: movements 30 / artists **64** / works **75**（画像41
 - 大きな囲み枠をやめ、細い罫線と余白でブロック分割。
 - **iOSのフォーカス時オートズーム対策**: 検索input・全selectを16px（`text-base` / `font-size:1rem`）に。`maximum-scale`/`user-scalable=no` は使わず、ピンチ拡大は維持。
 - 検証: unit **214** / Playwright+axe **256 passed**。
+
+### 追補（2026-08-07・PR #69）
+- **詳細条件が閉じていなかった不具合を修正**: `hidden` 属性は付けていたが、後から追加した
+  `.movements-advanced__panel { display: grid }` が Tailwind preflight の `[hidden]{display:none}`
+  を打ち消しており、実際には開いたままだった。`.movements-advanced__panel[hidden] { display: none }`
+  を追加して解決。**検証時に属性の有無だけを見て実表示（computed style / 矩形）を確認しなかった**のが
+  見落としの原因。以後、開閉UIは `display` と高さで確認する。
+- **ムーブメント一覧からLODを削除**: `LodControl` / `useLodState` / `filterMovementsByLod` を外し、
+  一覧は常に全54件を対象に。`ResultCard` の「現在の表示範囲では非表示」「◯◯で表示」も不要となり削除。
+  旧 `?lod=` が付いていても無視して全件表示にフォールバック。
+- **Explore by Era の件数表示を削除**（章番号01〜08と時代名のみ）。`aria-label` も「先史・古代を見る」に。
+- 影響したテストを更新: LOD共通表示は主要3画面（timeline/chronology/network）に変更、
+  地域フィルタE2Eは詳細条件を開いてから操作するよう修正。
+- 検証: unit **214** / Playwright+axe **256 passed**。

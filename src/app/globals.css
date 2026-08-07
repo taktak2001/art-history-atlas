@@ -3611,6 +3611,11 @@ html.dark .chronology-era--digital {
   padding-bottom: 1rem;
 }
 
+/* display:grid が [hidden] の display:none を打ち消さないようにする */
+.movements-advanced__panel[hidden] {
+  display: none;
+}
+
 @media (min-width: 640px) {
   .movements-advanced__panel {
     grid-template-columns: repeat(2, minmax(0, 1fr));
