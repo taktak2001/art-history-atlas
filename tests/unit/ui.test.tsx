@@ -304,17 +304,20 @@ describe('LOD UI', () => {
     expect(region.querySelectorAll('[data-sticky-cell="row"]').length).toBeGreaterThan(0);
   });
 
-  it('LOD外の検索結果を表示し、必要な密度へ切り替える', async () => {
+  it('一覧はLOD（表示範囲）を持たず、常に全件から検索する', () => {
     window.history.replaceState({}, '', '/movements/?lod=core');
     render(<MovementsExplorer />);
 
-    fireEvent.change(screen.getByRole('searchbox'), { target: { value: '未来派' } });
-    expect(screen.getByText('現在の表示範囲では非表示')).toBeVisible();
+    // LODコントロールは無い
+    expect(screen.queryByText('LEVEL OF DETAIL')).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: /^基本/ })).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: /^充実/ })).not.toBeInTheDocument();
 
-    fireEvent.click(screen.getByRole('button', { name: '充実で表示' }));
-    await waitFor(() =>
-      expect(window.location.search).toContain('lod=standard'),
-    );
+    // 旧 ?lod=core が付いていても全件が対象
+    expect(screen.getByText(`${movements.length}件のムーブメント`)).toBeInTheDocument();
+
+    // LOD外だった項目もそのまま見つかり、「非表示」の注意書きも出ない
+    fireEvent.change(screen.getByRole('searchbox'), { target: { value: '未来派' } });
     expect(screen.queryByText('現在の表示範囲では非表示')).not.toBeInTheDocument();
   });
 

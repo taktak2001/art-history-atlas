@@ -105,13 +105,12 @@ export default function HomePage() {
         />
         <div className="mt-5 grid grid-cols-2 gap-px bg-line sm:grid-cols-4">
           {ERA_ORDER.map((era, index) => {
-            const count = movements.filter((m) => m.era === era).length;
             return (
               <Link
                 key={era}
                 href={`/chronology/#era-${era}`}
                 className="home-compact-card flex flex-col gap-1 bg-raised hover:bg-surface"
-                aria-label={`${ERA_LABELS[era]}、${count}件を見る`}
+                aria-label={`${ERA_LABELS[era]}を見る`}
               >
                 {/* 章番号は時代名の左上に小さく添える（縦幅を増やさない） */}
                 <span className="flex items-baseline gap-2">
@@ -120,7 +119,6 @@ export default function HomePage() {
                   </span>
                   <span className="font-serif text-lg">{ERA_LABELS[era]}</span>
                 </span>
-                <span className="text-xs text-faint">{count}件</span>
               </Link>
             );
           })}

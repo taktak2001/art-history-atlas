@@ -83,6 +83,8 @@ test('比較共有URLを開くと選択状態を復元できる', async ({ page 
 
 test('地域フィルタ（日本）を適用できる', async ({ page }) => {
   await page.goto('/movements/');
+  // 地域は「詳細条件」アコーディオン内にあるため、まず開く
+  await page.getByRole('button', { name: /詳細条件/ }).click();
   await page.getByLabel('地域', { exact: true }).selectOption('japan');
   await expect(page.getByRole('link', { name: /もの派/ })).toBeVisible();
   await expect(page.getByRole('link', { name: /具体美術協会/ })).toBeVisible();

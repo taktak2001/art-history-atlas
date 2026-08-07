@@ -13,64 +13,32 @@ import {
 } from '@/lib/dataset';
 import {
   VERIFICATION_LABELS,
-  VISIBILITY_LEVEL_LABELS,
   type ClassificationKind,
   type RegionId,
   type EraId,
   type VerificationStatus,
   type Movement,
 } from '@/lib/schema';
-import {
-  filterMovementsByLod,
-  getMovementParent,
-  isMovementVisibleAtLod,
-} from '@/lib/movement-hierarchy';
-import { useLodState } from '@/lib/use-lod-state';
-import { LodControl } from './LodControl';
+import { getMovementParent } from '@/lib/movement-hierarchy';
 import { MovementCard } from './MovementCard';
 
 const CLASSIFICATIONS = Object.keys(CLASSIFICATION_LABELS) as ClassificationKind[];
 const VERIFICATIONS = Object.keys(VERIFICATION_LABELS) as VerificationStatus[];
 type HierarchyScope = 'all' | 'parent' | 'child';
 
-function ResultCard({
-  movement,
-  lod,
-  queryActive,
-  onReveal,
-}: {
-  movement: Movement;
-  lod: Movement['visibilityLevel'];
-  queryActive: boolean;
-  onReveal: (lod: Movement['visibilityLevel']) => void;
-}) {
-  const hiddenByLod = queryActive && !isMovementVisibleAtLod(movement, lod);
+function ResultCard({ movement }: { movement: Movement }) {
   const parent = getMovementParent(movement.id, movements);
 
   return (
     <div data-movement-result={movement.id}>
-      {(parent || hiddenByLod) && (
+      {parent && (
         <div className="border-x border-t hairline bg-surface px-3 py-2 text-xs text-muted">
-          {parent && (
-            <span className="mr-3">
-              上位分類：
-              <Link href={`/movements/${parent.id}/`} className="prose-link">
-                {parent.nameJa}
-              </Link>
-            </span>
-          )}
-          {hiddenByLod && (
-            <>
-              <span>現在の表示範囲では非表示</span>
-              <button
-                type="button"
-                onClick={() => onReveal(movement.visibilityLevel)}
-                className="ml-2 min-h-11 font-bold text-accent underline underline-offset-4"
-              >
-                {VISIBILITY_LEVEL_LABELS[movement.visibilityLevel]}で表示
-              </button>
-            </>
-          )}
+          <span>
+            上位分類：
+            <Link href={`/movements/${parent.id}/`} className="prose-link">
+              {parent.nameJa}
+            </Link>
+          </span>
         </div>
       )}
       <MovementCard movement={movement} />
@@ -86,7 +54,6 @@ export function MovementsExplorer() {
   const [ver, setVer] = useState<VerificationStatus | 'all'>('all');
   const [hierarchyScope, setHierarchyScope] = useState<HierarchyScope>('all');
   const [advancedOpen, setAdvancedOpen] = useState(false);
-  const { lod, setLod } = useLodState('core');
   const regions = activeRegions();
 
   const matchedIds = useMemo(() => {
@@ -108,9 +75,8 @@ export function MovementsExplorer() {
   }, [query]);
 
   const filtered = useMemo(() => {
-    const queryActive = Boolean(matchedIds);
-    const densityItems = queryActive ? movements : filterMovementsByLod(movements, lod);
-    return densityItems
+    // 一覧は常に全件を対象にする（表示密度LODは持たない）
+    return movements
       .filter((movement) => (matchedIds ? matchedIds.has(movement.id) : true))
       .filter((movement) => (era === 'all' ? true : movement.era === era))
       .filter((movement) =>
@@ -134,7 +100,7 @@ export function MovementsExplorer() {
           (a.displayOrder ?? Number.MAX_SAFE_INTEGER) -
           (b.displayOrder ?? Number.MAX_SAFE_INTEGER),
       );
-  }, [matchedIds, era, region, cls, ver, hierarchyScope, lod]);
+  }, [matchedIds, era, region, cls, ver, hierarchyScope]);
 
   const reset = () => {
     setQuery('');
@@ -143,7 +109,6 @@ export function MovementsExplorer() {
     setCls('all');
     setVer('all');
     setHierarchyScope('all');
-    setLod('core');
   };
 
   // iOSのフォーカス時オートズームを避けるため、フォーム部品は16px以上にする
@@ -187,21 +152,10 @@ export function MovementsExplorer() {
           activeFilters.length > 3 ? `ほか${activeFilters.length - 3}件` : ''
         }`;
 
-  const hasAnyCondition = queryActive || activeFilters.length > 0 || lod !== 'core';
+  const hasAnyCondition = queryActive || activeFilters.length > 0;
 
   return (
     <div>
-      <LodControl
-        value={lod}
-        onChange={setLod}
-        counts={{
-          core: filterMovementsByLod(movements, 'core').length,
-          standard: filterMovementsByLod(movements, 'standard').length,
-          detailed: filterMovementsByLod(movements, 'detailed').length,
-        }}
-        catalogue
-      />
-
       {/* 名前・キーワード検索は常時表示。詳細条件はアコーディオン内へ畳む */}
       <div className="movements-search">
         <label htmlFor="q" className="movements-search__label">
@@ -329,7 +283,7 @@ export function MovementsExplorer() {
         <ul className="mt-6 grid gap-4 sm:grid-cols-2 lg:grid-cols-3" data-movement-view="flat">
           {filtered.map((movement) => (
             <li key={movement.id}>
-              <ResultCard movement={movement} lod={lod} queryActive={queryActive} onReveal={setLod} />
+              <ResultCard movement={movement} />
             </li>
           ))}
         </ul>

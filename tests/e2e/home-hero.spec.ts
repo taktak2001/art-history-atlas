@@ -240,8 +240,7 @@ test('Explore by Era は2列を保ったまま01〜08の章番号で読む順番
   expect(layout.cells[2].top).toBeGreaterThan(layout.cells[0].top);
   expect(layout.cells[0].left).toBeLessThan(layout.cells[1].left);
 
-  // リンク名だけで遷移先が分かる
-  await expect(
-    page.getByRole('link', { name: /先史・古代、\d+件を見る/ }),
-  ).toBeVisible();
+  // 件数表示は置かず、リンク名だけで遷移先が分かる
+  await expect(page.getByRole('link', { name: '先史・古代を見る' })).toBeVisible();
+  await expect(page.locator('.home-compact-card').first()).not.toContainText('件');
 });

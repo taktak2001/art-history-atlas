@@ -1,9 +1,10 @@
 import { test, expect } from '@playwright/test';
 
-test('主要4画面で図録型LODと基本・充実・すべてを共通表示する', async ({
+test('主要3画面で図録型LODと基本・充実・すべてを共通表示する', async ({
   page,
 }) => {
-  for (const route of ['/timeline/', '/chronology/', '/network/', '/movements/']) {
+  // ムーブメント一覧はLODを持たない（常に全件が対象）
+  for (const route of ['/timeline/', '/chronology/', '/network/']) {
     await page.goto(route);
     const control = page.locator('[data-lod-control]');
     await expect(control).toHaveClass(/lod-control--catalogue/);
@@ -72,14 +73,16 @@ test('タイムラインは通史core、時代別standardを目的別初期値�
   await expect(page.locator('[data-timeline-bar="symbolism"]').first()).toBeVisible();
 });
 
-test('検索はLOD外の項目を見つけ、充実表示へ切り替えられる', async ({ page }) => {
+test('ムーブメント一覧はLODを持たず、常に全件から検索する', async ({ page }) => {
+  // 旧 ?lod= が残っていても無視して全件表示にフォールバックする
   await page.goto('/movements/?lod=core');
-  await page.getByRole('searchbox').fill('未来派');
 
-  await expect(page.getByText('現在の表示範囲では非表示')).toBeVisible();
-  await page.getByRole('button', { name: '充実で表示' }).click();
-  await expect(page).toHaveURL(/lod=standard/);
+  await expect(page.getByText('LEVEL OF DETAIL')).toHaveCount(0);
+  await expect(page.getByText('54件のムーブメント')).toBeVisible();
+
+  await page.getByRole('searchbox').fill('未来派');
   await expect(page.getByText('現在の表示範囲では非表示')).toHaveCount(0);
+  await expect(page.getByRole('link', { name: /未来派/ }).first()).toBeVisible();
 });
 
 test('マトリクスはセル内件数を制限し、+Nでそのセルだけ展開する', async ({ page }) => {
