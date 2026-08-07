@@ -1,6 +1,6 @@
 import { test, expect } from '@playwright/test';
 
-test('ホームのファーストビューに3つの探索導線を表示する', async ({ page }) => {
+test('ホームのファーストビューに4つの探索導線を表示する', async ({ page }) => {
   await page.goto('/');
 
   const hero = page.locator('[data-home-hero]');
@@ -10,9 +10,20 @@ test('ホームのファーストビューに3つの探索導線を表示する'
     name: 'Art History Atlas',
   });
   await expect(title).toHaveText('ART HISTORY ATLAS');
-  await expect(page.getByText('発生・継承・転換から読む美術史。')).toBeVisible();
+  // キャッチコピーはDOMごと削除している
+  await expect(page.getByText('発生・継承・転換から読む美術史。')).toHaveCount(0);
+  await expect(page.locator('.home-hero__tagline')).toHaveCount(0);
 
   const navigation = page.getByRole('navigation', { name: '主要な探索方法' });
+  // Movements を先頭に置く
+  await expect(navigation.getByRole('link').first()).toHaveAttribute(
+    'href',
+    '/movements/',
+  );
+  await expect(navigation.getByRole('link', { name: /Movements.*名前・時代・地域から探す/ })).toHaveAttribute(
+    'href',
+    '/movements/',
+  );
   await expect(navigation.getByRole('link', { name: /Timeline.*年代と地域の重なりを見る/ })).toHaveAttribute(
     'href',
     '/timeline/',
@@ -30,7 +41,6 @@ test('ホームのファーストビューに3つの探索導線を表示する'
   const geometry = await hero.evaluate((element) => {
     const rect = element.getBoundingClientRect();
     const title = element.querySelector<HTMLElement>('.home-hero__title');
-    const tagline = element.querySelector<HTMLElement>('.home-hero__tagline');
     const actions = element.querySelector<HTMLElement>('.home-hero__actions');
     const firstAction = element.querySelector<HTMLElement>('.home-hero__cta');
     const firstActionTitle = firstAction?.querySelector<HTMLElement>(
@@ -39,31 +49,26 @@ test('ホームのファーストビューに3つの探索導線を表示する'
     const firstActionDescription = firstAction?.querySelector<HTMLElement>(
       '.home-hero__cta-description',
     );
-    const taglineStyles = tagline ? getComputedStyle(tagline) : null;
     return {
       bottom: rect.bottom,
       height: rect.height,
       width: rect.width,
       viewportHeight: window.innerHeight,
-      taglineHeight: tagline?.getBoundingClientRect().height ?? 0,
-      taglineLineHeight: taglineStyles ? Number.parseFloat(taglineStyles.lineHeight) : 0,
-      titleToTagline:
-        (tagline?.getBoundingClientRect().top ?? 0) -
-        (title?.getBoundingClientRect().bottom ?? 0),
-      taglineToActions:
+      // 大見出し直下から区切り線（actionsの上辺）までの余白
+      titleToActions:
         (actions?.getBoundingClientRect().top ?? 0) -
-        (tagline?.getBoundingClientRect().bottom ?? 0),
+        (title?.getBoundingClientRect().bottom ?? 0),
       actionTitleToDescription:
         (firstActionDescription?.getBoundingClientRect().top ?? 0) -
         (firstActionTitle?.getBoundingClientRect().bottom ?? 0),
     };
   });
   expect(geometry.bottom).toBeLessThanOrEqual(geometry.viewportHeight + 1);
-  expect(geometry.height).toBeGreaterThanOrEqual(280);
-  expect(geometry.height).toBeLessThanOrEqual(geometry.width < 640 ? 390 : 360);
-  expect(geometry.taglineHeight).toBeLessThanOrEqual(geometry.taglineLineHeight * 2 + 1);
-  expect(geometry.titleToTagline).toBeGreaterThanOrEqual(11);
-  expect(geometry.taglineToActions).toBeGreaterThanOrEqual(23);
+  expect(geometry.height).toBeGreaterThanOrEqual(230);
+  expect(geometry.height).toBeLessThanOrEqual(geometry.width < 640 ? 430 : 360);
+  // キャッチコピー削除後も、詰まりすぎず空きすぎない余白を保つ
+  expect(geometry.titleToActions).toBeGreaterThanOrEqual(28);
+  expect(geometry.titleToActions).toBeLessThanOrEqual(44);
   expect(geometry.actionTitleToDescription).toBeGreaterThanOrEqual(5);
 
   const titleTypography = await title.evaluate((element) => {
@@ -201,4 +206,42 @@ test('正式名称をmetadata・読み上げ・構造化データで統一する
 
   await page.goto('/network/');
   await expect(page).toHaveTitle('関係ネットワーク | Art History Atlas');
+});
+
+test('Explore by Era は2列を保ったまま01〜08の章番号で読む順番を示す', async ({ page }) => {
+  await page.goto('/');
+  await page.setViewportSize({ width: 390, height: 844 });
+
+  const grid = page.locator('.home-era-index');
+  await expect(grid).toHaveCount(8);
+
+  // DOM順＝時系列順（01→02→03…）で、番号は視覚のみ（aria-hidden）
+  const indices = await grid.allTextContents();
+  expect(indices).toEqual(['01', '02', '03', '04', '05', '06', '07', '08']);
+  await expect(grid.first()).toHaveAttribute('aria-hidden', 'true');
+
+  // 2列グリッドを維持し、01→02 / 03→04 の順に読める配置になっている
+  const layout = await page.evaluate(() => {
+    const cells = Array.from(
+      document.querySelectorAll<HTMLElement>('.home-era-index'),
+    ).map((el) => {
+      const card = el.closest('a') as HTMLElement;
+      const r = card.getBoundingClientRect();
+      return { text: el.textContent?.trim() ?? '', top: Math.round(r.top), left: Math.round(r.left), height: Math.round(r.height) };
+    });
+    return {
+      cells,
+      columns: new Set(cells.map((c) => c.left)).size,
+    };
+  });
+  expect(layout.columns).toBe(2);
+  // 01と02は同じ行、03は次の行
+  expect(layout.cells[0].top).toBe(layout.cells[1].top);
+  expect(layout.cells[2].top).toBeGreaterThan(layout.cells[0].top);
+  expect(layout.cells[0].left).toBeLessThan(layout.cells[1].left);
+
+  // リンク名だけで遷移先が分かる
+  await expect(
+    page.getByRole('link', { name: /先史・古代、\d+件を見る/ }),
+  ).toBeVisible();
 });
