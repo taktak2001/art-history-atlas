@@ -3528,3 +3528,157 @@ html.dark .chronology-era--material {
 html.dark .chronology-era--digital {
   --era-accent: 133 166 199;
 }
+
+/* ムーブメント一覧の検索・絞り込み。
+   大きな囲み枠は使わず、細い罫線と余白でブロックを分ける。
+   フォーム部品は16px以上にしてiOSのフォーカス時オートズームを防ぐ。 */
+.movements-search {
+  margin-top: 1.5rem;
+}
+
+.movements-search__label {
+  display: block;
+  margin-bottom: 0.4rem;
+  color: rgb(var(--c-muted));
+  font-size: 0.75rem;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+}
+
+.movements-search__input {
+  width: 100%;
+  min-height: 2.75rem;
+  padding: 0.625rem 0.75rem;
+  border: 1px solid rgb(var(--c-line));
+  border-radius: 2px;
+  background: rgb(var(--c-raised));
+  color: rgb(var(--c-ink));
+  /* 16px未満にするとiOSがフォーカス時に自動ズームするため下げない */
+  font-size: 1rem;
+}
+
+.movements-search__input::placeholder {
+  color: rgb(var(--c-faint));
+}
+
+.movements-search__help {
+  margin-top: 0.4rem;
+  color: rgb(var(--c-faint));
+  font-size: 0.6875rem;
+  line-height: 1.6;
+}
+
+.movements-advanced {
+  margin-top: 1.25rem;
+  border-top: 1px solid rgb(var(--c-line));
+}
+
+.movements-advanced__toggle {
+  display: flex;
+  width: 100%;
+  min-height: 2.75rem;
+  align-items: center;
+  gap: 0.75rem;
+  padding-block: 0.75rem;
+  color: rgb(var(--c-ink));
+  text-align: left;
+}
+
+.movements-advanced__title {
+  font-size: 0.8125rem;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  white-space: nowrap;
+}
+
+.movements-advanced__summary {
+  overflow: hidden;
+  flex: 1;
+  color: rgb(var(--c-faint));
+  font-size: 0.75rem;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.movements-advanced__icon {
+  color: rgb(var(--c-muted));
+  font-size: 0.9rem;
+}
+
+.movements-advanced__panel {
+  display: grid;
+  gap: 0.75rem;
+  padding-bottom: 1rem;
+}
+
+@media (min-width: 640px) {
+  .movements-advanced__panel {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+@media (min-width: 1024px) {
+  .movements-advanced__panel {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+}
+
+.movements-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.375rem;
+  padding-bottom: 0.75rem;
+}
+
+.movements-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.25rem;
+  padding: 0.15rem 0.15rem 0.15rem 0.5rem;
+  border: 1px solid rgb(var(--c-line));
+  border-radius: 2px;
+  color: rgb(var(--c-muted));
+  font-size: 0.6875rem;
+}
+
+.movements-chip__clear {
+  min-width: 1.5rem;
+  min-height: 1.5rem;
+  color: rgb(var(--c-faint));
+}
+
+.movements-chip__clear:hover {
+  color: rgb(var(--c-ink));
+}
+
+.movements-chips__more {
+  align-self: center;
+  color: rgb(var(--c-faint));
+  font-size: 0.6875rem;
+}
+
+.movements-resultbar {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 1rem;
+  padding-block: 0.75rem;
+  border-top: 1px solid rgb(var(--c-line));
+}
+
+.movements-resultbar__count {
+  color: rgb(var(--c-muted));
+  font-size: 0.8125rem;
+}
+
+.movements-resultbar__clear {
+  min-height: 2.75rem;
+  color: rgb(var(--c-faint));
+  font-size: 0.75rem;
+  text-decoration: underline;
+  text-underline-offset: 0.25em;
+}
+
+.movements-resultbar__clear:hover {
+  color: rgb(var(--c-ink));
+}

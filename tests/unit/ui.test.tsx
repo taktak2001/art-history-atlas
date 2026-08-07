@@ -318,12 +318,79 @@ describe('LOD UI', () => {
     expect(screen.queryByText('現在の表示範囲では非表示')).not.toBeInTheDocument();
   });
 
-  it('一覧をフラット表示から階層表示へ切り替える', () => {
+  it('表示形式の切り替えUIを持たず、一覧は1種類に統一されている', () => {
     window.history.replaceState({}, '', '/movements/?lod=core');
     render(<MovementsExplorer />);
 
-    fireEvent.click(screen.getByRole('button', { name: '階層' }));
-    expect(document.querySelector('[data-movement-view="hierarchy"]')).toBeInTheDocument();
-    expect(screen.getByRole('heading', { name: '印象派周辺' })).toBeVisible();
+    expect(screen.queryByRole('group', { name: '表示形式' })).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: '階層' })).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'フラット' })).not.toBeInTheDocument();
+    expect(document.querySelector('[data-movement-view="hierarchy"]')).toBeNull();
+    expect(document.querySelector('[data-movement-view="flat"]')).toBeInTheDocument();
+  });
+
+  it('詳細条件は初期状態で閉じており、開閉できる', () => {
+    window.history.replaceState({}, '', '/movements/?lod=core');
+    render(<MovementsExplorer />);
+
+    const toggle = screen.getByRole('button', { name: /詳細条件/ });
+    expect(toggle).toHaveAttribute('aria-expanded', 'false');
+    expect(toggle).toHaveAttribute('aria-controls', 'advanced-filters');
+    expect(document.getElementById('advanced-filters')).toHaveAttribute('hidden');
+    // 条件未設定なら「条件なし」と要約する
+    expect(screen.getByText('条件なし')).toBeInTheDocument();
+
+    fireEvent.click(toggle);
+    expect(toggle).toHaveAttribute('aria-expanded', 'true');
+    expect(document.getElementById('advanced-filters')).not.toHaveAttribute('hidden');
+    expect(screen.getByLabelText('時代区分')).toBeInTheDocument();
+  });
+
+  it('検索欄は常時表示で、フォーム部品は16px以上（iOSの自動ズーム防止）', () => {
+    window.history.replaceState({}, '', '/movements/?lod=core');
+    render(<MovementsExplorer />);
+
+    const input = screen.getByLabelText('ムーブメントを検索');
+    expect(input).toBeVisible();
+    expect(input).toHaveAttribute('placeholder', 'ムーブメント名・作家・作品など');
+    expect(input).toHaveAttribute('aria-describedby', 'q-help');
+    expect(input).toHaveClass('movements-search__input');
+  });
+
+  it('詳細条件を閉じても選択条件がチップと要約で分かり、クリアできる', () => {
+    window.history.replaceState({}, '', '/movements/?lod=core');
+    render(<MovementsExplorer />);
+
+    const toggle = screen.getByRole('button', { name: /詳細条件/ });
+    fireEvent.click(toggle);
+    fireEvent.change(screen.getByLabelText('時代区分'), {
+      target: { value: 'renaissance' },
+    });
+    // 閉じても条件は維持され、見出しの要約とチップの両方に出る
+    fireEvent.click(toggle);
+    expect(toggle).toHaveAttribute('aria-expanded', 'false');
+    expect(document.querySelector('.movements-advanced__summary')).toHaveTextContent(
+      'ルネサンス',
+    );
+    expect(document.querySelector('.movements-chip')).toHaveTextContent('ルネサンス');
+
+    const clearChip = screen.getByRole('button', {
+      name: '絞り込み条件「ルネサンス」を解除',
+    });
+    fireEvent.click(clearChip);
+    expect(screen.getByText('条件なし')).toBeInTheDocument();
+  });
+
+  it('結果件数を「N件のムーブメント」で示し、条件がある時だけクリアを出す', () => {
+    window.history.replaceState({}, '', '/movements/?lod=core');
+    render(<MovementsExplorer />);
+
+    expect(screen.getByText(/\d+件のムーブメント/)).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: '条件をクリア' })).not.toBeInTheDocument();
+
+    fireEvent.change(screen.getByLabelText('ムーブメントを検索'), {
+      target: { value: 'バロック' },
+    });
+    expect(screen.getByRole('button', { name: '条件をクリア' })).toBeInTheDocument();
   });
 });
