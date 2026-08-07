@@ -121,13 +121,15 @@ const references: Record<string, ImageReference> = {
       'MOCA所蔵（Panza Collection）の作品単独ページ。ロスコ(d.1970)により保護期間内。本番表示は権利レビュー必須。',
   },
   'work-electric-dress': {
-    sourcePageUrl: 'https://artplatform.go.jp/collections/W411501',
-    provider: 'Art Platform Japan（所蔵：高松市美術館）',
+    sourcePageUrl:
+      'https://www.centrepompidou.fr/en/pompidou-plus/magazine/article/focus-on-denkifuku-atsuko-tanakas-electric-dress',
+    provider: 'Centre Pompidou',
+    imagePageUrl: 'https://artplatform.go.jp/collections/W411501',
     rightsStatus: 'permission-required',
-    accessed: ACCESSED,
-    verificationStatus: 'rights-review-required',
+    accessed: '2026-08-07',
+    verificationStatus: 'url-verified',
     verificationNote:
-      'Art Platform Japanの作品ページ（所蔵：高松市美術館。現存品は1986年の再制作）。田中敦子(d.2005)により保護期間内。インスタレーション撮影写真の権利も別途判定が必要。',
+      'ポンピドゥー・センターの作品解説記事。《電気服》の写真を複数掲載し、作者・年代のキャプションを伴うことを2026-08-07にブラウザで確認（掲載はポンピドゥー所蔵の1956/1999再制作）。所蔵記録としてArt Platform Japan（高松市美術館蔵・1986年再制作、W411501）を imagePageUrl に併記。田中敦子(d.2005)により保護期間内で、インスタレーション撮影写真の権利も別途判定が必要。',
   },
   'work-campbells-soup': {
     sourcePageUrl: 'https://www.moma.org/collection/works/79809',
@@ -202,13 +204,13 @@ const references: Record<string, ImageReference> = {
       '本データ《飛散/キャスティング》(1968–69) のオリジナルは消失。SFMOMA所蔵の同系スプラッシュ/キャスト作《Gutter Corner Splash: Night Shift》(1969/1995) を、美術館所蔵の関連作として参照。セラ(d.2024)保護期間内。',
   },
   'work-turrell-ganzfeld': {
-    sourcePageUrl: 'https://jamesturrell.com/',
-    provider: 'James Turrell（公式サイト／アーカイブ）',
+    sourcePageUrl: 'https://www.jmberlin.de/en/exhibition-james-turrell-aural',
+    provider: 'Jewish Museum Berlin',
     rightsStatus: 'permission-required',
-    accessed: ACCESSED,
-    verificationStatus: 'rights-review-required',
+    accessed: '2026-08-07',
+    verificationStatus: 'url-verified',
     verificationNote:
-      'ガンツフェルトは会場ごとに再制作されるサイト固有のシリーズで単独の恒久ページがない。作家公式サイトを暫定参照。タレル(b.1943)保護期間内。空間・光のインスタレーション写真の権利も別途判定。',
+      'ユダヤ博物館ベルリンのガンツフェルト作品《Aural》の展示ページ。作品解説と、光で満たされた空間の写真（キービジュアル／会場写真）を掲載していることを2026-08-07にブラウザで確認。ガンツフェルトは会場ごとに再制作されるサイト固有のシリーズで単独の恒久ページがないため、実作の写真と解説を伴う美術館ページを参照とする（作家公式サイト jamesturrell.com は工事中で作品情報を掲載していないことを確認）。タレル(b.1943)保護期間内。空間・光のインスタレーション写真の権利も別途判定。',
   },
   'work-irwin-scrim': {
     sourcePageUrl: 'https://whitney.org/exhibitions/robert-irwin',
