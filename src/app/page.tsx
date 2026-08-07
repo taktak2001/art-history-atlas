@@ -33,6 +33,12 @@ const turningPoints = [
 
 const primaryExplorationLinks = [
   {
+    // 利用頻度が高いため最上位に置く
+    href: '/movements/',
+    title: 'Movements',
+    description: '名前・時代・地域から探す',
+  },
+  {
     href: '/timeline/',
     title: 'Timeline',
     description: '年代と地域の重なりを見る',
@@ -79,9 +85,6 @@ export default function HomePage() {
           <h1 className="home-hero__title" aria-label="Art History Atlas">
             ART HISTORY ATLAS
           </h1>
-          <p className="home-hero__tagline">
-            発生・継承・転換から読む美術史。
-          </p>
         </div>
         <nav className="home-hero__actions" aria-label="主要な探索方法">
           {primaryExplorationLinks.map((item) => (
@@ -101,15 +104,22 @@ export default function HomePage() {
           description="時代ごとの価値基準から読む"
         />
         <div className="mt-5 grid grid-cols-2 gap-px bg-line sm:grid-cols-4">
-          {ERA_ORDER.map((era) => {
+          {ERA_ORDER.map((era, index) => {
             const count = movements.filter((m) => m.era === era).length;
             return (
               <Link
                 key={era}
                 href={`/chronology/#era-${era}`}
                 className="home-compact-card flex flex-col gap-1 bg-raised hover:bg-surface"
+                aria-label={`${ERA_LABELS[era]}、${count}件を見る`}
               >
-                <span className="font-serif text-lg">{ERA_LABELS[era]}</span>
+                {/* 章番号は時代名の左上に小さく添える（縦幅を増やさない） */}
+                <span className="flex items-baseline gap-2">
+                  <span className="home-era-index" aria-hidden="true">
+                    {String(index + 1).padStart(2, '0')}
+                  </span>
+                  <span className="font-serif text-lg">{ERA_LABELS[era]}</span>
+                </span>
                 <span className="text-xs text-faint">{count}件</span>
               </Link>
             );

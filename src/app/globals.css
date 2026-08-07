@@ -196,20 +196,22 @@ h1, h2, h3, h4 {
   white-space: nowrap;
 }
 
-.home-hero__tagline {
-  max-width: 36rem;
-  margin-top: clamp(0.75rem, 1.2vw, 0.875rem);
-  color: rgb(var(--c-muted));
-  font-size: clamp(0.9375rem, 1.5vw, 1.125rem);
-  letter-spacing: 0.03em;
-  line-height: 1.5;
-}
-
 .home-hero__actions {
   display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
-  margin-top: clamp(1.5rem, 2.5vw, 1.875rem);
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  /* キャッチコピー削除後、大見出しから区切り線までの余白をここで作る */
+  margin-top: clamp(2rem, 2.75vw, 2.5rem);
   border-block: 1px solid rgb(var(--c-line));
+}
+
+/* 「Explore by Era」の章番号。時代名より弱く見せ、読む順番だけを示す */
+.home-era-index {
+  color: rgb(var(--c-faint));
+  font-size: 0.6875rem;
+  font-weight: 500;
+  font-variant-numeric: tabular-nums;
+  letter-spacing: 0.14em;
+  line-height: 1;
 }
 
 .home-hero__cta {
@@ -352,7 +354,8 @@ html.dark .relation-badge {
 
   .home-hero__actions {
     grid-template-columns: 1fr;
-    margin-top: 1.5rem;
+    /* 大見出し直下〜区切り線をモバイルで28〜36pxに収める */
+    margin-top: 2rem;
   }
 
   .home-hero__cta {
