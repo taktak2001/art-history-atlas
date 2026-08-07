@@ -311,3 +311,60 @@ test('ダークモードでも時代と展示の階層を維持する', async ({
     });
   }
 });
+
+test('縦型年表：画像未収録作品はプレースホルダー全面が提供元への外部リンクになる', async ({
+  page,
+}) => {
+  await page.goto('/chronology/');
+
+  // 現代（もの派・スーパーフラット等、image:null の作品を含む展示）を展開する
+  await page.locator('#era-contemporary').getByRole('button').first().click();
+  await expect(page.locator('[data-chronology-movement]').first()).toBeVisible();
+
+  const sourceLink = page
+    .getByRole('link', { name: /提供元ページで見る（外部サイト）/ })
+    .first();
+  await expect(sourceLink).toBeVisible();
+  await expect(sourceLink).toHaveAttribute('target', '_blank');
+  await expect(sourceLink).toHaveAttribute('rel', /noopener/);
+  await expect(sourceLink).toHaveAttribute('href', /^https:\/\//);
+  await expect(sourceLink).toContainText('画像は提供元で確認');
+
+  // 未承認画像のサムネイルは出さない（プレースホルダー内に img を描画しない）
+  await expect(sourceLink.locator('img')).toHaveCount(0);
+  // リンクのネストを作らない
+  await expect(sourceLink.locator('a, button')).toHaveCount(0);
+});
+
+test('縦型年表：年代テキストと軸上の点が重ならない', async ({ page }) => {
+  await page.goto('/chronology/');
+  await page.locator('#era-prehistoric-ancient').getByRole('button').first().click();
+  await expect(page.locator('[data-chronology-movement]').first()).toBeVisible();
+
+  const overlaps = await page.evaluate(() => {
+    const rows = Array.from(
+      document.querySelectorAll('.chronology-movement, .chronology-event'),
+    );
+    const bad: { text: string; overlap: number }[] = [];
+    for (const row of rows) {
+      const start = row.querySelector(
+        '.chronology-movement__start, .chronology-event__year',
+      );
+      if (!start) continue;
+      const rowLeft = row.getBoundingClientRect().left;
+      const range = document.createRange();
+      range.selectNodeContents(start);
+      const glyphRight = range.getBoundingClientRect().right - rowLeft;
+      const dotLeft = parseFloat(getComputedStyle(row, '::before').left);
+      if (glyphRight > dotLeft) {
+        bad.push({
+          text: start.textContent?.trim() ?? '',
+          overlap: Math.round((glyphRight - dotLeft) * 10) / 10,
+        });
+      }
+    }
+    return bad;
+  });
+
+  expect(overlaps).toEqual([]);
+});

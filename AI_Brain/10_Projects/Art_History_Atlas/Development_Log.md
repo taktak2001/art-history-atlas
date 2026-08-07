@@ -138,3 +138,24 @@ Phase 2 現在の件数: movements 30 / artists **64** / works **75**（画像41
 - 非リンクのプレースホルダー文言は「画像は権利確認後に収録予定」に統一。
 - 検証: check（unit 210）+ 静的ビルドで面ごとの出力（詳細/ムーブメント=外部リンク、Timeline/Network/Chronology=0）
   と `<a>` 非ネストを確認 + Playwright/axe **250 passed**。
+
+### 追記（2026-08-07）: 縦型年表にも導線追加＋年代と点の重なり修正
+
+ユーザー要望により、当初「一覧性重視のため非表示」としていた **Chronology（縦型年表）にも
+全面リンク型プレースホルダーを追加**（1ムーブメント1作品で密度が低いため方針を変更）。
+
+- `ChronologyView`: `image===null` かつ `imageReference` ありのとき、代表作品を内部 `<Link>` で
+  包まず `WorkImage showReferenceLink` を使う（`<a>` ネスト回避）。キャプションを内部リンクにする。
+- `globals.css`: `.chronology-work__image > a` を背景・モバイル aspect-ratio の対象へ追加。
+- **年代テキストと軸上の点の重なりを修正**（実測値ベース）:
+  - 原因: 年代フォントが `clamp(1.75rem, 3vw, 2.55rem)` で viewport に応じて伸びるのに、
+    点(`left:5rem`)とレール(`5.35rem`)が固定だったため。1280pxで4桁年が88.2px、点が80px開始＝**8.2px重なり**。
+    最長表記「前40000」は最大約117px（デスクトップ）、モバイルでも9.5px重なりを確認。
+  - 対応（≥768px）: 年代カラム `6.75rem→7.75rem` / 点 `left:5rem→8.15rem` / レール `5.35rem→8.525rem`
+    / `.chronology-relationship` の左カラムも `7.75rem` へ整合。
+  - 対応（≤767px）: 年代カラム `4.8rem→5.75rem` / 点 `4.15rem→5.4rem` / レール `4.5rem→5.775rem`
+    / relationship 左カラム `5.75rem`。
+  - 結果: 重なり **-8.2px → 余白 +42.2px**（1280px時）。
+- E2E追加: Chronologyの外部リンク属性・サムネイル非表示・`<a>`非ネスト、および
+  **年代グリフ右端と点の左端の幾何チェック**（回帰防止、desktop/mobile両方）。
+- 検証: check（unit 210）+ 静的ビルド + Playwright/axe **254 passed**。

@@ -2807,7 +2807,8 @@ html.dark .timeline-era-option[aria-current='true'] {
 
 .chronology-exhibit__rail::before {
   position: absolute;
-  inset: 0 auto 0 5.35rem;
+  /* 年代テキスト（最長「前40000」は最大約117px）の右に軸を置く。点の中心と一致させる。 */
+  inset: 0 auto 0 8.525rem;
   width: 1px;
   background: rgb(var(--era-accent) / 0.28);
   content: '';
@@ -2817,7 +2818,8 @@ html.dark .timeline-era-option[aria-current='true'] {
 .chronology-event {
   position: relative;
   display: grid;
-  grid-template-columns: 6.75rem minmax(0, 1fr);
+  /* 年代カラムは最長表記「前40000」（最大約117px）を収める幅にする */
+  grid-template-columns: 7.75rem minmax(0, 1fr);
   gap: 2rem;
   padding-block: 2.75rem;
 }
@@ -2826,7 +2828,8 @@ html.dark .timeline-era-option[aria-current='true'] {
 .chronology-event::before {
   position: absolute;
   top: 3.15rem;
-  left: 5rem;
+  /* 年代テキストの右端より外側に置き、数字と重ならないようにする */
+  left: 8.15rem;
   z-index: 2;
   width: 0.75rem;
   height: 0.75rem;
@@ -2890,7 +2893,9 @@ html.dark .timeline-era-option[aria-current='true'] {
   color: rgb(var(--c-muted));
 }
 
+/* 画像未収録時は WorkImage が <a>（全面リンク）を描画するため a も対象にする */
 .chronology-work__image > div,
+.chronology-work__image > a,
 .chronology-work__image figure > div {
   background: rgb(var(--c-paper) / 0.6);
 }
@@ -3013,7 +3018,8 @@ html.dark .timeline-era-option[aria-current='true'] {
   position: relative;
   display: grid;
   min-height: 4.5rem;
-  grid-template-columns: 6.75rem auto minmax(0, 1fr) auto;
+  /* 年代カラム幅の変更に合わせ、左ガターの基準を揃える */
+  grid-template-columns: 7.75rem auto minmax(0, 1fr) auto;
   gap: 0.75rem;
   align-items: center;
   color: rgb(var(--c-faint));
@@ -3303,12 +3309,14 @@ html.dark .timeline-era-option[aria-current='true'] {
   }
 
   .chronology-exhibit__rail::before {
-    left: 4.5rem;
+    /* 点の中心に合わせる（年代テキストの右外側） */
+    left: 5.775rem;
   }
 
   .chronology-movement,
   .chronology-event {
-    grid-template-columns: 4.8rem minmax(0, 1fr);
+    /* 最長表記「前40000」を収める幅にし、軸と重ならないようにする */
+    grid-template-columns: 5.75rem minmax(0, 1fr);
     gap: 0.75rem;
     padding-block: 2.25rem;
   }
@@ -3316,7 +3324,7 @@ html.dark .timeline-era-option[aria-current='true'] {
   .chronology-movement::before,
   .chronology-event::before {
     top: 2.65rem;
-    left: 4.15rem;
+    left: 5.4rem;
   }
 
   .chronology-movement__start,
@@ -3339,6 +3347,7 @@ html.dark .timeline-era-option[aria-current='true'] {
   }
 
   .chronology-work__image > div,
+  .chronology-work__image > a,
   .chronology-work__image figure > div {
     aspect-ratio: 16 / 10;
   }
@@ -3399,7 +3408,8 @@ html.dark .timeline-era-option[aria-current='true'] {
 
   .chronology-relationship {
     min-height: 4rem;
-    grid-template-columns: 4.8rem auto minmax(0, 1fr) auto;
+    /* 年代カラム幅の変更に合わせる */
+    grid-template-columns: 5.75rem auto minmax(0, 1fr) auto;
     gap: 0.5rem;
   }
 
