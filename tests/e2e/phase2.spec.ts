@@ -55,9 +55,10 @@ test('iPhone幅でもゴシック美術の概要が文の途中で切れない',
 });
 
 for (const movement of [
-  { slug: 'prehistoric-ritual', title: '先史美術' },
-  { slug: 'italian-renaissance', title: 'イタリア・ルネサンス' },
-  { slug: 'mono-ha', title: 'もの派' },
+  // 注意書きの見出しは内容ごとに具体化している（一律の「学説上の注意」にしない）
+  { slug: 'prehistoric-ritual', title: '先史美術', note: '年代の精度について' },
+  { slug: 'italian-renaissance', title: 'イタリア・ルネサンス', note: '年代の扱い' },
+  { slug: 'mono-ha', title: 'もの派', note: '運動としてのまとまり' },
 ]) {
   test(`${movement.title}の詳細が8章の図録構成で表示される`, async ({ page }) => {
     await page.goto(`/movements/${movement.slug}/`);
@@ -67,7 +68,11 @@ for (const movement of [
     await expect(page.getByRole('heading', { name: '思想と歴史的背景' })).toBeVisible();
     await expect(page.getByRole('heading', { name: '代表作品', exact: true })).toBeVisible();
     await expect(page.getByRole('heading', { name: '出典', exact: true })).toBeVisible();
-    await expect(page.getByText('学説上の注意')).toBeVisible();
+    await expect(
+      page.getByRole('heading', { level: 3, name: movement.note }),
+    ).toBeVisible();
+    // 汎用の見出しは使わない
+    await expect(page.getByText('学説上の注意')).toHaveCount(0);
   });
 }
 
@@ -172,7 +177,7 @@ test('詳細本文の小見出しは全章でセリフ体に統一し、UIメタ
     '見た目の特徴',
     '色彩・光',
     '制作制度',
-    '学説上の注意',
+    '年代の扱い',
   ]) {
     await expect(
       page.getByRole('heading', { level: 3, name: title }),

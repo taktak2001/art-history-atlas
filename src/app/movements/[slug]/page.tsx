@@ -122,18 +122,23 @@ function Field({ label, value }: { label: string; value?: string }) {
 
 function Passage({
   kind,
+  heading,
   children,
 }: {
-  kind: '学説上の注意' | '鑑賞ポイント';
+  kind: 'scholarly-note' | '鑑賞ポイント';
+  /** 注意書きの具体的な見出し（例: 系譜について / 年代の扱い） */
+  heading?: string;
   children: ReactNode;
 }) {
-  if (kind === '学説上の注意') {
+  if (kind === 'scholarly-note') {
     return (
       <aside
         aria-labelledby="scholarly-note-title"
         className="max-w-[42em] border-l-2 border-accent/55 bg-surface/70 px-5 py-4 sm:px-6"
       >
-        <MovementSubheading id="scholarly-note-title">{kind}</MovementSubheading>
+        <MovementSubheading id="scholarly-note-title">
+          {heading ?? '年代の扱い'}
+        </MovementSubheading>
         <div className="detail-body mt-4 text-[15px] leading-[1.95] text-ink sm:text-base">
           {typeof children === 'string' ? toDisplayText(children) : children}
         </div>
@@ -326,8 +331,20 @@ export default async function MovementDetailPage({
             <Field label="技術革新との関連" value={movement.technologyContext} />
             <Field label="主な主題" value={movement.subjects} />
           </div>
-          {movement.dates.note && (
-            <Passage kind="学説上の注意">{movement.dates.note}</Passage>
+          {/* 研究上の留保があればその具体的な見出しで、無ければ年代の範囲説明として示す */}
+          {movement.scholarlyNote ? (
+            <Passage
+              kind="scholarly-note"
+              heading={movement.scholarlyNote.heading}
+            >
+              {movement.scholarlyNote.body}
+            </Passage>
+          ) : (
+            movement.dates.note && (
+              <Passage kind="scholarly-note" heading="年代の扱い">
+                {movement.dates.note}
+              </Passage>
+            )
           )}
         </div>
       </Chapter>
