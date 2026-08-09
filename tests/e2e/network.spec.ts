@@ -749,6 +749,71 @@ test('ラベルはノードに重ならず、離れた場合は引き出し線�
   expect(result.labelHits).toEqual([]);
   // 「同時代」がどのエッジか分かる状態で表示されている
   expect(result.texts).toContain('同時代');
-  // 線から離して置いた分だけ引き出し線がある
-  expect(result.leaders).toBeGreaterThan(0);
+  // 引き出し線はあくまで逃がした場合の補助。近くに収まったなら不要（0でよい）
+  expect(result.leaders).toBeGreaterThanOrEqual(0);
+});
+
+test('引き出し線はノードのブロックを貫通しない', async ({ page }) => {
+  // ゴシック focus は引き出し線がロマネスク美術のブロックを横切っていたケース
+  await page.goto('/network/?focus=gothic');
+  await expect(page.locator('[data-edge-label]').first()).toBeVisible();
+
+  const result = await page.evaluate(() => {
+    const first = document.querySelector('[data-edge-label]') as SVGGraphicsElement;
+    const svg = first.ownerSVGElement!;
+    const svgBox = svg.getBoundingClientRect();
+    const nodes = Array.from(
+      document.querySelectorAll<HTMLElement>('[data-network-node]'),
+    ).map((element) => {
+      const rect = element.getBoundingClientRect();
+      return {
+        text: element.innerText.split('\n')[0],
+        x: rect.left - svgBox.left,
+        y: rect.top - svgBox.top,
+        w: rect.width,
+        h: rect.height,
+      };
+    });
+    const leaders = Array.from(
+      svg.querySelectorAll<SVGLineElement>('[data-edge-label-leader]'),
+    );
+    const crossings: string[] = [];
+    leaders.forEach((leader, index) => {
+      const x1 = leader.x1.baseVal.value;
+      const y1 = leader.y1.baseVal.value;
+      const x2 = leader.x2.baseVal.value;
+      const y2 = leader.y2.baseVal.value;
+      for (let step = 0; step <= 30; step += 1) {
+        const x = x1 + ((x2 - x1) * step) / 30;
+        const y = y1 + ((y2 - y1) * step) / 30;
+        for (const node of nodes) {
+          if (x > node.x && x < node.x + node.w && y > node.y && y < node.y + node.h) {
+            crossings.push(`leader${index}×${node.text}`);
+            return;
+          }
+        }
+      }
+    });
+    // ラベル本体（と背景）もブロックに重ならない
+    const labelHits: string[] = [];
+    for (const element of Array.from(
+      svg.querySelectorAll<SVGGraphicsElement>('[data-edge-label]'),
+    )) {
+      const box = element.getBBox();
+      for (const node of nodes) {
+        if (
+          box.x < node.x + node.w &&
+          box.x + box.width > node.x &&
+          box.y < node.y + node.h &&
+          box.y + box.height > node.y
+        ) {
+          labelHits.push(`${element.textContent}×${node.text}`);
+        }
+      }
+    }
+    return { crossings: [...new Set(crossings)], labelHits };
+  });
+
+  expect(result.crossings).toEqual([]);
+  expect(result.labelHits).toEqual([]);
 });

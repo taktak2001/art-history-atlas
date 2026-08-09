@@ -1,6 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import type { NetworkEdgeGeometry } from '@/lib/network-geometry';
 import {
+  segmentIntersectsRect,
   cubicNormalAt,
   cubicPointAt,
   estimateLabelWidth,
@@ -200,12 +201,45 @@ describe('network label layout', () => {
       }
     });
 
+    it('引き出し線がノードを貫通する位置を選ばない', () => {
+      // エッジの左側にノードがあるので、左へ逃がすと引き出し線がノードを横切る
+      const blocking: Rect = { x: 300, y: 220, width: 166, height: 60 };
+      const obstacles: Obstacle[] = [{ rect: blocking, kind: 'node' }];
+      const [placement] = layoutEdgeLabels(
+        [label('a', straightEdge(560, 120, 560, 360))],
+        obstacles,
+        viewport,
+      );
+      if (placement.needsLeader) {
+        expect(
+          segmentIntersectsRect(placement.anchor, { x: placement.x, y: placement.y }, blocking),
+        ).toBe(false);
+      }
+      expect(rectsOverlap(placement.rect, blocking, LABEL_GAP.node)).toBe(false);
+    });
+
     it('ラベルは常に返す（非表示にしない）', () => {
       // 密集した10本でも全件配置を返す
       const inputs = Array.from({ length: 10 }, (_, index) =>
         label(`e${index}`, straightEdge(400, 300, 460, 300 + index)),
       );
       expect(layoutEdgeLabels(inputs, [], viewport)).toHaveLength(10);
+    });
+  });
+
+  describe('segmentIntersectsRect', () => {
+    const rect: Rect = { x: 100, y: 100, width: 100, height: 50 };
+
+    it('矩形を横切る線分を検出する', () => {
+      expect(segmentIntersectsRect({ x: 50, y: 125 }, { x: 250, y: 125 }, rect)).toBe(true);
+    });
+
+    it('矩形を通らない線分は false', () => {
+      expect(segmentIntersectsRect({ x: 50, y: 40 }, { x: 250, y: 40 }, rect)).toBe(false);
+    });
+
+    it('線分が矩形の手前で終わる場合は false', () => {
+      expect(segmentIntersectsRect({ x: 0, y: 125 }, { x: 90, y: 125 }, rect)).toBe(false);
     });
   });
 
