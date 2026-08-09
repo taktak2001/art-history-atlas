@@ -359,12 +359,33 @@ test('ノードのダブルタップでは遷移せず、下部の詳細リン�
   );
 });
 
-test('線ラベルは背景矩形を使わない', async ({ page }) => {
+test('線ラベルの背景は線を隠すためだけの最小限にする（pill状にしない）', async ({
+  page,
+}) => {
   await page.goto('/network/');
   const labels = page.locator('[data-network-layer="edge-labels"]');
+  const labelCount = await labels.locator('text[data-edge-label]').count();
+  expect(labelCount).toBeGreaterThan(0);
 
-  await expect(labels.locator('rect')).toHaveCount(0);
-  expect(await labels.locator('text[data-edge-label]').count()).toBeGreaterThan(0);
+  // バックプレートはラベルと同数、かつ枠線・影・大きな角丸を持たない
+  const plates = labels.locator('[data-edge-label-backplate]');
+  await expect(plates).toHaveCount(labelCount);
+  await expect(labels.locator('rect:not([data-edge-label-backplate])')).toHaveCount(0);
+
+  const style = await plates.first().evaluate((element) => {
+    const computed = getComputedStyle(element);
+    return {
+      stroke: computed.stroke,
+      filter: computed.filter,
+      rx: element.getAttribute('rx'),
+      height: (element as SVGGraphicsElement).getBBox().height,
+    };
+  });
+  expect(style.stroke === 'none' || style.stroke === '').toBe(true);
+  expect(style.filter === 'none' || style.filter === '').toBe(true);
+  expect(style.rx).toBeNull();
+  // 文字を隠す最小限の高さ（pillのような大きな塊にしない）
+  expect(style.height).toBeLessThanOrEqual(22);
 });
 
 test('PCで時代ジャンプと左右キーにより現代まで移動できる', async ({ page }) => {
@@ -548,4 +569,104 @@ test('focus付きURLは再読込で同じ状態を復元し、無効なfocusは�
   await expect(page.locator('[data-network-node]').first()).toBeVisible();
   await expect(page).not.toHaveURL(/focus=/);
   expect(errors).toEqual([]);
+});
+
+test('関係ラベルは密集しても互いに重ならず、全件表示される', async ({ page }) => {
+  // ミニマリズムは反発/継承/影響/同時代/地域的展開が1点へ集まっていたケース
+  await page.goto('/network/?focus=minimalism');
+
+  // focusの自動調整が終わって表示が落ち着いてから測る
+  await expect(
+    page.locator('.network-scope-option[aria-pressed="true"]'),
+  ).toHaveText('このムーブメント');
+  await expect(page.locator('[data-edge-label]').first()).toBeVisible();
+
+  const result = await page.evaluate(() => {
+    const first = document.querySelector('[data-edge-label]') as SVGGraphicsElement;
+    const svg = first.ownerSVGElement!;
+    const labels = Array.from(
+      svg.querySelectorAll<SVGGraphicsElement>('[data-edge-label]'),
+    );
+    const boxes = labels.map((element) => {
+      const box = element.getBBox();
+      return {
+        text: element.textContent ?? '',
+        x: box.x,
+        y: box.y,
+        w: box.width,
+        h: box.height,
+      };
+    });
+    const overlaps: string[] = [];
+    for (let i = 0; i < boxes.length; i += 1) {
+      for (let j = i + 1; j < boxes.length; j += 1) {
+        const a = boxes[i];
+        const b = boxes[j];
+        if (
+          a.x < b.x + b.w &&
+          a.x + a.w > b.x &&
+          a.y < b.y + b.h &&
+          a.y + a.h > b.y
+        ) {
+          overlaps.push(`${a.text}×${b.text}`);
+        }
+      }
+    }
+    const viewBox = svg.viewBox.baseVal;
+    const outside = boxes
+      .filter(
+        (box) =>
+          box.x < viewBox.x - 1 ||
+          box.y < viewBox.y - 1 ||
+          box.x + box.w > viewBox.x + viewBox.width + 1 ||
+          box.y + box.h > viewBox.y + viewBox.height + 1,
+      )
+      .map((box) => box.text);
+    return {
+      labelCount: labels.length,
+      backplateCount: svg.querySelectorAll('[data-edge-label-backplate]').length,
+      overlaps,
+      outside,
+    };
+  });
+
+  expect(result.labelCount).toBeGreaterThanOrEqual(3);
+  // ラベル同士が重ならない
+  expect(result.overlaps).toEqual([]);
+  // 画面外へ出さない
+  expect(result.outside).toEqual([]);
+  // ラベルは消さず、線が文字を貫通しないようバックプレートを敷く
+  expect(result.backplateCount).toBe(result.labelCount);
+});
+
+test('全体表示でラベルが密集してもラベル同士が重ならない', async ({ page }) => {
+  await page.goto('/network/?scope=all');
+
+  await expect(page.locator('[data-edge-label]').first()).toBeVisible();
+
+  const { count, overlaps } = await page.evaluate(() => {
+    const first = document.querySelector('[data-edge-label]') as SVGGraphicsElement;
+    const svg = first.ownerSVGElement!;
+    const boxes = Array.from(
+      svg.querySelectorAll<SVGGraphicsElement>('[data-edge-label]'),
+    ).map((element) => {
+      const box = element.getBBox();
+      return { text: element.textContent ?? '', x: box.x, y: box.y, w: box.width, h: box.height };
+    });
+    const hits: string[] = [];
+    for (let i = 0; i < boxes.length; i += 1) {
+      for (let j = i + 1; j < boxes.length; j += 1) {
+        const a = boxes[i];
+        const b = boxes[j];
+        if (a.x < b.x + b.w && a.x + a.w > b.x && a.y < b.y + b.h && a.y + a.h > b.y) {
+          hits.push(`${a.text}×${b.text}`);
+        }
+      }
+    }
+    return { count: boxes.length, overlaps: hits };
+  });
+
+  // 端末幅によって同時表示数は変わるため、件数より重なりゼロを主眼に検証する
+  expect(count).toBeGreaterThanOrEqual(3);
+  expect(overlaps).toEqual([]);
 });
