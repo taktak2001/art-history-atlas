@@ -12,6 +12,7 @@ import Link from 'next/link';
 import { useSearchParams, useRouter } from 'next/navigation';
 import { movements, worksOf } from '@/lib/dataset';
 import { WorkImage } from './WorkImage';
+import { MovementPicker } from './MovementPicker';
 import {
   compareSections,
   parseCompareIds,
@@ -33,6 +34,8 @@ export function CompareBoard() {
   );
   const [exitingId, setExitingId] = useState<string | null>(null);
   const [copied, setCopied] = useState(false);
+  const [pickerOpen, setPickerOpen] = useState(false);
+  const addTriggerRef = useRef<HTMLButtonElement | null>(null);
   const removeTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const selected = useMemo(() => compareMovements(ids), [ids]);
@@ -90,7 +93,6 @@ export function CompareBoard() {
     }
   };
 
-  const candidates = movements.filter((m) => !ids.includes(m.id));
   const missingCount = Math.max(0, MIN_COMPARE - ids.length);
   const accentStyle = (id: string) =>
     ({
@@ -102,22 +104,37 @@ export function CompareBoard() {
       {/* 追加コントロール */}
       <div className="compare-controls border hairline bg-surface p-4">
         <div className="flex flex-wrap items-center gap-3">
-          <label htmlFor="add-movement" className="text-sm text-muted">
-            比較に追加（{MIN_COMPARE}〜{MAX_COMPARE}件）
-          </label>
-          <select
-            id="add-movement"
-            value=""
-            onChange={(e) => add(e.target.value)}
-            disabled={ids.length >= MAX_COMPARE || Boolean(exitingId)}
-            className="min-h-11 rounded-sm border hairline bg-raised px-2 py-2 text-sm text-ink disabled:opacity-50"
-          >
-            <option value="">ムーブメントを選択…</option>
-            {candidates.map((m) => (
-              <option key={m.id} value={m.id}>{m.nameJa}</option>
-            ))}
-          </select>
-          <span className="text-sm tabular-nums text-faint">{ids.length}/{MAX_COMPARE}件</span>
+          <p className="text-sm text-muted">
+            比較するムーブメント{' '}
+            <span className="tabular-nums text-faint">
+              {ids.length}/{MAX_COMPARE}
+            </span>
+          </p>
+          <div className="compare-add">
+            <button
+              ref={addTriggerRef}
+              type="button"
+              onClick={() => setPickerOpen((open) => !open)}
+              aria-expanded={pickerOpen}
+              aria-haspopup="dialog"
+              disabled={ids.length >= MAX_COMPARE || Boolean(exitingId)}
+              className="compare-add__trigger"
+              data-compare-add
+            >
+              ＋ ムーブメントを追加
+            </button>
+            <MovementPicker
+              open={pickerOpen}
+              onClose={() => setPickerOpen(false)}
+              selectedIds={ids}
+              onToggle={(movement) => {
+                if (ids.includes(movement.id)) remove(movement.id);
+                else add(movement.id);
+              }}
+              max={MAX_COMPARE}
+              triggerRef={addTriggerRef}
+            />
+          </div>
           {ids.length >= MIN_COMPARE && (
             <button
               type="button"

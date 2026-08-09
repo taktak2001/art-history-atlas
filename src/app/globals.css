@@ -3722,3 +3722,211 @@ html.dark .chronology-era--digital {
     transition: none;
   }
 }
+
+/* 検索可能なムーブメントピッカー。
+   iOSの巨大なネイティブselectをやめ、美術館の索引に近い静かな検索UIにする。
+   モバイル=ボトムシート / デスクトップ=トリガー直下のポップオーバー。 */
+.movement-picker {
+  position: fixed;
+  z-index: 60;
+  inset: 0;
+}
+
+.movement-picker__scrim {
+  position: absolute;
+  inset: 0;
+  background: rgb(0 0 0 / 0.32);
+}
+
+.movement-picker__panel {
+  position: absolute;
+  right: 0;
+  bottom: 0;
+  left: 0;
+  display: flex;
+  max-height: 92vh;
+  flex-direction: column;
+  border-top: 1px solid rgb(var(--c-line));
+  background: rgb(var(--c-paper));
+  padding-bottom: env(safe-area-inset-bottom);
+}
+
+.movement-picker__header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  padding: 0.9rem 1rem 0.6rem;
+  border-bottom: 1px solid rgb(var(--c-line));
+}
+
+.movement-picker__title {
+  font-family: var(--font-serif);
+  font-size: 1.05rem;
+  color: rgb(var(--c-ink));
+}
+
+.movement-picker__close {
+  min-width: 2.75rem;
+  min-height: 2.75rem;
+  color: rgb(var(--c-muted));
+  font-size: 1.1rem;
+}
+
+.movement-picker__search {
+  padding: 0.75rem 1rem 0.5rem;
+  border-bottom: 1px solid rgb(var(--c-line));
+}
+
+.movement-picker__input {
+  width: 100%;
+  min-height: 2.75rem;
+  padding: 0.55rem 0.75rem;
+  border: 1px solid rgb(var(--c-line));
+  border-radius: 2px;
+  background: rgb(var(--c-raised));
+  color: rgb(var(--c-ink));
+  /* 16px未満だとiOSがフォーカス時に自動ズームする */
+  font-size: 1rem;
+}
+
+.movement-picker__status,
+.movement-picker__count,
+.movement-picker__limit {
+  color: rgb(var(--c-faint));
+  font-size: 0.72rem;
+}
+
+.movement-picker__status {
+  margin-top: 0.4rem;
+}
+
+.movement-picker__selected {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 0.75rem;
+  padding: 0.5rem 1rem;
+}
+
+.movement-picker__results {
+  overflow-y: auto;
+  flex: 1;
+  padding: 0 1rem 0.5rem;
+}
+
+.movement-picker__group + .movement-picker__group {
+  margin-top: 0.9rem;
+}
+
+.movement-picker__group-title {
+  padding: 0.5rem 0 0.3rem;
+  color: rgb(var(--c-faint));
+  font-size: 0.68rem;
+  font-weight: 700;
+  letter-spacing: 0.14em;
+}
+
+.movement-picker__option {
+  display: grid;
+  width: 100%;
+  min-height: 2.75rem;
+  gap: 0.15rem;
+  padding: 0.6rem 0.1rem;
+  border-top: 1px solid rgb(var(--c-line));
+  text-align: left;
+}
+
+.movement-picker__option:hover:not(:disabled),
+.movement-picker__option[data-active='true'] {
+  background: rgb(var(--c-surface));
+}
+
+.movement-picker__option:disabled {
+  opacity: 0.4;
+}
+
+.movement-picker__name {
+  color: rgb(var(--c-ink));
+  font-family: var(--font-serif);
+  font-size: 0.95rem;
+}
+
+.movement-picker__meta,
+.movement-picker__selected-mark {
+  color: rgb(var(--c-faint));
+  font-size: 0.7rem;
+}
+
+.movement-picker__empty {
+  padding: 1.5rem 0;
+  color: rgb(var(--c-muted));
+  font-size: 0.85rem;
+  text-align: center;
+}
+
+.movement-picker__footer {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  padding: 0.7rem 1rem 0.9rem;
+  border-top: 1px solid rgb(var(--c-line));
+  background: rgb(var(--c-paper));
+}
+
+.movement-picker__done {
+  min-height: 2.75rem;
+  padding: 0 1.1rem;
+  border: 1px solid rgb(var(--c-line));
+  border-radius: 2px;
+  color: rgb(var(--c-ink));
+  font-size: 0.85rem;
+}
+
+/* デスクトップはトリガー直下のポップオーバー */
+@media (min-width: 640px) {
+  .movement-picker {
+    position: absolute;
+    inset: auto;
+    z-index: 60;
+    top: calc(100% + 0.4rem);
+    left: 0;
+  }
+
+  .movement-picker__scrim {
+    display: none;
+  }
+
+  .movement-picker__panel {
+    position: static;
+    width: min(34rem, calc(100vw - 2rem));
+    max-height: min(30rem, 70vh);
+    border: 1px solid rgb(var(--c-line));
+  }
+}
+
+/* 比較ページの操作領域をコンパクトに */
+.compare-add {
+  position: relative;
+}
+
+.compare-add__trigger {
+  display: inline-flex;
+  min-height: 2.75rem;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0 0.9rem;
+  border: 1px solid rgb(var(--c-line));
+  border-radius: 2px;
+  color: rgb(var(--c-ink));
+  font-size: 0.85rem;
+}
+
+.compare-add__trigger:hover:not(:disabled) {
+  background: rgb(var(--c-surface));
+}
+
+.compare-add__trigger:disabled {
+  opacity: 0.5;
+}
