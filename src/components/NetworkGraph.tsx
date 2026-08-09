@@ -632,7 +632,7 @@ export function NetworkGraph({ movements, relationships, eraOrder }: Props) {
             id: relationship.id,
             geometry,
             width: estimateLabelWidth(text, labelFontSize) + 6,
-            height: labelFontSize + 6,
+            height: labelFontSize + 4,
             priority: touchesSelection ? 0 : inSubgraph ? 1 : 2,
           } satisfies LabelInput,
         };

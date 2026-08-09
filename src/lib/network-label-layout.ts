@@ -36,14 +36,26 @@ export const LABEL_LEADER_THRESHOLD = 44;
 
 export const LABEL_PENALTY = {
   label: 1000,
-  node: 1000,
+  /**
+   * ノード（ブロック）への重なりは最優先で避ける。
+   * 他の衝突より十分大きくして、「ラベル同士が近い」「線から遠い」を許容してでも
+   * ブロックの上に載らないようにする。
+   */
+  node: 5000,
   arrow: 500,
   viewport: 1000,
+  /** 引き出し線がノードを貫通する（＝謎の線に見える）のを避ける */
+  leaderCrossesNode: 900,
   /** 線から離れるほど小さなペナルティ */
   distance: 2,
 } as const;
 
+/** 距離ペナルティを頭打ちにする距離（px） */
+export const LABEL_MAX_DISTANCE_PENALTY_AT = 40;
+
 /** ラベル同士・ノードとの最小すき間（px） */
+// ノードの隙間（モバイルは行間84 - ノード高58 = 26px）へ収まる値にする。
+// 大きくしすぎると隙間に入れず、かえってノードの上に載る。
 export const LABEL_GAP = { label: 4, node: 5 } as const;
 
 export type ObstacleKind = 'node' | 'arrow' | 'label';
@@ -115,14 +127,60 @@ export function viewportOverflowRatio(rect: Rect, viewport: Rect): number {
   return 1 - (overlapW * overlapH) / area;
 }
 
+/**
+ * 線分が矩形と交差するか（スラブ法）。
+ * 引き出し線がノードを横切らないか判定するために使う。
+ */
+export function segmentIntersectsRect(
+  from: Point,
+  to: Point,
+  rect: Rect,
+): boolean {
+  const dx = to.x - from.x;
+  const dy = to.y - from.y;
+  let tMin = 0;
+  let tMax = 1;
+
+  const clip = (delta: number, start: number, min: number, max: number) => {
+    if (delta === 0) return start >= min && start <= max;
+    const t1 = (min - start) / delta;
+    const t2 = (max - start) / delta;
+    const near = Math.min(t1, t2);
+    const far = Math.max(t1, t2);
+    tMin = Math.max(tMin, near);
+    tMax = Math.min(tMax, far);
+    return tMax >= tMin;
+  };
+
+  if (!clip(dx, from.x, rect.x, rect.x + rect.width)) return false;
+  if (!clip(dy, from.y, rect.y, rect.y + rect.height)) return false;
+  return tMax >= tMin;
+}
+
 /** ラベル候補の衝突スコア（小さいほど良い） */
 export function scoreLabelPlacement(
   rect: Rect,
   obstacles: Obstacle[],
   viewport: Rect,
   distanceFromEdge: number,
+  /** 引き出し線を引く場合の始点（エッジ上の点）。ノード貫通を採点する。 */
+  leaderFrom?: Point,
 ): number {
-  let score = Math.abs(distanceFromEdge) * LABEL_PENALTY.distance;
+  // 距離のペナルティには上限を設ける。
+  // 上限が無いと「遠いが衝突しない位置」が「近いがノードに重なる位置」に負けてしまう。
+  let score =
+    Math.min(Math.abs(distanceFromEdge), LABEL_MAX_DISTANCE_PENALTY_AT) *
+    LABEL_PENALTY.distance;
+
+  if (leaderFrom) {
+    const center = { x: rect.x + rect.width / 2, y: rect.y + rect.height / 2 };
+    for (const obstacle of obstacles) {
+      if (obstacle.kind !== 'node') continue;
+      if (segmentIntersectsRect(leaderFrom, center, obstacle.rect)) {
+        score += LABEL_PENALTY.leaderCrossesNode;
+      }
+    }
+  }
 
   for (const obstacle of obstacles) {
     const gap =
@@ -198,7 +256,14 @@ function findBestPlacement(
           y: point.y + normal.y * offset,
         };
         const rect = rectAround(center, input.width, input.height);
-        const score = scoreLabelPlacement(rect, placed, viewport, offset);
+        const needsLeader = Math.abs(offset) >= LABEL_LEADER_THRESHOLD;
+        const score = scoreLabelPlacement(
+          rect,
+          placed,
+          viewport,
+          offset,
+          needsLeader ? point : undefined,
+        );
         if (score >= bestScore) continue;
         bestScore = score;
         best = {
@@ -209,7 +274,7 @@ function findBestPlacement(
           offset,
           rect,
           anchor: point,
-          needsLeader: Math.abs(offset) >= LABEL_LEADER_THRESHOLD,
+          needsLeader,
           collided: score >= LABEL_PENALTY.arrow,
         };
       }
