@@ -3687,3 +3687,10 @@ html.dark .chronology-era--digital {
 .movements-resultbar__clear:hover {
   color: rgb(var(--c-ink));
 }
+
+/* 関係ネットワーク：focus時の自動調整を示す小さな補助テキスト（通知カードにはしない） */
+.network-controls__auto-note {
+  color: rgb(var(--c-faint));
+  font-size: 0.6875rem;
+  line-height: 1.5;
+}

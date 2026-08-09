@@ -47,5 +47,18 @@ export function useLodState(defaultLod: VisibilityLevel) {
     [hasExplicitChoice],
   );
 
-  return { lod, setLod, applyPurposeDefault, hasExplicitChoice };
+  /**
+   * 既定値へ戻し、URLからも lod を取り除く。
+   * （focus解除時など「遷移前の通常状態」へ復帰させるために使う）
+   */
+  const clearLod = useCallback(() => {
+    setLodState(defaultLod);
+    setHasExplicitChoice(false);
+    if (typeof window === 'undefined') return;
+    const url = new URL(window.location.href);
+    url.searchParams.delete('lod');
+    window.history.replaceState(window.history.state, '', url);
+  }, [defaultLod]);
+
+  return { lod, setLod, applyPurposeDefault, clearLod, hasExplicitChoice };
 }

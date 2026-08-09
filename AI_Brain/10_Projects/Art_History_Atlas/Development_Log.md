@@ -196,3 +196,28 @@ Phase 2 現在の件数: movements 30 / artists **64** / works **75**（画像41
 - 影響したテストを更新: LOD共通表示は主要3画面（timeline/chronology/network）に変更、
   地域フィルタE2Eは詳細条件を開いてから操作するよう修正。
 - 検証: unit **214** / Playwright+axe **256 passed**。
+
+## 詳細→ネットワーク遷移の文脈反映（2026-08-09・PR #70）
+
+詳細ページから `?focus=` で来ても LOD=基本 / 表示関係=重要関係 のままで、直接関係の
+standard/detailed ノードや「重要関係」外のエッジが欠落していた問題を解消。
+
+- 新ライブラリ `src/lib/network-focus-context.ts`（純粋関数）:
+  `getDirectEdges` / `getDirectNodeIds` / `getHighestVisibilityLevel` /
+  `resolveFocusContext` / `parseRelationScope`。**1ホップに限定**し2ホップへ広げない。
+- **必要な最小LODを自動判定**（core<standard<detailed）。常に「すべて」へ上げない。
+  例: 日本水墨画は直接関係1件・相手がstandard → **基本→充実**へ自動調整。
+- 表示関係に **`focus`（このムーブメント）** を追加し、focus付き遷移時の初期値に。
+  focus直結エッジは importance / LOD を理由に落とさない（関係タイプの手動選択のみ適用）。
+  Relationshipデータ自体は不変。
+- 「このムーブメント」表示では直接関係ノードのみ描画（非関連ノードは非表示）。
+  focusノードはLODに関わらず常に表示。
+- 件数表示はサブグラフ基準（「直接関係N件・Mノード表示中」）に切替。
+  自動調整時のみ小さな補助テキスト「表示に合わせて『充実』へ自動調整」。
+- URL: `focus` / `lod` / `scope` を同期し、再読込・戻る・共有で復元。basePath維持。
+  無効focusは通常表示へフォールバック（コンソールエラーなし）。
+- **手動変更の尊重**: 自動調整は「URL由来のfocusの初回」だけ。`useLodState` に `clearLod()`
+  を追加し、選択解除時は focus/scope/lod をURLから外して全体表示（重要関係）へ戻す。
+  グラフ内のノードクリックでは自動調整しない（当初これが既存テスト2件を壊して発覚）。
+  LOD手動変更時も focus は保持する（従来は選択が解除されていた）。
+- 検証: unit **226**（focus-context 12件を含む） / Playwright+axe **262 passed**。

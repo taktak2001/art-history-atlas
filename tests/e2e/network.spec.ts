@@ -466,3 +466,86 @@ for (const zoom of [1.25, 1.5]) {
     expect(box!.height).toBeGreaterThan(200);
   });
 }
+
+test('詳細ページから関係ネットワークへ移ると直接関係が欠落せず表示される', async ({
+  page,
+}) => {
+  await page.goto('/movements/japanese-ink-painting/');
+  await page.getByRole('link', { name: /関係ネットワーク/ }).first().click();
+
+  // 1. focus が URL に載る
+  await expect(page).toHaveURL(/focus=japanese-ink-painting/);
+
+  // 2. 選択状態になる
+  const focusNode = page.locator('[data-network-node][aria-pressed="true"]');
+  await expect(focusNode).toHaveCount(1);
+  await expect(focusNode).toContainText('日本水墨画');
+
+  // 3. 直接関係を出すために必要な最小LOD（充実）へ自動変更される
+  await expect(
+    page.locator('[data-lod-control] button[aria-pressed="true"]'),
+  ).toContainText('充実');
+  await expect(page).toHaveURL(/lod=standard/);
+
+  // 4. 表示関係が「このムーブメント」になる
+  const scopeSelected = page.locator('.network-scope-option[aria-pressed="true"]');
+  await expect(scopeSelected).toHaveText('このムーブメント');
+  await expect(page).toHaveURL(/scope=focus/);
+
+  // 5. 直接関係先（中国山水画）が表示され、非関連ノードは出ない
+  await expect(page.getByText('中国山水画').first()).toBeVisible();
+  await expect(page.locator('[data-network-node]')).toHaveCount(2);
+
+  // 6. 全体寄りではなくサブグラフの件数を出す
+  await expect(page.locator('.network-controls__count')).toContainText('直接関係');
+
+  // 7. 自動調整の理由を小さく添える
+  await expect(page.locator('.network-controls__auto-note')).toContainText('自動調整');
+});
+
+test('focus中は手動変更を尊重し、選択解除で全体表示へ戻る', async ({ page }) => {
+  await page.goto('/network/?focus=japanese-ink-painting');
+  await expect(page).toHaveURL(/scope=focus/);
+
+  // 手動でLODを基本へ戻しても、自動設定へ巻き戻さない
+  await page
+    .locator('[data-lod-control] button')
+    .filter({ hasText: '基本' })
+    .click();
+  await expect(page).toHaveURL(/lod=core/);
+  await expect(page).toHaveURL(/focus=japanese-ink-painting/);
+  // focusノードと直接関係はLODに関わらず表示し続ける
+  await expect(page.locator('[data-network-node]')).toHaveCount(2);
+  await expect(
+    page.locator('.network-scope-option[aria-pressed="true"]'),
+  ).toHaveText('このムーブメント');
+
+  // 選択解除で focus を外し、「重要関係」の全体表示へ戻る
+  await page.getByRole('button', { name: '選択を解除' }).click();
+  await expect(page).not.toHaveURL(/focus=/);
+  await expect(
+    page.locator('.network-scope-option[aria-pressed="true"]'),
+  ).toHaveText('重要関係');
+  await expect(page.locator('.network-controls__count')).toContainText('関係・');
+});
+
+test('focus付きURLは再読込で同じ状態を復元し、無効なfocusは通常表示へ落ちる', async ({
+  page,
+}) => {
+  await page.goto('/network/?focus=japanese-ink-painting&lod=standard&scope=focus');
+  await expect(
+    page.locator('.network-scope-option[aria-pressed="true"]'),
+  ).toHaveText('このムーブメント');
+  await expect(
+    page.locator('[data-lod-control] button[aria-pressed="true"]'),
+  ).toContainText('充実');
+  await expect(page.locator('[data-network-node][aria-pressed="true"]')).toHaveCount(1);
+
+  // 無効な focus はエラーにせず通常表示
+  const errors: string[] = [];
+  page.on('pageerror', (error) => errors.push(String(error)));
+  await page.goto('/network/?focus=not-a-real-movement');
+  await expect(page.locator('[data-network-node]').first()).toBeVisible();
+  await expect(page).not.toHaveURL(/focus=/);
+  expect(errors).toEqual([]);
+});
