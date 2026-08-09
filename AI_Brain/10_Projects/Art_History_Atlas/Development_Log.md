@@ -441,3 +441,26 @@ label-label / label-node / viewport overflow はすべて 0 を維持。
 全体実行で `network.spec.ts`「強調線」と `timeline.spec.ts`「近代では対象範囲」が各1回落ちたが、
 いずれも単独・`--repeat-each=2` で安定し、再実行で全件成功（276 passed）。
 **本変更による回帰ではなく既存の並列実行フレーク**。
+
+## 検索可能なムーブメントピッカー（2026-08-09・PR #79）
+
+比較ページの追加UIが**54件のネイティブselect**で、目的の項目を見つけられなかった問題を解消。
+
+- 共通ロジック `src/lib/movement-picker.ts`（純粋関数）:
+  `searchMovements`（既存の検索インデックスを再利用し、日本語名・英語名・別名・作家・作品でヒット）/
+  `groupMovementsByEra` / `describeMovement`（年代｜地域）/ `getInitialMovements`（最近選択→基本LOD）/
+  `readRecentIds` `pushRecentId`（localStorage、**Movement IDのみ**最大8件）/
+  `canAdd` `addSelection` `removeSelection`（重複防止・上限・選択順維持）。
+- 共通UI `src/components/MovementPicker.tsx`:
+  モバイル=ボトムシート（ヘッダー・検索欄固定、safe-area対応）/ デスクトップ=トリガー直下ポップオーバー。
+  検索・グループ化・行表示は共通。`role="dialog"` + `aria-modal` + `combobox` + `role="listbox/option"`、
+  `aria-live` で件数通知、↑↓移動・Enter選択・Escape閉じ・フォーカストラップ・閉じたらトリガーへ復帰。
+- 比較ページ: ネイティブselectを撤去し「＋ ムーブメントを追加」トリガー＋件数表示へ。操作領域が縦に短縮。
+- 4件上限: 未選択項目を `disabled` にし「比較できるのは最大4件です」を表示。既存項目の削除は常に可能。
+- 検索欄は16pxでiOSの自動ズームを回避。
+- 実測: ネイティブselect **0件**、`キュビスム`/`surrealism`/`ピカソ`/`モナ・リザ` いずれも該当ムーブメントに到達。
+  選択→URL `?ids=` 同期→チップ→履歴保存まで確認。
+- 検証: unit **279**（picker 20件）/ Playwright+axe **286 passed**。
+
+**再利用の余地（未実施）**: ホーム検索・ネットワークのフォーカス選択・タイムラインのジャンプへは
+まだ差し替えていない。ロジックとUIは共通化済みなので、各画面の置き換えは差分のみで可能。
