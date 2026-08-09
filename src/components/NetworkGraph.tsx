@@ -1200,6 +1200,19 @@ export function NetworkGraph({ movements, relationships, eraOrder }: Props) {
               const text = RELATION_LABELS[relationship.kind];
               return (
                 <g key={relationship.id}>
+                  {/* 線から離して置いた場合は、どのエッジのラベルか分かるよう引き出し線を描く */}
+                  {placement.needsLeader && (
+                    <line
+                      x1={placement.anchor.x}
+                      y1={placement.anchor.y}
+                      x2={placement.x}
+                      y2={placement.y}
+                      stroke={RELATION_COLOR[relationship.kind]}
+                      strokeWidth="1"
+                      strokeOpacity="0.5"
+                      data-edge-label-leader
+                    />
+                  )}
                   {/* 線が文字を貫通しないための小さな紙色バックプレート（pillにしない） */}
                   <rect
                     x={placement.rect.x}

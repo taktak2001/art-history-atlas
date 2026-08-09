@@ -182,6 +182,24 @@ describe('network label layout', () => {
       expect(rectsOverlap(high.rect, low.rect)).toBe(false);
     });
 
+    it('ノードで塞がれていても引き出し線付きで逃がし、重ならない', () => {
+      // 縦のエッジ経路上に大きなノードが居座るケース（北方ルネサンス相当）
+      const nodeRect: Rect = { x: 420, y: 200, width: 166, height: 60 };
+      const obstacles: Obstacle[] = [{ rect: nodeRect, kind: 'node' }];
+      const [placement] = layoutEdgeLabels(
+        [label('a', straightEdge(503, 120, 503, 340))],
+        obstacles,
+        viewport,
+      );
+      expect(rectsOverlap(placement.rect, nodeRect, LABEL_GAP.node)).toBe(false);
+      // 大きく離した場合は引き出し線でどのエッジか示す
+      if (Math.abs(placement.offset) >= 44) {
+        expect(placement.needsLeader).toBe(true);
+        // 引き出し線の始点はエッジ上にある
+        expect(placement.anchor.x).toBeCloseTo(503, 5);
+      }
+    });
+
     it('ラベルは常に返す（非表示にしない）', () => {
       // 密集した10本でも全件配置を返す
       const inputs = Array.from({ length: 10 }, (_, index) =>
