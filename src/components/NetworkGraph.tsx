@@ -59,6 +59,7 @@ import {
   type RelationScope,
 } from '@/lib/network-focus-context';
 import { parseFocus, buildFocusQuery } from '@/lib/network';
+import { AccordionChevron } from '@/components/AccordionChevron';
 
 type Props = {
   movements: Movement[];
@@ -915,7 +916,8 @@ export function NetworkGraph({ movements, relationships, eraOrder }: Props) {
               aria-controls="network-line-guide-panel"
               aria-expanded={isLineGuideOpen}
             >
-              線の見方 <span aria-hidden="true">ⓘ</span>
+              線の見方
+              <AccordionChevron open={isLineGuideOpen} />
             </summary>
             <div
               id="network-line-guide-panel"

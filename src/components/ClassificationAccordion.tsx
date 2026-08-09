@@ -1,6 +1,7 @@
 'use client';
 
 import { useRef, useState, type KeyboardEvent } from 'react';
+import { AccordionChevron } from './AccordionChevron';
 
 export type ClassificationItem = {
   id: string;
@@ -170,12 +171,7 @@ export function ClassificationAccordion({
                     {item.summary}
                   </span>
                 </span>
-                <span
-                  aria-hidden="true"
-                  className="mt-1 flex h-7 w-7 shrink-0 items-center justify-center rounded-full border hairline font-sans text-lg leading-none text-accent transition-colors duration-150 group-hover:bg-surface sm:mt-0"
-                >
-                  {isOpen ? '−' : '＋'}
-                </span>
+                <AccordionChevron open={isOpen} />
               </button>
             </h3>
 

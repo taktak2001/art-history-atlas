@@ -12,6 +12,7 @@ import {
 } from '@/lib/relationship-definitions';
 import type { RelationKind } from '@/lib/schema';
 import { RelationLineSample } from '@/components/RelationLine';
+import { AccordionChevron } from './AccordionChevron';
 
 function DefinitionList({
   items,
@@ -66,7 +67,7 @@ export function RelationshipStandards() {
             onClick={() => setReadingOpen((current) => !current)}
           >
             <span>関係データの読み方</span>
-            <span aria-hidden="true">{readingOpen ? '−' : '＋'}</span>
+            <AccordionChevron open={readingOpen} />
           </button>
         </h3>
         <div
@@ -123,12 +124,10 @@ export function RelationshipStandards() {
                       {item.shortDefinition}
                     </span>
                   </span>
-                  <span
-                    aria-hidden="true"
+                  <AccordionChevron
+                    open={isOpen}
                     className="relationship-accordion__icon"
-                  >
-                    {isOpen ? '−' : '＋'}
-                  </span>
+                  />
                 </button>
               </h3>
 
