@@ -30,8 +30,13 @@ import {
   RelationLineSample,
 } from '@/components/RelationLine';
 import {
+  estimateLabelWidth,
+  layoutEdgeLabels,
+  type LabelInput,
+  type Obstacle,
+} from '@/lib/network-label-layout';
+import {
   getNetworkEdgeGeometry,
-  getNetworkEdgeLabelPoint,
   getNetworkEdgeRouteOffset,
   getNetworkViewBox,
   getParallelEdgeRouteOffset,
@@ -574,6 +579,114 @@ export function NetworkGraph({ movements, relationships, eraOrder }: Props) {
     window.requestAnimationFrame(() => centerEdge(relationship));
   };
 
+  const labelFontSize = isMobile ? 11 : 10;
+
+  /**
+   * 関係ラベルの配置。中点固定をやめ、線の近くで衝突しない位置を選ぶ。
+   * 選択ノード直結 → 1ホップ内 → その他 の順に位置を確定し、
+   * 先に重要なラベルへ読める場所を与える。
+   * 依存は選択・LOD・scope・レイアウト（=リサイズ/回転を含む）だけなので、
+   * スクロール中に毎フレーム再計算されない。
+   */
+  const edgeLabelPlacements = useMemo(() => {
+    const entries = visibleEdges
+      .map((relationship) => {
+        const geometry = getEdgeGeometry(relationship, layout, visibleEdges);
+        if (!geometry) return null;
+        const showLabel =
+          selectedEdgeId === relationship.id ||
+          focusedEdgeId === relationship.id ||
+          (selectedNodeId &&
+            (relationship.from === selectedNodeId ||
+              relationship.to === selectedNodeId)) ||
+          (!selectionActive && idleLabelIds.has(relationship.id));
+        if (!showLabel) return null;
+
+        const touchesSelection =
+          selectedNodeId === relationship.from || selectedNodeId === relationship.to;
+        const anchorSide: 'start' | 'middle' | 'end' =
+          selectedNodeId === relationship.from
+            ? 'start'
+            : selectedNodeId === relationship.to
+              ? 'end'
+              : 'middle';
+        const inSubgraph = Boolean(
+          focusContext &&
+            focusContext.directNodeIds.has(relationship.from) &&
+            focusContext.directNodeIds.has(relationship.to),
+        );
+        const text = RELATION_LABELS[relationship.kind];
+        return {
+          relationship,
+          geometry,
+          anchor: anchorSide,
+          input: {
+            id: relationship.id,
+            geometry,
+            width: estimateLabelWidth(text, labelFontSize) + 6,
+            height: labelFontSize + 6,
+            priority: touchesSelection ? 0 : inSubgraph ? 1 : 2,
+          } satisfies LabelInput,
+        };
+      })
+      .filter((item): item is NonNullable<typeof item> => item !== null);
+
+    if (entries.length === 0) return [];
+
+    // ノード矩形（タイトル・年代を含む枠）を障害物にする
+    const obstacles: Obstacle[] = displayedMovements.flatMap((movement) => {
+      const position = layout.positions.get(movement.id);
+      if (!position) return [];
+      return [
+        {
+          rect: {
+            x: position.x,
+            y: position.y,
+            width: layout.nodeW,
+            height: layout.nodeH,
+          },
+          kind: 'node' as const,
+        },
+      ];
+    });
+    // 矢印先端付近も避ける
+    for (const entry of entries) {
+      obstacles.push({
+        rect: {
+          x: entry.geometry.targetBoundary.x - 7,
+          y: entry.geometry.targetBoundary.y - 7,
+          width: 14,
+          height: 14,
+        },
+        kind: 'arrow' as const,
+      });
+    }
+
+    const placements = layoutEdgeLabels(
+      entries.map((entry) => entry.input),
+      obstacles,
+      { x: 0, y: 0, width: layout.canvasW, height: layout.canvasH },
+    );
+    const byId = new Map(entries.map((entry) => [entry.relationship.id, entry]));
+    return placements.flatMap((placement) => {
+      const entry = byId.get(placement.id);
+      return entry
+        ? [{ placement, relationship: entry.relationship, anchor: entry.anchor }]
+        : [];
+    });
+  }, [
+    displayedMovements,
+    focusContext,
+    focusedEdgeId,
+    idleLabelIds,
+    labelFontSize,
+    layout,
+    selectedEdgeId,
+    selectedNodeId,
+    selectionActive,
+    visibleEdges,
+  ]);
+
   const setKindFilter = (kind: RelationKindFilter) => {
     setSelectedNodeId(null);
     setSelectedEdgeId(null);
@@ -1083,50 +1196,34 @@ export function NetworkGraph({ movements, relationships, eraOrder }: Props) {
             aria-hidden="true"
             data-network-layer="edge-labels"
           >
-            {visibleEdges.map((relationship) => {
-              const geometry = getEdgeGeometry(
-                relationship,
-                layout,
-                visibleEdges,
-              );
-              if (!geometry) return null;
-              const showLabel =
-                selectedEdgeId === relationship.id ||
-                focusedEdgeId === relationship.id ||
-                (selectedNodeId &&
-                  (relationship.from === selectedNodeId ||
-                    relationship.to === selectedNodeId)) ||
-                (!selectionActive && idleLabelIds.has(relationship.id));
-              if (!showLabel) return null;
-              const labelAnchor =
-                selectedNodeId === relationship.from
-                  ? 'start'
-                  : selectedNodeId === relationship.to
-                    ? 'end'
-                    : 'middle';
-              const labelPoint = getNetworkEdgeLabelPoint(
-                geometry,
-                labelAnchor,
-              );
-
+            {edgeLabelPlacements.map(({ placement, relationship, anchor }) => {
+              const text = RELATION_LABELS[relationship.kind];
               return (
-                <text
-                  key={relationship.id}
-                  x={labelPoint.x}
-                  y={labelPoint.y - 6}
-                  textAnchor="middle"
-                  fill={RELATION_COLOR[relationship.kind]}
-                  stroke="rgb(var(--c-raised))"
-                  strokeWidth="3.5"
-                  strokeOpacity="0.76"
-                  paintOrder="stroke"
-                  fontSize="10"
-                  fontWeight="700"
-                  data-edge-label
-                  data-edge-label-anchor={labelAnchor}
-                >
-                  {RELATION_LABELS[relationship.kind]}
-                </text>
+                <g key={relationship.id}>
+                  {/* 線が文字を貫通しないための小さな紙色バックプレート（pillにしない） */}
+                  <rect
+                    x={placement.rect.x}
+                    y={placement.rect.y}
+                    width={placement.rect.width}
+                    height={placement.rect.height}
+                    fill="rgb(var(--c-raised))"
+                    fillOpacity="0.88"
+                    data-edge-label-backplate
+                  />
+                  <text
+                    x={placement.x}
+                    y={placement.y}
+                    textAnchor="middle"
+                    dominantBaseline="central"
+                    fill={RELATION_COLOR[relationship.kind]}
+                    fontSize={labelFontSize}
+                    fontWeight="700"
+                    data-edge-label
+                    data-edge-label-anchor={anchor}
+                  >
+                    {text}
+                  </text>
+                </g>
               );
             })}
           </svg>
