@@ -10,6 +10,7 @@ import {
   getRectangleBoundaryPoint,
   NETWORK_ARROW_GAP,
   NETWORK_SVG_SAFE_PADDING,
+  getSharedCorridorOffset,
 } from '@/lib/network-geometry';
 import { RELATION_LINE_STYLE } from '@/lib/network-presentation';
 import { RELATION_LABELS, type RelationKind } from '@/lib/schema';
@@ -221,5 +222,72 @@ describe('shared relation markers', () => {
     expect(lines[0]).toHaveAttribute('stroke-width', '2.8');
     expect(lines[1]).toHaveAttribute('stroke-width', '4.6');
     expect(container.querySelectorAll('marker')).toHaveLength(1);
+  });
+});
+
+describe('同じ縦経路を共有するエッジの分離', () => {
+  const positions = new Map([
+    ['ital', { x: 600, y: 158 }],
+    ['north', { x: 600, y: 242 }],
+    ['mann', { x: 600, y: 326 }],
+    ['other', { x: 900, y: 158 }],
+  ]);
+
+  it('同じ列でy範囲が重なるエッジへ左右のレーンを割り当てる', () => {
+    const edges = [
+      { id: 'e-contemporary', from: 'ital', to: 'north' },
+      { id: 'e-reaction', from: 'mann', to: 'ital' },
+    ];
+    const offsets = edges.map((edge) =>
+      getSharedCorridorOffset(edge, edges, positions),
+    );
+    // 1本目は中央、2本目はずらす（＝完全に重ならない）
+    expect(offsets[0]).toBe(0);
+    expect(Math.abs(offsets[1])).toBeGreaterThan(0);
+  });
+
+  it('横向きのエッジや単独のエッジはずらさない', () => {
+    const horizontal = [{ id: 'h', from: 'ital', to: 'other' }];
+    expect(getSharedCorridorOffset(horizontal[0], horizontal, positions)).toBe(0);
+
+    const lonely = [{ id: 'v', from: 'ital', to: 'north' }];
+    expect(getSharedCorridorOffset(lonely[0], lonely, positions)).toBe(0);
+  });
+
+  it('y範囲が重ならない縦エッジは分離しない', () => {
+    const separated = [
+      { id: 'a', from: 'ital', to: 'north' },
+      { id: 'b', from: 'north', to: 'mann' },
+    ];
+    // 端点を共有するだけ（区間が重ならない）ならレーン分割は不要
+    const offsets = separated.map((edge) =>
+      getSharedCorridorOffset(edge, separated, positions),
+    );
+    expect(offsets).toEqual([0, 0]);
+  });
+
+  it('lateralOffset は縦のエッジを横方向へずらす', () => {
+    const base = getNetworkEdgeGeometry(
+      { x: 600, y: 158 },
+      { x: 600, y: 326 },
+      166,
+      60,
+      true,
+      undefined,
+      0,
+      0,
+    );
+    const shifted = getNetworkEdgeGeometry(
+      { x: 600, y: 158 },
+      { x: 600, y: 326 },
+      166,
+      60,
+      true,
+      undefined,
+      0,
+      22,
+    );
+    // curveOffset(y加算)では動かない縦線が、lateralOffsetでは確実に横へ動く
+    expect(Math.abs(shifted.midX - base.midX)).toBeGreaterThan(5);
   });
 });

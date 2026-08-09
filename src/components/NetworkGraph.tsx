@@ -40,6 +40,7 @@ import {
   getNetworkEdgeRouteOffset,
   getNetworkViewBox,
   getParallelEdgeRouteOffset,
+  getSharedCorridorOffset,
   NETWORK_SVG_SAFE_PADDING,
   type NetworkEdgeGeometry,
 } from '@/lib/network-geometry';
@@ -111,6 +112,12 @@ function getEdgeGeometry(
     relationship,
     visibleEdges,
   );
+  // 同じ縦の経路を共有する別ペアのエッジを分離し、線が重なって消えないようにする
+  const corridorOffset = getSharedCorridorOffset(
+    relationship,
+    visibleEdges,
+    layout.positions,
+  );
   const routeOffset =
     obstacleOffset === 0
       ? parallelOffset
@@ -124,6 +131,7 @@ function getEdgeGeometry(
     RELATION_LINE_STYLE[relationship.kind].arrow,
     undefined,
     routeOffset,
+    corridorOffset,
   );
 }
 

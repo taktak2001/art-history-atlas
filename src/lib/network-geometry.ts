@@ -69,6 +69,12 @@ export function getNetworkEdgeGeometry(
   directed: boolean,
   arrowGap = NETWORK_ARROW_GAP,
   curveOffset = 0,
+  /**
+   * 線の進行方向に対して「垂直」へずらす量。
+   * curveOffset は y にだけ加算するため横向きの線にしか効かない。
+   * 縦に重なる線を分離するにはこちらを使う。
+   */
+  lateralOffset = 0,
 ): NetworkEdgeGeometry {
   const fromCenter = {
     x: fromPosition.x + nodeWidth / 2,
@@ -99,13 +105,18 @@ export function getNetworkEdgeGeometry(
   const distance = Math.max(Math.hypot(dx, dy), 1);
   const unit = { x: dx / distance, y: dy / distance };
   const handle = Math.min(64, Math.max(22, distance * 0.22));
+  // 進行方向に垂直な単位ベクトル
+  const perpendicular = { x: -unit.y, y: unit.x };
   const firstControl = {
-    x: start.x + Math.sign(dx || 1) * Math.min(Math.abs(dx) * 0.42, 92),
-    y: start.y + curveOffset,
+    x:
+      start.x +
+      Math.sign(dx || 1) * Math.min(Math.abs(dx) * 0.42, 92) +
+      perpendicular.x * lateralOffset,
+    y: start.y + curveOffset + perpendicular.y * lateralOffset,
   };
   const secondControl = {
-    x: end.x - unit.x * handle,
-    y: end.y - unit.y * handle + curveOffset,
+    x: end.x - unit.x * handle + perpendicular.x * lateralOffset,
+    y: end.y - unit.y * handle + curveOffset + perpendicular.y * lateralOffset,
   };
   const midX =
     start.x * 0.125 +
@@ -246,4 +257,60 @@ export function getParallelEdgeRouteOffset(
 
 export function getNetworkViewBox(width: number, height: number): string {
   return `0 0 ${width} ${height}`;
+}
+
+/** 同じ縦の経路を共有する（＝重なって見えなくなる）エッジを分離するための間隔 */
+export const NETWORK_CORRIDOR_SPACING = 22;
+
+type PositionedEdge = {
+  id: string;
+  from: string;
+  to: string;
+};
+
+/**
+ * 同一列を縦に走るエッジ同士が完全に重なって「線が消える」のを防ぐ。
+ *
+ * 同じペア間の平行エッジは getParallelEdgeRouteOffset が扱うが、
+ * 別ペアでも同じ列の同じ区間を通る場合（例: A→B と C→A が B を貫く）は
+ * 軌道が一致してしまうため、y範囲が重なるものへ左右交互のオフセットを与える。
+ */
+export function getSharedCorridorOffset(
+  edge: PositionedEdge,
+  edges: Iterable<PositionedEdge>,
+  positions: Map<string, Point>,
+  spacing = NETWORK_CORRIDOR_SPACING,
+): number {
+  const from = positions.get(edge.from);
+  const to = positions.get(edge.to);
+  if (!from || !to) return 0;
+  // 縦方向（同じ列）でなければ対象外
+  if (Math.abs(from.x - to.x) > 1) return 0;
+
+  const span = (a: Point, b: Point) => ({
+    min: Math.min(a.y, b.y),
+    max: Math.max(a.y, b.y),
+  });
+  const self = span(from, to);
+
+  // 同じ列を縦に走り、y範囲が重なるエッジを集める
+  const corridor = Array.from(edges)
+    .filter((candidate) => {
+      const candidateFrom = positions.get(candidate.from);
+      const candidateTo = positions.get(candidate.to);
+      if (!candidateFrom || !candidateTo) return false;
+      if (Math.abs(candidateFrom.x - candidateTo.x) > 1) return false;
+      if (Math.abs(candidateFrom.x - from.x) > 1) return false;
+      const other = span(candidateFrom, candidateTo);
+      return other.min < self.max && other.max > self.min;
+    })
+    .sort((a, b) => a.id.localeCompare(b.id));
+
+  if (corridor.length <= 1) return 0;
+
+  const index = corridor.findIndex((candidate) => candidate.id === edge.id);
+  if (index <= 0) return 0;
+  // 1本目は中央のまま、以降を左右交互へ振り分ける
+  const lane = Math.floor((index + 1) / 2);
+  return (index % 2 === 1 ? -1 : 1) * lane * spacing;
 }

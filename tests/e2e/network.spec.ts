@@ -363,24 +363,34 @@ test('線ラベルの背景は線を隠すためだけの最小限にする（pi
   page,
 }) => {
   await page.goto('/network/');
-  const labels = page.locator('[data-network-layer="edge-labels"]');
-  const labelCount = await labels.locator('text[data-edge-label]').count();
-  expect(labelCount).toBeGreaterThan(0);
+  await expect(page.locator('[data-edge-label]').first()).toBeVisible();
 
-  // バックプレートはラベルと同数、かつ枠線・影・大きな角丸を持たない
-  const plates = labels.locator('[data-edge-label-backplate]');
-  await expect(plates).toHaveCount(labelCount);
-  await expect(labels.locator('rect:not([data-edge-label-backplate])')).toHaveCount(0);
-
-  const style = await plates.first().evaluate((element) => {
-    const computed = getComputedStyle(element);
+  // ラベル数とバックプレート数は描画確定後に一度で読む（途中経過で数が変わるため）
+  const counts = await page.evaluate(() => {
+    const layer = document.querySelector('[data-network-layer="edge-labels"]')!;
     return {
-      stroke: computed.stroke,
-      filter: computed.filter,
-      rx: element.getAttribute('rx'),
-      height: (element as SVGGraphicsElement).getBBox().height,
+      labels: layer.querySelectorAll('text[data-edge-label]').length,
+      backplates: layer.querySelectorAll('[data-edge-label-backplate]').length,
+      otherRects: layer.querySelectorAll('rect:not([data-edge-label-backplate])')
+        .length,
     };
   });
+  expect(counts.labels).toBeGreaterThan(0);
+  expect(counts.backplates).toBe(counts.labels);
+  expect(counts.otherRects).toBe(0);
+
+  const style = await page
+    .locator('[data-edge-label-backplate]')
+    .first()
+    .evaluate((element) => {
+      const computed = getComputedStyle(element);
+      return {
+        stroke: computed.stroke,
+        filter: computed.filter,
+        rx: element.getAttribute('rx'),
+        height: (element as SVGGraphicsElement).getBBox().height,
+      };
+    });
   expect(style.stroke === 'none' || style.stroke === '').toBe(true);
   expect(style.filter === 'none' || style.filter === '').toBe(true);
   expect(style.rx).toBeNull();
