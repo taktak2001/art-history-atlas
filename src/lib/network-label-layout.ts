@@ -22,6 +22,17 @@ export const LABEL_PROGRESS_CANDIDATES = [
 export const LABEL_NORMAL_OFFSETS = [0, -8, 8, -14, 14, -20, 20];
 /** 第2フォールバックで使う拡張オフセット */
 export const LABEL_FALLBACK_OFFSETS = [-26, 26, -32, 32, -40, 40];
+/**
+ * 第3フォールバック。ここまで離すと線との対応が視覚的に切れるため、
+ * 採用した場合はリーダー線（引き出し線）を描いてどのエッジのラベルか示す。
+ */
+export const LABEL_LEADER_OFFSETS = [
+  // ノード幅（148〜166px）を確実に越えられる距離まで用意する。
+  // 引き出し線で対応関係を示すため、離れても「どのエッジのラベルか」は保てる。
+  -56, 56, -72, 72, -96, 96, -118, 118, -140, 140,
+];
+/** リーダー線を描き始めるオフセットの閾値 */
+export const LABEL_LEADER_THRESHOLD = 44;
 
 export const LABEL_PENALTY = {
   label: 1000,
@@ -150,6 +161,10 @@ export type LabelPlacement = {
   progress: number;
   offset: number;
   rect: Rect;
+  /** ラベルが指すエッジ上の点（リーダー線の始点） */
+  anchor: Point;
+  /** 線から離れているため引き出し線が必要 */
+  needsLeader: boolean;
   /** すべての候補が衝突した場合 true（それでも非表示にはしない） */
   collided: boolean;
 };
@@ -169,7 +184,11 @@ function findBestPlacement(
   let best: LabelPlacement | null = null;
   let bestScore = Number.POSITIVE_INFINITY;
 
-  for (const offsets of [LABEL_NORMAL_OFFSETS, LABEL_FALLBACK_OFFSETS]) {
+  for (const offsets of [
+    LABEL_NORMAL_OFFSETS,
+    LABEL_FALLBACK_OFFSETS,
+    LABEL_LEADER_OFFSETS,
+  ]) {
     for (const progress of LABEL_PROGRESS_CANDIDATES) {
       const point = cubicPointAt(input.geometry, progress);
       const normal = cubicNormalAt(input.geometry, progress);
@@ -189,6 +208,8 @@ function findBestPlacement(
           progress,
           offset,
           rect,
+          anchor: point,
+          needsLeader: Math.abs(offset) >= LABEL_LEADER_THRESHOLD,
           collided: score >= LABEL_PENALTY.arrow,
         };
       }

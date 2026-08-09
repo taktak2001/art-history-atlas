@@ -670,3 +670,75 @@ test('全体表示でラベルが密集してもラベル同士が重ならな�
   expect(count).toBeGreaterThanOrEqual(3);
   expect(overlaps).toEqual([]);
 });
+
+test('ラベルはノードに重ならず、離れた場合は引き出し線で対応を示す', async ({
+  page,
+}) => {
+  // イタリア・ルネサンスは同時代/反発が同じ縦の経路に重なっていたケース
+  await page.goto('/network/?focus=italian-renaissance');
+  await expect(
+    page.locator('.network-scope-option[aria-pressed="true"]'),
+  ).toHaveText('このムーブメント');
+  await expect(page.locator('[data-edge-label]').first()).toBeVisible();
+
+  const result = await page.evaluate(() => {
+    const first = document.querySelector('[data-edge-label]') as SVGGraphicsElement;
+    const svg = first.ownerSVGElement!;
+    const svgBox = svg.getBoundingClientRect();
+    const labels = Array.from(
+      svg.querySelectorAll<SVGGraphicsElement>('[data-edge-label]'),
+    ).map((element) => {
+      const box = element.getBBox();
+      return { text: element.textContent ?? '', x: box.x, y: box.y, w: box.width, h: box.height };
+    });
+    const nodes = Array.from(
+      document.querySelectorAll<HTMLElement>('[data-network-node]'),
+    ).map((element) => {
+      const rect = element.getBoundingClientRect();
+      return {
+        text: element.innerText.split('\n')[0],
+        x: rect.left - svgBox.left,
+        y: rect.top - svgBox.top,
+        w: rect.width,
+        h: rect.height,
+      };
+    });
+    const nodeHits: string[] = [];
+    for (const label of labels) {
+      for (const node of nodes) {
+        if (
+          label.x < node.x + node.w &&
+          label.x + label.w > node.x &&
+          label.y < node.y + node.h &&
+          label.y + label.h > node.y
+        ) {
+          nodeHits.push(`${label.text}×${node.text}`);
+        }
+      }
+    }
+    const labelHits: string[] = [];
+    for (let i = 0; i < labels.length; i += 1) {
+      for (let j = i + 1; j < labels.length; j += 1) {
+        const a = labels[i];
+        const b = labels[j];
+        if (a.x < b.x + b.w && a.x + a.w > b.x && a.y < b.y + b.h && a.y + a.h > b.y) {
+          labelHits.push(`${a.text}×${b.text}`);
+        }
+      }
+    }
+    return {
+      texts: labels.map((label) => label.text),
+      nodeHits,
+      labelHits,
+      leaders: svg.querySelectorAll('[data-edge-label-leader]').length,
+    };
+  });
+
+  // ノードにも他のラベルにも重ならない
+  expect(result.nodeHits).toEqual([]);
+  expect(result.labelHits).toEqual([]);
+  // 「同時代」がどのエッジか分かる状態で表示されている
+  expect(result.texts).toContain('同時代');
+  // 線から離して置いた分だけ引き出し線がある
+  expect(result.leaders).toBeGreaterThan(0);
+});
