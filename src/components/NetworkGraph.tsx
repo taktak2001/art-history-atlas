@@ -394,7 +394,7 @@ export function NetworkGraph({ movements, relationships, eraOrder }: Props) {
 
   const layout = useMemo<Layout>(() => {
     const colStep = isMobile ? 212 : 248;
-    const rowStep = isMobile ? 84 : 88;
+    const baseRowStep = isMobile ? 84 : 88;
     const nodeW = isMobile ? 148 : 166;
     const nodeH = isMobile ? 58 : 60;
     const top = 58;
@@ -402,16 +402,69 @@ export function NetworkGraph({ movements, relationships, eraOrder }: Props) {
     const safePad = NETWORK_SVG_SAFE_PADDING;
     const endPanSpace = isMobile ? 220 : 700;
     const positions = new Map<string, { x: number; y: number }>();
-    let maxRows = 0;
 
+    // 密集した列だけ局所的にゆるめる量（全画面一律には広げない）
+    const denseRowGain = isMobile ? 16 : 20;
+    const denseColumnShift = isMobile ? 8 : 12;
+
+    /**
+     * 「その列が密集しているか」を、実際に描かれる関係から判定する。
+     * ここを緩めることで、ラベルが長い引き出し線に頼らず線の近くへ収まる。
+     */
+    const columnsByEra = new Map<EraId, Movement[]>();
+    eraOrder.forEach((era) => {
+      columnsByEra.set(
+        era,
+        displayedMovements
+          .filter((movement) => movement.era === era)
+          .sort((a, b) => a.dates.start - b.dates.start),
+      );
+    });
+    const eraOfMovement = new Map(
+      displayedMovements.map((movement) => [movement.id, movement.era]),
+    );
+    const selectionDegree = selectedNodeId
+      ? visibleEdges.filter(
+          (edge) => edge.from === selectedNodeId || edge.to === selectedNodeId,
+        ).length
+      : 0;
+
+    const isDenseColumn = (era: EraId) => {
+      const inEra = columnsByEra.get(era) ?? [];
+      if (inEra.length < 3) return false;
+      // 同じ列の中を縦に走る関係が3本以上ある
+      const verticalEdges = visibleEdges.filter(
+        (edge) =>
+          eraOfMovement.get(edge.from) === era &&
+          eraOfMovement.get(edge.to) === era,
+      ).length;
+      if (verticalEdges >= 3) return true;
+      // 選択ノードの直接関係が多く、その列に選択ノードか相手がいる
+      if (selectionDegree >= 4) {
+        return inEra.some(
+          (movement) =>
+            movement.id === selectedNodeId ||
+            visibleEdges.some(
+              (edge) =>
+                (edge.from === selectedNodeId && edge.to === movement.id) ||
+                (edge.to === selectedNodeId && edge.from === movement.id),
+            ),
+        );
+      }
+      return false;
+    };
+
+    let maxColumnHeight = 0;
     eraOrder.forEach((era, column) => {
-      const inEra = displayedMovements
-        .filter((movement) => movement.era === era)
-        .sort((a, b) => a.dates.start - b.dates.start);
-      maxRows = Math.max(maxRows, inEra.length);
+      const inEra = columnsByEra.get(era) ?? [];
+      const dense = isDenseColumn(era);
+      const rowStep = dense ? baseRowStep + denseRowGain : baseRowStep;
+      maxColumnHeight = Math.max(maxColumnHeight, inEra.length * rowStep);
       inEra.forEach((movement, row) => {
+        // 密集列は左右交互に少しずらし、線とラベルの通り道を分ける
+        const shift = dense ? (row % 2 === 0 ? -1 : 1) * denseColumnShift : 0;
         positions.set(movement.id, {
-          x: safePad + pad + column * colStep,
+          x: safePad + pad + column * colStep + shift,
           y: safePad + top + row * rowStep,
         });
       });
@@ -424,16 +477,17 @@ export function NetworkGraph({ movements, relationships, eraOrder }: Props) {
         pad * 2 +
         (eraOrder.length - 1) * colStep +
         nodeW +
+        denseColumnShift +
         endPanSpace,
       canvasH:
-        safePad * 2 + top + Math.max(maxRows, 1) * rowStep + pad,
+        safePad * 2 + top + Math.max(maxColumnHeight, baseRowStep) + pad,
       colStep,
       nodeW,
       nodeH,
       pad,
       safePad,
     };
-  }, [displayedMovements, eraOrder, isMobile]);
+  }, [displayedMovements, eraOrder, isMobile, selectedNodeId, visibleEdges]);
 
   const movementById = useMemo(
     () => new Map(movements.map((movement) => [movement.id, movement])),
