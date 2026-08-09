@@ -3930,3 +3930,22 @@ html.dark .chronology-era--digital {
 .compare-add__trigger:disabled {
   opacity: 0.5;
 }
+
+/* ネットワークのムーブメント検索トリガー（ポップオーバーの位置基準） */
+.network-picker-control {
+  position: relative;
+}
+
+.network-picker-trigger {
+  min-height: 2.75rem;
+  padding: 0 0.85rem;
+  border: 1px solid rgb(var(--c-line));
+  border-radius: 2px;
+  color: rgb(var(--c-ink));
+  font-size: 0.8rem;
+}
+
+.network-picker-trigger:hover {
+  background: rgb(var(--c-surface));
+}
+
