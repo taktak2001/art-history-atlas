@@ -21,6 +21,7 @@ import {
 } from '@/lib/schema';
 import { getMovementParent } from '@/lib/movement-hierarchy';
 import { MovementCard } from './MovementCard';
+import { AccordionChevron } from './AccordionChevron';
 
 const CLASSIFICATIONS = Object.keys(CLASSIFICATION_LABELS) as ClassificationKind[];
 const VERIFICATIONS = Object.keys(VERIFICATION_LABELS) as VerificationStatus[];
@@ -185,9 +186,10 @@ export function MovementsExplorer() {
         >
           <span className="movements-advanced__title">詳細条件</span>
           <span className="movements-advanced__summary">{advancedSummary}</span>
-          <span className="movements-advanced__icon" aria-hidden="true">
-            {advancedOpen ? '−' : '＋'}
-          </span>
+          <AccordionChevron
+            open={advancedOpen}
+            className="movements-advanced__icon"
+          />
         </button>
 
         {activeFilters.length > 0 && (

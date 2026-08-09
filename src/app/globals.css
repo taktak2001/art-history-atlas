@@ -3600,11 +3600,6 @@ html.dark .chronology-era--digital {
   white-space: nowrap;
 }
 
-.movements-advanced__icon {
-  color: rgb(var(--c-muted));
-  font-size: 0.9rem;
-}
-
 .movements-advanced__panel {
   display: grid;
   gap: 0.75rem;
@@ -3693,4 +3688,37 @@ html.dark .chronology-era--digital {
   color: rgb(var(--c-faint));
   font-size: 0.6875rem;
   line-height: 1.5;
+}
+
+/* アコーディオンの開閉シェブロン。閉=右向き / 開=下向き（90度回転）。
+   ＋は「追加」、→は「遷移」、×は「削除・閉じる」と役割を分ける。 */
+.accordion-chevron {
+  display: grid;
+  min-width: 2.75rem;
+  min-height: 2.75rem;
+  flex-shrink: 0;
+  align-items: center;
+  justify-content: center;
+  justify-self: end;
+  color: rgb(var(--c-faint));
+}
+
+.accordion-chevron svg {
+  width: 1.05rem;
+  height: 1.05rem;
+  transition: transform 180ms ease;
+}
+
+.accordion-chevron[data-open='true'] {
+  color: rgb(var(--c-muted));
+}
+
+.accordion-chevron[data-open='true'] svg {
+  transform: rotate(90deg);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .accordion-chevron svg {
+    transition: none;
+  }
 }
