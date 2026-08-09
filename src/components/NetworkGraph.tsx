@@ -45,7 +45,13 @@ import {
   getMovementGroup,
   type AggregatedRelationship,
 } from '@/lib/movement-hierarchy';
+import { VISIBILITY_LEVEL_LABELS } from '@/lib/schema';
 import { useLodState } from '@/lib/use-lod-state';
+import {
+  parseRelationScope,
+  resolveFocusContext,
+  type RelationScope,
+} from '@/lib/network-focus-context';
 import { parseFocus, buildFocusQuery } from '@/lib/network';
 
 type Props = {
@@ -54,7 +60,6 @@ type Props = {
   eraOrder: EraId[];
 };
 
-type RelationScope = 'important' | 'all';
 type RelationKindFilter = 'all' | RelationKind;
 
 type Layout = {
@@ -139,11 +144,17 @@ export function NetworkGraph({ movements, relationships, eraOrder }: Props) {
   const [relationKindFilter, setRelationKindFilter] =
     useState<RelationKindFilter>('all');
   const [relationScope, setRelationScope] = useState<RelationScope>('important');
+  // focus ごとに自動調整を1回だけ適用する（手動変更後に戻さないため）
+  const focusAutoAppliedForRef = useRef<string | null>(null);
+  // URL(?focus=)由来のfocusだけを自動調整の対象にする（グラフ内クリックは対象外）
+  const urlFocusRef = useRef<string | null>(null);
+  const [scopeTouched, setScopeTouched] = useState(false);
   const [isMobile, setIsMobile] = useState(false);
   const [isLineGuideOpen, setIsLineGuideOpen] = useState(false);
   const [activeEra, setActiveEra] = useState<EraId>(eraOrder[0]);
   const [expandedGroupIds, setExpandedGroupIds] = useState<Set<string>>(new Set());
-  const { lod, setLod } = useLodState('core');
+  const { lod, setLod, applyPurposeDefault, clearLod, hasExplicitChoice } =
+    useLodState('core');
 
   useEffect(() => {
     const media = window.matchMedia('(max-width: 639px)');
@@ -165,6 +176,7 @@ export function NetworkGraph({ movements, relationships, eraOrder }: Props) {
       const url = new URL(window.location.href);
       const raw = url.searchParams.get('focus');
       const valid = parseFocus(raw, movementIds);
+      urlFocusRef.current = valid;
       setSelectedNodeId(valid);
       setSelectedEdgeId(null);
       // 無効な focus はエラーにせず、URLから静かに除去（他クエリは保持）
@@ -177,6 +189,58 @@ export function NetworkGraph({ movements, relationships, eraOrder }: Props) {
     window.addEventListener('popstate', readFocus);
     return () => window.removeEventListener('popstate', readFocus);
   }, [movementIds]);
+
+  const focusScopeActive = relationScope === 'focus' && Boolean(selectedNodeId);
+  // 自動でLODを上げた場合だけ理由を添える（ユーザーが自分で選んだ場合は出さない）
+  const [autoAdjustedLod, setAutoAdjustedLod] = useState(false);
+
+  // 詳細ページから ?focus= で来たときの文脈（直接関係・必要LOD）
+  const focusContext = useMemo(
+    () => resolveFocusContext(selectedNodeId, movements, relationships),
+    [movements, relationships, selectedNodeId],
+  );
+
+  // URL の ?scope= を復元（focus付きなら既定は focus）
+  useEffect(() => {
+    const readScope = () => {
+      const raw = new URL(window.location.href).searchParams.get('scope');
+      const parsed = parseRelationScope(raw, 'important');
+      if (raw) {
+        setRelationScope(parsed);
+        setScopeTouched(true);
+      }
+    };
+    readScope();
+    window.addEventListener('popstate', readScope);
+    return () => window.removeEventListener('popstate', readScope);
+  }, []);
+
+  // focus 付き遷移の初期状態だけを自動調整する。
+  // 直接関係を欠落なく出せる最小LODへ上げ、表示関係を「このムーブメント」にする。
+  // 手動変更後や、同じfocusでの再適用はしない。
+  useEffect(() => {
+    if (!focusContext) return;
+    // 詳細ページからの遷移（URLのfocus）に限定する
+    if (focusContext.focusId !== urlFocusRef.current) return;
+    if (focusAutoAppliedForRef.current === focusContext.focusId) return;
+    focusAutoAppliedForRef.current = focusContext.focusId;
+    applyPurposeDefault(focusContext.requiredLod);
+    setAutoAdjustedLod(!hasExplicitChoice && focusContext.requiredLod !== 'core');
+    if (!scopeTouched) setRelationScope('focus');
+  }, [applyPurposeDefault, focusContext, hasExplicitChoice, scopeTouched]);
+
+  // scope を URL(?scope=) へ反映（focus/lod と共有・復元できるように）
+  useEffect(() => {
+    const url = new URL(window.location.href);
+    const params = new URLSearchParams(url.search);
+    if (relationScope === 'important') params.delete('scope');
+    else params.set('scope', relationScope);
+    const next = params.toString();
+    if (next !== new URLSearchParams(url.search).toString()) {
+      url.search = next;
+      window.history.replaceState(window.history.state, '', url);
+    }
+  }, [relationScope]);
 
   // 選択状態の変化を URL(?focus=) に反映（他クエリは保持）。初回の同期はURL読取と競合するため1回だけ抑止。
   useEffect(() => {
@@ -235,8 +299,12 @@ export function NetworkGraph({ movements, relationships, eraOrder }: Props) {
     }
     // 詳細ページからの deep-link（?focus=）先が現在のLODで隠れていても必ず表示する
     if (selectedNodeId) ids.add(selectedNodeId);
+    // 「このムーブメント」表示では、直接関係するノードはLODに関わらず必ず含める
+    if (focusScopeActive && focusContext) {
+      for (const id of focusContext.directNodeIds) ids.add(id);
+    }
     return movements.filter((movement) => ids.has(movement.id));
-  }, [expandedGroupIds, lod, movements, selectedNodeId]);
+  }, [expandedGroupIds, focusContext, focusScopeActive, lod, movements, selectedNodeId]);
 
   const aggregatedEdges = useMemo(
     () =>
@@ -248,16 +316,35 @@ export function NetworkGraph({ movements, relationships, eraOrder }: Props) {
     [lodMovements, movements, relationships],
   );
 
-  const scopedEdges = useMemo(
-    () =>
-      aggregatedEdges.filter(
-        (relationship) =>
-          (relationKindFilter === 'all' ||
-            relationship.kind === relationKindFilter) &&
-          (relationScope === 'all' || isImportantRelationship(relationship)),
-      ),
-    [aggregatedEdges, relationKindFilter, relationScope],
-  );
+  const scopedEdges = useMemo(() => {
+    // 「このムーブメント」表示では、focus へ直接つながる関係を
+    // importance や LOD を理由に落とさない（関係タイプの手動選択のみ適用）。
+    if (focusScopeActive && focusContext) {
+      return focusContext.directEdges
+        .filter(
+          (relationship) =>
+            relationKindFilter === 'all' || relationship.kind === relationKindFilter,
+        )
+        .map((relationship) => ({
+          ...relationship,
+          aggregateCount: 1,
+          originalRelationshipIds: [relationship.id],
+          hasDirectRelationship: true,
+        }));
+    }
+    return aggregatedEdges.filter(
+      (relationship) =>
+        (relationKindFilter === 'all' ||
+          relationship.kind === relationKindFilter) &&
+        (relationScope === 'all' || isImportantRelationship(relationship)),
+    );
+  }, [
+    aggregatedEdges,
+    focusContext,
+    focusScopeActive,
+    relationKindFilter,
+    relationScope,
+  ]);
 
   const visibleEdges = useMemo(
     () =>
@@ -495,9 +582,13 @@ export function NetworkGraph({ movements, relationships, eraOrder }: Props) {
 
   const setScope = (scope: RelationScope) => {
     setRelationScope(scope);
+    setScopeTouched(true);
     setRelationKindFilter('all');
-    setSelectedNodeId(null);
-    setSelectedEdgeId(null);
+    // 「このムーブメント」は選択ノードが前提なので選択を保持する
+    if (scope !== 'focus') {
+      setSelectedNodeId(null);
+      setSelectedEdgeId(null);
+    }
     window.requestAnimationFrame(() => {
       scrollRef.current?.scrollTo({ left: 0, behavior: 'auto' });
     });
@@ -631,7 +722,9 @@ export function NetworkGraph({ movements, relationships, eraOrder }: Props) {
         <LodControl
           value={lod}
           onChange={(next) => {
-            setSelectedNodeId(null);
+            // focus中はLODを手動変更しても選択を保持する
+            // （focusノードと直接関係はLODに関わらず表示し続ける）
+            if (!selectedNodeId) setSelectedNodeId(null);
             setSelectedEdgeId(null);
             setExpandedGroupIds(new Set());
             setLod(next);
@@ -653,6 +746,9 @@ export function NetworkGraph({ movements, relationships, eraOrder }: Props) {
               aria-label="関係の表示範囲"
             >
               {([
+                ...(selectedNodeId
+                  ? ([['focus', 'このムーブメント', '選択したムーブメントの直接関係のみ']] as const)
+                  : []),
                 ['important', '重要関係', '重要関係のみ'],
                 ['all', 'すべて', 'すべて表示'],
               ] as const).map(([scope, label, accessibleLabel]) => (
@@ -731,8 +827,15 @@ export function NetworkGraph({ movements, relationships, eraOrder }: Props) {
           </details>
 
           <p className="network-controls__count" aria-live="polite">
-            {visibleEdges.length}関係・{displayedMovements.length}ノード表示中
+            {focusScopeActive && focusContext
+              ? `直接関係${focusContext.directEdges.length}件・${focusContext.relatedNodeCount}ノード表示中`
+              : `${visibleEdges.length}関係・${displayedMovements.length}ノード表示中`}
           </p>
+          {focusScopeActive && focusContext && autoAdjustedLod && !hasExplicitChoice && (
+            <p className="network-controls__auto-note">
+              表示に合わせて「{VISIBILITY_LEVEL_LABELS[focusContext.requiredLod]}」へ自動調整
+            </p>
+          )}
         </div>
 
       </section>
@@ -752,6 +855,11 @@ export function NetworkGraph({ movements, relationships, eraOrder }: Props) {
             onClick={() => {
               setSelectedNodeId(null);
               setSelectedEdgeId(null);
+              // 自動調整を巻き戻し、全体表示の既定へ戻す
+              setRelationScope('important');
+              setScopeTouched(false);
+              focusAutoAppliedForRef.current = null;
+              if (!hasExplicitChoice) clearLod();
             }}
             className="network-clear-selection"
           >
