@@ -60,6 +60,7 @@ import {
 } from '@/lib/network-focus-context';
 import { parseFocus, buildFocusQuery } from '@/lib/network';
 import { AccordionChevron } from '@/components/AccordionChevron';
+import { MovementPicker } from '@/components/MovementPicker';
 
 type Props = {
   movements: Movement[];
@@ -207,6 +208,8 @@ export function NetworkGraph({ movements, relationships, eraOrder }: Props) {
   const focusScopeActive = relationScope === 'focus' && Boolean(selectedNodeId);
   // 自動でLODを上げた場合だけ理由を添える（ユーザーが自分で選んだ場合は出さない）
   const [autoAdjustedLod, setAutoAdjustedLod] = useState(false);
+  const [pickerOpen, setPickerOpen] = useState(false);
+  const pickerTriggerRef = useRef<HTMLButtonElement | null>(null);
 
   // 詳細ページから ?focus= で来たときの文脈（直接関係・必要LOD）
   const focusContext = useMemo(
@@ -751,6 +754,23 @@ export function NetworkGraph({ movements, relationships, eraOrder }: Props) {
     visibleEdges,
   ]);
 
+  /**
+   * 検索から特定のムーブメントへフォーカスする。
+   * 詳細ページからの ?focus= 到着と同じ扱いにして、
+   * 「必要な最小LODへ自動調整 → このムーブメント表示 → 1ホップへ一度だけ寄せる」を再利用する。
+   * 以後のユーザー操作（zoom/pan/LOD/scope）は上書きしない（自動調整はfocusごとに1回だけ）。
+   */
+  const focusMovement = (id: string) => {
+    // URL由来のfocusと同じ経路に載せる（自動調整の対象にする）
+    urlFocusRef.current = id;
+    focusAutoAppliedForRef.current = null;
+    focusCenteredForRef.current = null;
+    setScopeTouched(false);
+    setRelationKindFilter('all');
+    setSelectedEdgeId(null);
+    setSelectedNodeId(id);
+  };
+
   const setKindFilter = (kind: RelationKindFilter) => {
     setSelectedNodeId(null);
     setSelectedEdgeId(null);
@@ -915,6 +935,30 @@ export function NetworkGraph({ movements, relationships, eraOrder }: Props) {
         />
 
         <div className="network-controls__row">
+          <div className="network-picker-control">
+            <button
+              ref={pickerTriggerRef}
+              type="button"
+              onClick={() => setPickerOpen((open) => !open)}
+              aria-expanded={pickerOpen}
+              aria-haspopup="dialog"
+              className="network-picker-trigger"
+              data-network-picker-trigger
+            >
+              ムーブメントを検索
+            </button>
+            <MovementPicker
+              open={pickerOpen}
+              onClose={() => setPickerOpen(false)}
+              mode="navigate"
+              title="ムーブメントを検索"
+              selectedIds={selectedNodeId ? [selectedNodeId] : []}
+              max={1}
+              triggerRef={pickerTriggerRef}
+              onToggle={(movement) => focusMovement(movement.id)}
+            />
+          </div>
+
           <div className="network-scope-control">
             <span className="network-control-label">表示関係</span>
             <div

@@ -30,6 +30,8 @@ export function MovementPicker({
   max,
   title = 'ムーブメントを追加',
   triggerRef,
+  mode = 'select',
+  closeOnSelect,
 }: {
   open: boolean;
   onClose: () => void;
@@ -40,7 +42,17 @@ export function MovementPicker({
   title?: string;
   /** 閉じたときにフォーカスを戻す先 */
   triggerRef?: React.RefObject<HTMLElement | null>;
+  /**
+   * 用途。
+   * - select: 複数選ぶ（比較ページ）。選択中の件数と上限を出す
+   * - navigate: 1件選んで移動する（ネットワークのフォーカス、タイムラインのジャンプ）
+   */
+  mode?: 'select' | 'navigate';
+  /** 選択したら閉じるか。既定は navigate のとき true */
+  closeOnSelect?: boolean;
 }) {
+  const isNavigate = mode === 'navigate';
+  const shouldCloseOnSelect = closeOnSelect ?? isNavigate;
   const [query, setQuery] = useState('');
   const [recentIds, setRecentIds] = useState<string[]>([]);
   const [activeIndex, setActiveIndex] = useState(0);
@@ -79,8 +91,9 @@ export function MovementPicker({
         setRecentIds(next);
         window.localStorage.setItem(RECENT_STORAGE_KEY, JSON.stringify(next));
       }
+      if (shouldCloseOnSelect) close();
     },
-    [onToggle, recentIds, selectedIds],
+    [close, onToggle, recentIds, selectedIds, shouldCloseOnSelect],
   );
 
   // Escapeで閉じる／外側クリックで閉じる／フォーカストラップ
@@ -144,7 +157,7 @@ export function MovementPicker({
 
   if (!open) return null;
 
-  const atLimit = selectedIds.length >= max;
+  const atLimit = !isNavigate && selectedIds.length >= max;
 
   return (
     <div className="movement-picker" data-movement-picker>
@@ -200,14 +213,16 @@ export function MovementPicker({
           </p>
         </div>
 
-        <div className="movement-picker__selected">
-          <p className="movement-picker__count">
-            選択中 {selectedIds.length}/{max}
-          </p>
-          {atLimit && (
-            <p className="movement-picker__limit">比較できるのは最大{max}件です</p>
-          )}
-        </div>
+        {!isNavigate && (
+          <div className="movement-picker__selected">
+            <p className="movement-picker__count">
+              選択中 {selectedIds.length}/{max}
+            </p>
+            {atLimit && (
+              <p className="movement-picker__limit">比較できるのは最大{max}件です</p>
+            )}
+          </div>
+        )}
 
         <div className="movement-picker__results" id={listId} role="listbox">
           {groups.length === 0 ? (
@@ -256,18 +271,20 @@ export function MovementPicker({
           )}
         </div>
 
-        <div className="movement-picker__footer">
-          <p className="movement-picker__count">
-            選択中 {selectedIds.length}/{max}
-          </p>
-          <button
-            type="button"
-            onClick={close}
-            className="movement-picker__done"
-          >
-            完了
-          </button>
-        </div>
+        {!isNavigate && (
+          <div className="movement-picker__footer">
+            <p className="movement-picker__count">
+              選択中 {selectedIds.length}/{max}
+            </p>
+            <button
+              type="button"
+              onClick={close}
+              className="movement-picker__done"
+            >
+              完了
+            </button>
+          </div>
+        )}
       </div>
     </div>
   );

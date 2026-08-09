@@ -77,3 +77,52 @@ test('共有URLを直接開くと選択が復元される', async ({ page }) => 
   await expect(page.locator('[data-compare-chip="baroque"]')).toBeVisible();
   await expect(page.getByRole('region', { name: '選択したムーブメントの比較表' })).toBeVisible();
 });
+
+test('ネットワークは検索からフォーカスでき、文脈が自動調整される', async ({ page }) => {
+  await page.goto('/network/');
+
+  const trigger = page.locator('[data-network-picker-trigger]');
+  await expect(trigger).toBeVisible();
+  await trigger.click();
+
+  const dialog = page.getByRole('dialog', { name: 'ムーブメントを検索' });
+  await expect(dialog).toBeVisible();
+  // navigate モードでは選択件数・完了ボタンを出さない
+  await expect(dialog.locator('.movement-picker__done')).toHaveCount(0);
+
+  // 作家名からムーブメントへ到達する
+  await dialog.getByRole('combobox').fill('ピカソ');
+  await page.locator('[data-movement-option="cubism"]').click();
+
+  // 1件選んだら閉じる（navigate）
+  await expect(dialog).toHaveCount(0);
+
+  // 詳細ページからの ?focus= 到着と同じ自動調整が働く
+  await expect(page).toHaveURL(/focus=cubism/);
+  await expect(page).toHaveURL(/scope=focus/);
+  await expect(
+    page.locator('.network-scope-option[aria-pressed="true"]'),
+  ).toHaveText('このムーブメント');
+  await expect(
+    page.locator('[data-network-node][aria-pressed="true"]'),
+  ).toContainText('キュビスム');
+  await expect(page.locator('.network-controls__count')).toContainText('直接関係');
+});
+
+test('ネットワークで検索後に手動変更しても自動設定へ戻らない', async ({ page }) => {
+  await page.goto('/network/');
+  await page.locator('[data-network-picker-trigger]').click();
+  const dialog = page.getByRole('dialog', { name: 'ムーブメントを検索' });
+  await dialog.getByRole('combobox').fill('キュビスム');
+  await page.locator('[data-movement-option="cubism"]').click();
+  await expect(page).toHaveURL(/lod=standard/);
+
+  // 手動でLODを基本へ戻す
+  await page.locator('[data-lod-control] button').filter({ hasText: '基本' }).click();
+  await expect(page).toHaveURL(/lod=core/);
+  // focus と scope は保持され、自動調整で上書きされない
+  await expect(page).toHaveURL(/focus=cubism/);
+  await expect(
+    page.locator('.network-scope-option[aria-pressed="true"]'),
+  ).toHaveText('このムーブメント');
+});
