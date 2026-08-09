@@ -46,6 +46,12 @@ export const LABEL_PENALTY = {
   viewport: 1000,
   /** 引き出し線がノードを貫通する（＝謎の線に見える）のを避ける */
   leaderCrossesNode: 900,
+  /**
+   * 引き出し線は「元のエッジとの対応を示す最低限の補助線」に留める。
+   * 距離ペナルティは頭打ちにするため、閾値を超えた分はここで別に加算し、
+   * 衝突しない候補が複数あるときは短い引き出し線を選ばせる。
+   */
+  leaderLength: 3,
   /** 線から離れるほど小さなペナルティ */
   distance: 2,
 } as const;
@@ -56,7 +62,7 @@ export const LABEL_MAX_DISTANCE_PENALTY_AT = 40;
 /** ラベル同士・ノードとの最小すき間（px） */
 // ノードの隙間（モバイルは行間84 - ノード高58 = 26px）へ収まる値にする。
 // 大きくしすぎると隙間に入れず、かえってノードの上に載る。
-export const LABEL_GAP = { label: 4, node: 5 } as const;
+export const LABEL_GAP = { label: 4, node: 5, arrow: 4 } as const;
 
 export type ObstacleKind = 'node' | 'arrow' | 'label';
 export type Obstacle = { rect: Rect; kind: ObstacleKind };
@@ -173,6 +179,10 @@ export function scoreLabelPlacement(
     LABEL_PENALTY.distance;
 
   if (leaderFrom) {
+    // 閾値を超えて離した分だけ加点し、短い引き出し線を優先する
+    score +=
+      Math.max(0, Math.abs(distanceFromEdge) - LABEL_LEADER_THRESHOLD) *
+      LABEL_PENALTY.leaderLength;
     const center = { x: rect.x + rect.width / 2, y: rect.y + rect.height / 2 };
     for (const obstacle of obstacles) {
       if (obstacle.kind !== 'node') continue;
@@ -188,7 +198,7 @@ export function scoreLabelPlacement(
         ? LABEL_GAP.label
         : obstacle.kind === 'node'
           ? LABEL_GAP.node
-          : 0;
+          : LABEL_GAP.arrow;
     if (!rectsOverlap(rect, obstacle.rect, gap)) continue;
     score +=
       obstacle.kind === 'label'

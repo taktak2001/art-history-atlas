@@ -588,7 +588,8 @@ export function NetworkGraph({ movements, relationships, eraOrder }: Props) {
     window.requestAnimationFrame(() => centerEdge(relationship));
   };
 
-  const labelFontSize = isMobile ? 11 : 10;
+  // 注釈として読める大きさを確保する（縮小より配置で衝突を解く方針）
+  const labelFontSize = 12;
 
   /**
    * 関係ラベルの配置。中点固定をやめ、線の近くで衝突しない位置を選ぶ。
@@ -1240,7 +1241,7 @@ export function NetworkGraph({ movements, relationships, eraOrder }: Props) {
                     dominantBaseline="central"
                     fill={RELATION_COLOR[relationship.kind]}
                     fontSize={labelFontSize}
-                    fontWeight="700"
+                    fontWeight="600"
                     data-edge-label
                     data-edge-label-anchor={anchor}
                   >
