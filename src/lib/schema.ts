@@ -456,6 +456,23 @@ export const ImageReference = z
   });
 export type ImageReference = z.infer<typeof ImageReference>;
 
+/**
+ * 研究上の留保（注意書き）。
+ *
+ * 目的は警告ではなく理解の精密化。「よくある理解」と「より適切な理解」が
+ * 読み取れる文章にする。見出しは内容を示す具体的なものにし、
+ * 一律の「学説上の注意」にしない。
+ */
+export const ScholarlyNote = z.object({
+  /** 何についての留保かが分かる具体的な見出し（例: 系譜について / 名称について） */
+  heading: z.string().min(2).max(24),
+  /** 誤解と適切な理解が分かる本文。スマホで読める長さに保つ */
+  body: z.string().min(20).max(220),
+  /** 記述の根拠。既存の出典に基づく */
+  sourceIds: z.array(slug).default([]),
+});
+export type ScholarlyNote = z.infer<typeof ScholarlyNote>;
+
 /** 作品 */
 export const Work = z.object({
   id: slug,
@@ -543,6 +560,12 @@ export const Movement = z.object({
   dates: DateRange,
   regionIds: z.array(RegionId).min(1),
   cities: z.array(z.string()).default([]),
+
+  /**
+   * 研究上の留保。年代の範囲説明にとどまる `dates.note` とは役割が異なり、
+   * 「誤解されやすい理解」と「より適切な理解」を示す。
+   */
+  scholarlyNote: ScholarlyNote.optional(),
 
   /** 解説項目 */
   summary: z.string().min(1),

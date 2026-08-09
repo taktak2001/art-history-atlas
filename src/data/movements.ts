@@ -1,6 +1,7 @@
 import type { Movement } from '@/lib/schema';
 import { coreExpansionMovements } from './expansion/core-movements';
 import { finalExpansionMovements } from './expansion/final-movements';
+import { applyScholarlyNotes } from './expansion/scholarly-notes';
 import { standardOneExpansionMovements } from './expansion/standard-one-movements';
 
 /**
@@ -10,7 +11,7 @@ import { standardOneExpansionMovements } from './expansion/standard-one-movement
  * 「〜とされる」「見解の一つ」等で示す。年代は諸説ある場合 dates.circa=true と note で明示。
  * 発展史観（未熟→進歩）を採らず、各時代の異なる目的・価値・鑑賞環境を記述する方針。
  */
-export const movements: Movement[] = [
+const movementRecords: Movement[] = [
   /* 1 ─────────────────────────────────────────────── */
   {
     id: 'prehistoric-ritual',
@@ -1728,3 +1729,6 @@ export const movements: Movement[] = [
   ...standardOneExpansionMovements,
   ...finalExpansionMovements,
 ];
+
+// 研究上の留保（見出し＋本文）を最後に付与する。既存の記述データは変更しない。
+export const movements: Movement[] = applyScholarlyNotes(movementRecords);

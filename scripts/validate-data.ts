@@ -367,6 +367,37 @@ console.log('▶ imageReference（画像未収録作品の調査・審査用参�
   console.log(`  ✓ imageReference: ${refSourceUrls.length}件を検証`);
 }
 
+console.log('▶ 研究上の留保（scholarlyNote）チェック');
+{
+  let checked = 0;
+  for (const m of movements) {
+    const note = m.scholarlyNote;
+    if (!note) continue;
+    checked += 1;
+    if (!note.heading.trim()) fail(`movement ${m.id}: 注意書きの見出しが空`);
+    if (!note.body.trim()) fail(`movement ${m.id}: 注意書きの本文が空`);
+    if (note.heading.trim() === '学説上の注意') {
+      fail(`movement ${m.id}: 見出しは内容を示す具体的なものにする`);
+    }
+    // 「〜を扱う」だけの編集方針は注意書きとして残さない
+    if (/を(扱う|概観する)。?$/.test(note.body.trim())) {
+      fail(`movement ${m.id}: 注意書きが編集方針の記述にとどまっている`);
+    }
+    if (note.body.length > 220) {
+      fail(`movement ${m.id}: 注意書きが長すぎる（${note.body.length}字）`);
+    }
+    for (const sourceId of note.sourceIds) {
+      if (!sourceIds.has(sourceId)) {
+        fail(`movement ${m.id}: 注意書きの出典 "${sourceId}" が存在しない`);
+      }
+      if (!m.sourceIds.includes(sourceId)) {
+        fail(`movement ${m.id}: 注意書きの出典 "${sourceId}" はこの項目に紐づいていない`);
+      }
+    }
+  }
+  console.log(`  ✓ scholarlyNote: ${checked}件を検証`);
+}
+
 console.log('');
 if (errors > 0) {
   console.error(`✗ 検証失敗: ${errors}件のエラー`);
