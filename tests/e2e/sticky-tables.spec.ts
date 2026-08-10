@@ -40,6 +40,38 @@ test('マトリクスは左上・時代・地域を表内スクロール中も�
   expectNear(cornerAfterVertical.y, scrollBox.y + 1);
 });
 
+test('マトリクスは地域色と図録型ラベルを共通利用し、ページ全体を横に溢れさせない', async ({
+  page,
+}) => {
+  await page.goto('/matrix/?lod=detailed');
+
+  const franceRow = page.locator('[data-matrix-region="france"]');
+  const dot = franceRow.locator('.matrix-region-dot');
+  const link = franceRow.locator('.matrix-movement-link').first();
+  const regionColor = await franceRow.evaluate((element) =>
+    getComputedStyle(element).getPropertyValue('--matrix-region-rgb').trim(),
+  );
+  const dotColor = await dot.evaluate((element) => getComputedStyle(element).backgroundColor);
+  const linkBorder = await link.evaluate((element) => getComputedStyle(element).borderLeftColor);
+
+  expect(regionColor).toBe('64 103 137');
+  expect(dotColor).toContain('64, 103, 137');
+  expect(linkBorder).toContain('64, 103, 137');
+  await expect(page.getByText('LEVEL OF DETAIL', { exact: true })).toBeVisible();
+  await expect(page.getByText('表示する範囲', { exact: true })).toHaveCount(0);
+  const emptyColor = await page
+    .locator('.matrix-empty')
+    .first()
+    .evaluate((element) => getComputedStyle(element).color);
+  expect(emptyColor).toContain('0.42');
+
+  const pageWidths = await page.evaluate(() => ({
+    client: document.documentElement.clientWidth,
+    scroll: document.documentElement.scrollWidth,
+  }));
+  expect(pageWidths.scroll).toBeLessThanOrEqual(pageWidths.client);
+});
+
 test('比較表は対象別アクセントと固定行列を共通利用する', async ({ page }) => {
   await page.goto('/compare/?ids=gothic,italian-renaissance,baroque');
 

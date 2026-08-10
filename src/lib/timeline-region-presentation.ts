@@ -1,12 +1,12 @@
 import type { RegionId } from '@/lib/schema';
 
 /**
- * 横型タイムライン専用の地域色。
+ * タイムラインと地域比較画面で共有する地域色。
  *
  * 色は分類の主役ではなく、同じ地域の流れを追うための補助情報として使う。
  * 文字色には適用せず、ラベル枠・期間線・地域インデックスに限定する。
  */
-export const TIMELINE_REGION_RGB = {
+export const REGION_RGB = {
   mediterranean: '112 91 73',
   italy: '151 65 54',
   netherlands: '169 101 43',
@@ -22,5 +22,11 @@ export const TIMELINE_REGION_RGB = {
   other: '113 105 96',
 } satisfies Record<RegionId, string>;
 
+/** @deprecated 新規画面では REGION_RGB / regionRgb を使用する。 */
+export const TIMELINE_REGION_RGB = REGION_RGB;
+
+export const regionRgb = (region: RegionId) => REGION_RGB[region];
+
+/** @deprecated 新規画面では regionRgb を使用する。 */
 export const timelineRegionRgb = (region: RegionId) =>
-  TIMELINE_REGION_RGB[region];
+  regionRgb(region);

@@ -369,7 +369,7 @@ describe('LOD UI', () => {
     const cell = document.querySelector(
       '[data-matrix-cell="france:nineteenth"]',
     ) as HTMLElement;
-    const reveal = within(cell).getByRole('button', { name: /\+2/ });
+    const reveal = within(cell).getByRole('button', { name: /ほか2件/ });
     fireEvent.click(reveal);
 
     expect(reveal).toHaveAttribute('aria-expanded', 'true');
@@ -385,10 +385,12 @@ describe('LOD UI', () => {
     });
     expect(region).toHaveAttribute('tabindex', '0');
     expect(region.querySelector('[data-sticky-cell="corner"]')).toHaveTextContent(
-      '地域 ＼ 時代',
+      /地域\s*時代 →/,
     );
     expect(region.querySelectorAll('[data-sticky-cell="column"]').length).toBeGreaterThan(0);
     expect(region.querySelectorAll('[data-sticky-cell="row"]').length).toBeGreaterThan(0);
+    expect(region.querySelector('[data-matrix-region="france"] .matrix-region-dot')).toBeInTheDocument();
+    expect(region.querySelector('.matrix-movement-link')).toBeInTheDocument();
   });
 
   it('一覧はLOD（表示範囲）を持たず、常に全件から検索する', () => {
