@@ -219,8 +219,8 @@ describe('shared relation markers', () => {
     );
 
     expect(lines[0]).toHaveAttribute('marker-end', lines[1].getAttribute('marker-end'));
-    expect(lines[0]).toHaveAttribute('stroke-width', '2.8');
-    expect(lines[1]).toHaveAttribute('stroke-width', '4.6');
+    expect(lines[0]).toHaveAttribute('stroke-width', '1.7');
+    expect(lines[1]).toHaveAttribute('stroke-width', '3.4');
     expect(container.querySelectorAll('marker')).toHaveLength(1);
   });
 });
