@@ -135,5 +135,13 @@ test('ネットワークはLOD外ノードをDOMへ描画しない', async ({ pa
   if (testInfo.project.name === 'mobile') {
     await page.getByRole('button', { name: 'すべて表示' }).click();
   }
+  // Overview is an editorial map capped at the principal movements. Zoom into
+  // Study before asserting that the selected LOD's complete DOM set is present.
+  const zoomIn = page.getByRole('button', { name: 'ネットワークを拡大' });
+  for (let step = 0; step < 8; step += 1) {
+    if ((await graph.getAttribute('data-network-semantic-level')) !== 'overview') break;
+    await zoomIn.click();
+  }
+  await expect(graph).toHaveAttribute('data-network-semantic-level', 'study');
   await expect(graph.getByRole('button', { name: '未来派を選択' })).toBeVisible();
 });

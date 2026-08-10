@@ -39,7 +39,7 @@ import {
   type Obstacle,
 } from '@/lib/network-label-layout';
 import {
-  getNetworkEdgeGeometry,
+  getNetworkMetroEdgeGeometry,
   getNetworkEdgeRouteOffset,
   getNetworkViewBox,
   getParallelEdgeRouteOffset,
@@ -70,10 +70,13 @@ import {
   buildChronologicalNetworkLayout,
   clampNetworkZoom,
   getNetworkFitZoom,
+  networkNodeImportanceScore,
+  networkNodeProminence,
   getNetworkVisualBounds,
   NETWORK_ZOOM_MAX,
   NETWORK_ZOOM_MIN,
   networkSemanticLevel,
+  selectNetworkOverviewMovements,
   type ChronologicalNetworkLayout,
   type NetworkVisualBounds,
   type NetworkVisualRect,
@@ -156,7 +159,7 @@ function getEdgeGeometry(
       ? parallelOffset
       : obstacleOffset + Math.sign(obstacleOffset) * Math.abs(parallelOffset);
 
-  return getNetworkEdgeGeometry(
+  return getNetworkMetroEdgeGeometry(
     fromPosition,
     toPosition,
     layout.nodeW,
@@ -165,6 +168,88 @@ function getEdgeGeometry(
     undefined,
     routeOffset,
     corridorOffset,
+  );
+}
+
+const ORBIT_POINTS = [
+  { x: 130, y: 22, textX: 130, textY: 10, anchor: 'middle' as const },
+  { x: 226, y: 76, textX: 236, textY: 80, anchor: 'start' as const },
+  { x: 130, y: 130, textX: 130, textY: 148, anchor: 'middle' as const },
+  { x: 34, y: 76, textX: 24, textY: 80, anchor: 'end' as const },
+];
+
+function NetworkLocalOrbit({
+  movement,
+  edges,
+  movementById,
+}: {
+  movement: Movement;
+  edges: AggregatedRelationship[];
+  movementById: ReadonlyMap<string, Movement>;
+}) {
+  const orbitEdges = edges.slice(0, ORBIT_POINTS.length);
+  if (orbitEdges.length === 0) return null;
+
+  return (
+    <figure className="network-detail-orbit" data-network-detail-orbit>
+      <figcaption>LOCAL ORBIT</figcaption>
+      <svg
+        viewBox="0 0 260 156"
+        role="img"
+        aria-label={`${movement.nameJa}と直接関係するムーブメント`}
+      >
+        <title>{movement.nameJa}の直接関係</title>
+        {orbitEdges.map((relationship, index) => {
+          const point = ORBIT_POINTS[index];
+          const otherId =
+            relationship.from === movement.id
+              ? relationship.to
+              : relationship.from;
+          const other = movementById.get(otherId);
+          return (
+            <g key={relationship.id} data-orbit-relation={relationship.kind}>
+              <line
+                x1="130"
+                y1="76"
+                x2={point.x}
+                y2={point.y}
+                stroke={RELATION_COLOR[relationship.kind]}
+                strokeWidth="1.5"
+                strokeDasharray={RELATION_LINE_STYLE[relationship.kind].dasharray}
+                strokeLinecap="round"
+              />
+              <circle
+                cx={point.x}
+                cy={point.y}
+                r="3.5"
+                fill="rgb(var(--c-paper))"
+                stroke="rgb(var(--c-ink) / 0.72)"
+                strokeWidth="1.25"
+              />
+              <text
+                x={point.textX}
+                y={point.textY}
+                textAnchor={point.anchor}
+                className="network-detail-orbit__label"
+              >
+                {other?.shortLabel ?? other?.nameJa ?? otherId}
+              </text>
+            </g>
+          );
+        })}
+        <circle
+          cx="130"
+          cy="76"
+          r="6"
+          fill="rgb(var(--c-ink))"
+          stroke="rgb(var(--c-paper))"
+          strokeWidth="2"
+        />
+        <text x="130" y="96" textAnchor="middle" className="network-detail-orbit__center-label">
+          {movement.shortLabel}
+        </text>
+      </svg>
+    </figure>
   );
 }
 
@@ -413,19 +498,40 @@ export function NetworkGraph({ movements, relationships, eraOrder }: Props) {
     relationScope,
   ]);
 
-  const visibleEdges = useMemo(
-    () =>
-      isMobile && relationScope === 'important'
-        ? limitMobileRelationships(scopedEdges)
-        : scopedEdges,
-    [isMobile, relationScope, scopedEdges],
-  );
+  const semanticLevel = networkSemanticLevel(networkZoom);
+
+  const editorialDegreeByNode = useMemo(() => {
+    const degrees = new Map<string, number>();
+    for (const relationship of relationships) {
+      degrees.set(relationship.from, (degrees.get(relationship.from) ?? 0) + 1);
+      degrees.set(relationship.to, (degrees.get(relationship.to) ?? 0) + 1);
+    }
+    return degrees;
+  }, [relationships]);
 
   const displayedMovements = useMemo(() => {
-    // Relation filters change the lines, not the historical field itself.
-    // Keeping every movement in the selected LOD preserves regions and lets
-    // unrelated nodes recede instead of disappearing during selection.
-    const base = [...lodMovements].sort(
+    const overviewBase =
+      semanticLevel === 'overview'
+        ? selectNetworkOverviewMovements(lodMovements, editorialDegreeByNode)
+        : lodMovements;
+    const ids = new Set(overviewBase.map((movement) => movement.id));
+
+    // A focus remains a local map even when the camera is still at overview
+    // scale. Keep the selected station and every direct destination visible.
+    if (selectedNodeId) {
+      ids.add(selectedNodeId);
+      for (const relationship of scopedEdges) {
+        if (
+          relationship.from === selectedNodeId ||
+          relationship.to === selectedNodeId
+        ) {
+          ids.add(relationship.from);
+          ids.add(relationship.to);
+        }
+      }
+    }
+
+    const base = movements.filter((movement) => ids.has(movement.id)).sort(
       (a, b) => a.dates.start - b.dates.start || a.id.localeCompare(b.id),
     );
 
@@ -435,7 +541,45 @@ export function NetworkGraph({ movements, relationships, eraOrder }: Props) {
       if (focused) return [...base, focused];
     }
     return base;
-  }, [lodMovements, movements, selectedNodeId]);
+  }, [editorialDegreeByNode, lodMovements, movements, scopedEdges, selectedNodeId, semanticLevel]);
+
+  const displayedMovementIds = useMemo(
+    () => new Set(displayedMovements.map((movement) => movement.id)),
+    [displayedMovements],
+  );
+
+  const overviewLandmarkIds = useMemo(() => {
+    const landmarkByRegion = new Map<string, Movement>();
+    for (const movement of displayedMovements) {
+      const region = movement.regionIds[0] ?? 'other';
+      const current = landmarkByRegion.get(region);
+      if (
+        !current ||
+        networkNodeImportanceScore(
+          movement,
+          editorialDegreeByNode.get(movement.id) ?? 0,
+        ) >
+          networkNodeImportanceScore(
+            current,
+            editorialDegreeByNode.get(current.id) ?? 0,
+          )
+      ) {
+        landmarkByRegion.set(region, movement);
+      }
+    }
+    return new Set([...landmarkByRegion.values()].map((movement) => movement.id));
+  }, [displayedMovements, editorialDegreeByNode]);
+
+  const visibleEdges = useMemo(() => {
+    const withinMap = scopedEdges.filter(
+      (relationship) =>
+        displayedMovementIds.has(relationship.from) &&
+        displayedMovementIds.has(relationship.to),
+    );
+    return isMobile && relationScope === 'important'
+      ? limitMobileRelationships(withinMap)
+      : withinMap;
+  }, [displayedMovementIds, isMobile, relationScope, scopedEdges]);
 
   const layout = useMemo<Layout>(
     () =>
@@ -448,7 +592,6 @@ export function NetworkGraph({ movements, relationships, eraOrder }: Props) {
       }),
     [displayedMovements, isMobile, networkZoom],
   );
-  const semanticLevel = networkSemanticLevel(networkZoom);
 
   useLayoutEffect(() => {
     const anchor = zoomAnchorRef.current;
@@ -530,13 +673,15 @@ export function NetworkGraph({ movements, relationships, eraOrder }: Props) {
   }, [relatedNodeIds, selectedNodeId, visibleEdges]);
 
   const idleLabelIds = useMemo(
-    () =>
-      new Set(
+    () => {
+      if (semanticLevel === 'overview') return new Set<string>();
+      return new Set(
         visibleEdges
           .filter(isImportantRelationship)
-          .slice(0, isMobile || semanticLevel === 'overview' ? 3 : 8)
+          .slice(0, isMobile ? 3 : 8)
           .map((relationship) => relationship.id),
-      ),
+      );
+    },
     [isMobile, semanticLevel, visibleEdges],
   );
 
@@ -778,10 +923,20 @@ export function NetworkGraph({ movements, relationships, eraOrder }: Props) {
       if (nodeIds && !nodeIds.has(movement.id)) continue;
       const position = layout.positions.get(movement.id);
       if (!position) continue;
+      const prominence = networkNodeProminence(
+        movement,
+        editorialDegreeByNode.get(movement.id) ?? 0,
+      );
+      const compactLabelWidth =
+        networkZoom < 0.52 && (prominence === 'hub' || prominence === 'major')
+          ? prominence === 'hub'
+            ? 124
+            : 108
+          : 0;
       rects.push({
         x: position.x - 4,
         y: position.y - 4,
-        width: layout.nodeW + 8,
+        width: Math.max(layout.nodeW, compactLabelWidth) + 8,
         height: layout.nodeH + 8,
       });
     }
@@ -795,7 +950,7 @@ export function NetworkGraph({ movements, relationships, eraOrder }: Props) {
       }
       const geometry = getEdgeGeometry(relationship, layout, visibleEdges);
       if (!geometry) continue;
-      const points = [
+      const points = geometry.pathPoints ?? [
         geometry.start,
         geometry.end,
         geometry.firstControl,
@@ -832,12 +987,12 @@ export function NetworkGraph({ movements, relationships, eraOrder }: Props) {
     () => getCameraBounds(),
     // getCameraBounds is intentionally derived from these stable layout inputs.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    [displayedMovements, edgeLabelPlacements, layout, visibleEdges],
+    [displayedMovements, edgeLabelPlacements, editorialDegreeByNode, layout, networkZoom, visibleEdges],
   );
   const focusedCameraBounds = useMemo(
     () => getCameraBounds(relatedNodeIds),
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    [displayedMovements, edgeLabelPlacements, layout, relatedNodeIds, visibleEdges],
+    [displayedMovements, edgeLabelPlacements, editorialDegreeByNode, layout, networkZoom, relatedNodeIds, visibleEdges],
   );
 
   // Edge nodes need extra scrollable space while focused. This is camera
@@ -1247,6 +1402,7 @@ export function NetworkGraph({ movements, relationships, eraOrder }: Props) {
         className="transition-opacity"
         data-network-edge
         data-network-edge-id={relationship.id}
+        data-route-grammar="metro"
         data-route-offset={String(geometry.routeOffset)}
         data-edge-layer={mode}
         data-edge-related={
@@ -1641,6 +1797,10 @@ export function NetworkGraph({ movements, relationships, eraOrder }: Props) {
             const dimmed = selectionActive && !isRelated && !isSecondHop;
             const isEdgeSource = selectedEdge?.from === movement.id;
             const isEdgeTarget = selectedEdge?.to === movement.id;
+            const prominence = networkNodeProminence(
+              movement,
+              editorialDegreeByNode.get(movement.id) ?? 0,
+            );
 
             return (
               <div
@@ -1672,8 +1832,10 @@ export function NetworkGraph({ movements, relationships, eraOrder }: Props) {
                   }}
                   aria-pressed={isSelected}
                   aria-label={`${movement.nameJa}を選択`}
-                  className="network-node relative flex h-full w-full flex-col justify-center px-2 text-left text-xs"
+                  className="network-node relative h-full w-full text-left"
                   data-network-node
+                  data-node-prominence={prominence}
+                  data-overview-landmark={overviewLandmarkIds.has(movement.id)}
                   data-node-state={
                     isSelected
                       ? 'selected'
@@ -1689,33 +1851,40 @@ export function NetworkGraph({ movements, relationships, eraOrder }: Props) {
                     isEdgeSource ? 'source' : isEdgeTarget ? 'target' : undefined
                   }
                 >
-                  {(isEdgeSource || isEdgeTarget) && (
-                    <span className="absolute right-1 top-0.5 text-[8px] font-bold tracking-[0.08em] text-muted">
-                      {isEdgeSource ? '起点' : '到達先'}
-                    </span>
-                  )}
-                  <span
-                    className="network-node__title truncate pr-7 font-serif text-ink"
-                    data-network-node-title
-                  >
-                    {networkZoom < 0.52 ? movement.shortLabel : movement.nameJa}
+                  <span className="network-node__station" aria-hidden="true">
+                    <span />
                   </span>
-                  {networkZoom >= 0.52 && (
+                  <span className="network-node__content">
+                    {(isEdgeSource || isEdgeTarget) && (
+                      <span className="network-node__role">
+                        {isEdgeSource ? '起点' : '到達先'}
+                      </span>
+                    )}
                     <span
-                      className="network-node__date truncate text-[10px] text-faint"
-                      data-network-node-date
+                      className="network-node__title"
+                      data-network-node-title
                     >
-                      {movement.dates.start < 0
-                        ? `前${Math.abs(movement.dates.start)}`
-                        : movement.dates.start}
-                      〜
+                      {networkZoom < 0.52
+                        ? movement.shortLabel || movement.nameJa
+                        : movement.nameJa}
                     </span>
-                  )}
-                  {isSelected && (relationshipCountByNode.get(movement.id) ?? 0) > 1 && (
-                    <span className="truncate text-[9px] font-bold text-muted">
-                      関連 {relationshipCountByNode.get(movement.id)}
-                    </span>
-                  )}
+                    {semanticLevel !== 'overview' && (
+                      <span
+                        className="network-node__date"
+                        data-network-node-date
+                      >
+                        {movement.dates.start < 0
+                          ? `前${Math.abs(movement.dates.start)}`
+                          : movement.dates.start}
+                        〜
+                      </span>
+                    )}
+                    {isSelected && (relationshipCountByNode.get(movement.id) ?? 0) > 1 && (
+                      <span className="network-node__relation-count">
+                        関連 {relationshipCountByNode.get(movement.id)}
+                      </span>
+                    )}
+                  </span>
                 </button>
               </div>
             );
@@ -1920,6 +2089,12 @@ export function NetworkGraph({ movements, relationships, eraOrder }: Props) {
             {selectedMovement.regionIds.map((region) => REGION_LABELS[region]).join('・')}
           </p>
           <p className="network-detail-panel__summary">{selectedMovement.summary}</p>
+
+          <NetworkLocalOrbit
+            movement={selectedMovement}
+            edges={selectedNodeEdges}
+            movementById={movementById}
+          />
 
           <div className="network-detail-panel__grid">
             <section aria-labelledby="network-detail-artists">

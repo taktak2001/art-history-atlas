@@ -2,6 +2,7 @@ import type { Movement, RegionId } from '@/lib/schema';
 import { timelineModeById, yearToTimelineX } from '@/lib/timeline-presentation';
 
 export type NetworkSemanticLevel = 'overview' | 'study' | 'detail';
+export type NetworkNodeProminence = 'hub' | 'major' | 'normal' | 'peripheral';
 
 export type NetworkVisualBounds = {
   minX: number;
@@ -46,6 +47,7 @@ export type ChronologicalNetworkLayout = {
 export const NETWORK_ZOOM_MIN = 0.18;
 export const NETWORK_ZOOM_MAX = 1.6;
 export const NETWORK_VISUAL_GUTTER = 32;
+export const NETWORK_OVERVIEW_NODE_LIMIT = 26;
 
 export function clampNetworkZoom(value: number) {
   return Math.min(NETWORK_ZOOM_MAX, Math.max(NETWORK_ZOOM_MIN, value));
@@ -55,6 +57,68 @@ export function networkSemanticLevel(zoom: number): NetworkSemanticLevel {
   if (zoom < 0.94) return 'overview';
   if (zoom < 1.28) return 'study';
   return 'detail';
+}
+
+export function networkNodeImportanceScore(
+  movement: Movement,
+  relationshipDegree: number,
+): number {
+  const visibilityScore =
+    movement.visibilityLevel === 'core'
+      ? 5
+      : movement.visibilityLevel === 'standard'
+        ? 2
+        : 0;
+  return relationshipDegree * 2 + visibilityScore + (movement.isRepresentative ? 5 : 0);
+}
+
+export function networkNodeProminence(
+  movement: Movement,
+  relationshipDegree: number,
+): NetworkNodeProminence {
+  const score = networkNodeImportanceScore(movement, relationshipDegree);
+  if (score >= 23) return 'hub';
+  if (score >= 17) return 'major';
+  if (score >= 9) return 'normal';
+  return 'peripheral';
+}
+
+/**
+ * Overview is an editorial map rather than a smaller rendering of Detail.
+ * Keep one strong landmark per active region, then fill the remaining places
+ * by historical connectivity and editorial importance.
+ */
+export function selectNetworkOverviewMovements(
+  movements: Movement[],
+  relationshipDegreeById: ReadonlyMap<string, number>,
+  limit = NETWORK_OVERVIEW_NODE_LIMIT,
+): Movement[] {
+  if (movements.length <= limit) return [...movements];
+
+  const ranked = [...movements].sort((a, b) => {
+    const scoreDifference =
+      networkNodeImportanceScore(b, relationshipDegreeById.get(b.id) ?? 0) -
+      networkNodeImportanceScore(a, relationshipDegreeById.get(a.id) ?? 0);
+    return scoreDifference || a.dates.start - b.dates.start || a.id.localeCompare(b.id);
+  });
+  const selected = new Map<string, Movement>();
+  const seenRegions = new Set<RegionId>();
+
+  for (const movement of ranked) {
+    const region = primaryRegion(movement);
+    if (seenRegions.has(region)) continue;
+    selected.set(movement.id, movement);
+    seenRegions.add(region);
+    if (selected.size >= limit) break;
+  }
+  for (const movement of ranked) {
+    if (selected.size >= limit) break;
+    selected.set(movement.id, movement);
+  }
+
+  return [...selected.values()].sort(
+    (a, b) => a.dates.start - b.dates.start || a.id.localeCompare(b.id),
+  );
 }
 
 export function getNetworkVisualBounds(
@@ -147,6 +211,7 @@ export function buildChronologicalNetworkLayout({
   const baseTrackStep = compact ? 72 : 76;
   const baseLanePadding = compact ? 22 : 26;
   const baseMinimumLaneHeight = compact ? 108 : 116;
+  const baseRegionGap = compact ? 12 : 18;
   const baseTimelineW = compact ? 1540 : 2240;
   const pad = Math.round(basePad * resolvedZoom);
   const nodeW = Math.round(baseNodeW * resolvedZoom);
@@ -163,6 +228,7 @@ export function buildChronologicalNetworkLayout({
     compact ? 21 : 25,
     Math.round(baseMinimumLaneHeight * resolvedZoom),
   );
+  const regionGap = Math.max(6, Math.round(baseRegionGap * resolvedZoom));
   const timelineW = Math.round(baseTimelineW * resolvedZoom);
   // The final historical years must be centerable even on a wide viewport.
   // This is display-safe space only; it never changes the time coordinate.
@@ -225,7 +291,7 @@ export function buildChronologicalNetworkLayout({
         y: laneTop + lanePadding + placement.track * trackStep,
       });
     }
-    laneTop += height;
+    laneTop += height + regionGap;
   }
 
   const nodeRects = [...positions.values()].map((position) => ({

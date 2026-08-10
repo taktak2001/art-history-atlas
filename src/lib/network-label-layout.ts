@@ -74,8 +74,32 @@ const cubic = (a: number, b: number, c: number, d: number, t: number) => {
   );
 };
 
+const polylinePointAt = (points: Point[], progress: number): Point => {
+  if (points.length < 2) return points[0] ?? { x: 0, y: 0 };
+  const lengths = points.slice(1).map((point, index) =>
+    Math.hypot(point.x - points[index].x, point.y - points[index].y),
+  );
+  const totalLength = lengths.reduce((sum, length) => sum + length, 0);
+  let distance = Math.max(0, Math.min(1, progress)) * totalLength;
+  for (let index = 0; index < lengths.length; index += 1) {
+    const length = lengths[index];
+    if (distance <= length || index === lengths.length - 1) {
+      const ratio = length === 0 ? 0 : distance / length;
+      return {
+        x: points[index].x + (points[index + 1].x - points[index].x) * ratio,
+        y: points[index].y + (points[index + 1].y - points[index].y) * ratio,
+      };
+    }
+    distance -= length;
+  }
+  return points[points.length - 1];
+};
+
 /** 三次ベジェ上の点 */
 export function cubicPointAt(geometry: NetworkEdgeGeometry, t: number): Point {
+  if (geometry.pathPoints && geometry.pathPoints.length > 1) {
+    return polylinePointAt(geometry.pathPoints, t);
+  }
   return {
     x: cubic(
       geometry.start.x,
