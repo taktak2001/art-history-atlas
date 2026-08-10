@@ -5,6 +5,7 @@ export type Point = {
 
 export type NetworkEdgeGeometry = {
   d: string;
+  pathPoints?: Point[];
   start: Point;
   end: Point;
   firstControl: Point;
@@ -142,6 +143,135 @@ export function getNetworkEdgeGeometry(
   };
 }
 
+const uniquePathPoints = (points: Point[]) =>
+  points.filter(
+    (point, index) =>
+      index === 0 ||
+      point.x !== points[index - 1].x ||
+      point.y !== points[index - 1].y,
+  );
+
+const metroPath = (points: Point[]) =>
+  points
+    .map((point, index) => `${index === 0 ? 'M' : 'L'} ${point.x} ${point.y}`)
+    .join(' ');
+
+/**
+ * Metro-map geometry used by the historical network. Movement positions stay
+ * tied to actual year and region, while the visible route is constrained to
+ * horizontal and vertical corridors. The label box is not used as an edge
+ * boundary: every relation meets the shared station point instead.
+ */
+export function getNetworkMetroEdgeGeometry(
+  fromPosition: Point,
+  toPosition: Point,
+  nodeWidth: number,
+  nodeHeight: number,
+  directed: boolean,
+  arrowGap = NETWORK_ARROW_GAP,
+  routeOffset = 0,
+  corridorOffset = 0,
+): NetworkEdgeGeometry {
+  const stationInset = Math.min(14, Math.max(8, nodeWidth * 0.08));
+  const sourceStation = {
+    x: fromPosition.x + stationInset,
+    y: fromPosition.y + nodeHeight / 2,
+  };
+  const targetStation = {
+    x: toPosition.x + stationInset,
+    y: toPosition.y + nodeHeight / 2,
+  };
+  const direction = targetStation.x >= sourceStation.x ? 1 : -1;
+  const start = insetPointToward(sourceStation, targetStation, 4);
+  const targetBoundary = targetStation;
+  const end = insetPointToward(
+    targetBoundary,
+    sourceStation,
+    directed ? arrowGap + 4 : 4,
+  );
+  const horizontalDistance = Math.abs(end.x - start.x);
+  const sameTrack = Math.abs(end.y - start.y) < 1;
+  let points: Point[];
+
+  if (sameTrack) {
+    points = [start, end];
+  } else if (horizontalDistance < 28) {
+    const corridorX = start.x + corridorOffset;
+    points = [
+      start,
+      { x: corridorX, y: start.y },
+      { x: corridorX, y: end.y },
+      end,
+    ];
+  } else {
+    const minimumX = Math.min(start.x, end.x) + 12;
+    const maximumX = Math.max(start.x, end.x) - 12;
+    const corridorX = Math.max(
+      minimumX,
+      Math.min(
+        maximumX,
+        (start.x + end.x) / 2 + corridorOffset,
+      ),
+    );
+    const routedY = start.y + routeOffset;
+    const leadX = start.x + direction * Math.min(14, horizontalDistance / 4);
+    points = [start];
+    if (routeOffset !== 0) {
+      points.push(
+        { x: leadX, y: start.y },
+        { x: leadX, y: routedY },
+      );
+    }
+    points.push(
+      { x: corridorX, y: routedY },
+      { x: corridorX, y: end.y },
+      end,
+    );
+  }
+
+  points = uniquePathPoints(points);
+  const middleIndex = Math.max(0, Math.floor((points.length - 1) / 2));
+  const firstControl = points[Math.min(1, points.length - 1)] ?? start;
+  const secondControl = points[Math.max(0, points.length - 2)] ?? end;
+  const middleStart = points[middleIndex] ?? start;
+  const middleEnd = points[Math.min(points.length - 1, middleIndex + 1)] ?? end;
+
+  return {
+    d: metroPath(points),
+    pathPoints: points,
+    start,
+    end,
+    firstControl,
+    secondControl,
+    targetBoundary,
+    midX: (middleStart.x + middleEnd.x) / 2,
+    midY: (middleStart.y + middleEnd.y) / 2,
+    routeOffset,
+  };
+}
+
+function pointOnPolyline(points: Point[], progress: number): Point {
+  if (points.length < 2) return points[0] ?? { x: 0, y: 0 };
+  const lengths = points.slice(1).map((point, index) =>
+    Math.hypot(point.x - points[index].x, point.y - points[index].y),
+  );
+  const totalLength = lengths.reduce((sum, length) => sum + length, 0);
+  let distance = Math.max(0, Math.min(1, progress)) * totalLength;
+
+  for (let index = 0; index < lengths.length; index += 1) {
+    const length = lengths[index];
+    if (distance <= length || index === lengths.length - 1) {
+      const ratio = length === 0 ? 0 : distance / length;
+      return {
+        x: points[index].x + (points[index + 1].x - points[index].x) * ratio,
+        y: points[index].y + (points[index + 1].y - points[index].y) * ratio,
+      };
+    }
+    distance -= length;
+  }
+  return points[points.length - 1];
+}
+
 export function getNetworkEdgeLabelPoint(
   geometry: NetworkEdgeGeometry,
   anchor: 'start' | 'middle' | 'end' = 'middle',
@@ -153,6 +283,10 @@ export function getNetworkEdgeLabelPoint(
         ? 1 - NETWORK_SELECTED_LABEL_PROGRESS
         : 0.5;
   const inverse = 1 - t;
+
+  if (geometry.pathPoints && geometry.pathPoints.length > 1) {
+    return pointOnPolyline(geometry.pathPoints, t);
+  }
 
   return {
     x:

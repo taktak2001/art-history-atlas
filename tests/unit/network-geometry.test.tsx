@@ -4,6 +4,7 @@ import { ArrowMarkerDefs, RelationLine } from '@/components/RelationLine';
 import {
   getNetworkEdgeGeometry,
   getNetworkEdgeLabelPoint,
+  getNetworkMetroEdgeGeometry,
   getNetworkEdgeRouteOffset,
   getParallelEdgeRouteOffset,
   getNetworkViewBox,
@@ -141,6 +142,45 @@ describe('network geometry', () => {
 
     expect(getParallelEdgeRouteOffset(edges[1], edges)).toBe(0);
     expect(getParallelEdgeRouteOffset(edges[0], edges)).toBe(-24);
+  });
+
+  it('歴史地図の関係線を水平・垂直のmetro corridorとして描く', () => {
+    const geometry = getNetworkMetroEdgeGeometry(
+      { x: 80, y: 60 },
+      { x: 420, y: 220 },
+      160,
+      60,
+      true,
+      undefined,
+      -20,
+      16,
+    );
+
+    expect(geometry.d).toContain(' L ');
+    expect(geometry.d).not.toContain(' C ');
+    expect(geometry.pathPoints!.length).toBeGreaterThanOrEqual(4);
+    for (let index = 1; index < geometry.pathPoints!.length; index += 1) {
+      const previous = geometry.pathPoints![index - 1];
+      const current = geometry.pathPoints![index];
+      expect(current.x === previous.x || current.y === previous.y).toBe(true);
+    }
+    expect(geometry.end.x).toBeLessThan(geometry.targetBoundary.x);
+  });
+
+  it('metro corridor上の関係ラベル位置を線分長に沿って計算する', () => {
+    const geometry = getNetworkMetroEdgeGeometry(
+      { x: 40, y: 40 },
+      { x: 320, y: 180 },
+      150,
+      58,
+      true,
+    );
+    const start = getNetworkEdgeLabelPoint(geometry, 'start');
+    const end = getNetworkEdgeLabelPoint(geometry, 'end');
+
+    expect(start.x).toBeLessThan(end.x);
+    expect(Number.isFinite(start.y)).toBe(true);
+    expect(Number.isFinite(end.y)).toBe(true);
   });
 });
 

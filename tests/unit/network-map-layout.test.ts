@@ -5,7 +5,10 @@ import {
   clampNetworkZoom,
   getNetworkFitZoom,
   getNetworkVisualBounds,
+  NETWORK_OVERVIEW_NODE_LIMIT,
+  networkNodeProminence,
   networkSemanticLevel,
+  selectNetworkOverviewMovements,
 } from '@/lib/network-map-layout';
 
 describe('chronological network map layout', () => {
@@ -75,6 +78,37 @@ describe('network semantic zoom', () => {
     expect(networkSemanticLevel(0.84)).toBe('overview');
     expect(networkSemanticLevel(1)).toBe('study');
     expect(networkSemanticLevel(1.4)).toBe('detail');
+  });
+
+  it('limits overview to an editorial set while preserving regional landmarks', () => {
+    const degreeById = new Map<string, number>();
+    for (const relationship of relationships) {
+      degreeById.set(
+        relationship.from,
+        (degreeById.get(relationship.from) ?? 0) + 1,
+      );
+      degreeById.set(
+        relationship.to,
+        (degreeById.get(relationship.to) ?? 0) + 1,
+      );
+    }
+    const overview = selectNetworkOverviewMovements(movements, degreeById);
+
+    expect(overview).toHaveLength(NETWORK_OVERVIEW_NODE_LIMIT);
+    expect(new Set(overview.map((movement) => movement.regionIds[0])).size).toBe(
+      new Set(movements.map((movement) => movement.regionIds[0])).size,
+    );
+    expect(overview.map((movement) => movement.id)).toContain('italian-renaissance');
+  });
+
+  it('assigns stronger station hierarchy to connected representative movements', () => {
+    const renaissance = movements.find(
+      (movement) => movement.id === 'italian-renaissance',
+    )!;
+    const peripheral = movements.find((movement) => movement.id === 'land-art')!;
+
+    expect(networkNodeProminence(renaissance, 7)).toBe('hub');
+    expect(networkNodeProminence(peripheral, 0)).toBe('peripheral');
   });
 });
 

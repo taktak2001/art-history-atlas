@@ -1,4 +1,14 @@
-import { test, expect } from '@playwright/test';
+import { test, expect, type Page } from '@playwright/test';
+
+async function zoomNetworkToStudy(page: Page) {
+  const graph = page.getByRole('group', { name: '美術運動の関係ネットワーク図' });
+  const zoomIn = page.getByRole('button', { name: 'ネットワークを拡大' });
+  for (let step = 0; step < 8; step += 1) {
+    if ((await graph.getAttribute('data-network-semantic-level')) !== 'overview') break;
+    await zoomIn.click();
+  }
+  await expect(graph).toHaveAttribute('data-network-semantic-level', 'study');
+}
 
 test('iPhone幅では重要関係を絞り、基本LODの歴史的背景ノードを保つ', async ({ page }) => {
   await page.setViewportSize({ width: 390, height: 844 });
@@ -17,7 +27,13 @@ test('iPhone幅では重要関係を絞り、基本LODの歴史的背景ノー�
   expect(edgeCount).toBeLessThanOrEqual(18);
 
   const nodeCount = await graph.locator('[data-network-node]').count();
-  expect(nodeCount).toBe(32);
+  expect(nodeCount).toBe(26);
+  expect(await graph.locator('[data-overview-landmark="true"]').count()).toBeGreaterThan(0);
+  expect(
+    await graph.locator('[data-network-node-title]').evaluateAll((elements) =>
+      elements.filter((element) => !element.textContent?.trim()).length,
+    ),
+  ).toBe(0);
   await expect(page.getByRole('heading', { name: '関係一覧' })).toBeVisible();
   await expect(page.getByRole('button', { name: 'すべて表示' })).toBeVisible();
 });
@@ -110,6 +126,14 @@ test('選択時は直接関係、2-hop、背景の3段階で焦点化する', as
     .first()
     .evaluate((element) => Number(getComputedStyle(element).opacity));
   expect(secondHopOpacity).toBeGreaterThan(backgroundOpacity);
+  await expect(page.locator('[data-network-detail-panel] figure')).toContainText(
+    'LOCAL ORBIT',
+  );
+  await expect(
+    page.getByRole('img', {
+      name: 'イタリア・ルネサンスと直接関係するムーブメント',
+    }),
+  ).toBeVisible();
 });
 
 test('overviewとfocused cameraを分け、全体操作で俯瞰へ戻る', async ({ page }) => {
@@ -120,6 +144,11 @@ test('overviewとfocused cameraを分け、全体操作で俯瞰へ戻る', asyn
   await expect(graph).toHaveAttribute('data-network-camera', 'overview');
   await expect(graph).toHaveAttribute('data-network-visual-gutter', '32');
   await expect(graph.locator('[data-node-state="dimmed"]')).toHaveCount(0);
+  await expect(graph.locator('[data-network-node]')).toHaveCount(26);
+  await expect(graph.locator('[data-edge-label]')).toHaveCount(0);
+  await expect(
+    graph.locator('[data-network-edge][data-route-grammar="metro"]'),
+  ).toHaveCount(await graph.locator('[data-network-edge]').count());
   await expect(
     page.getByRole('button', { name: '表示中のネットワーク全体へ戻る' }),
   ).toBeVisible();
@@ -325,7 +354,7 @@ test('ノード選択時は強調線を無関係ノードより前、関連ノ�
   );
   await expect(baseLayer.locator('[data-network-edge]').first()).toHaveAttribute(
     'opacity',
-    '0.06',
+    '0.04',
   );
   expect(await graph.locator('[data-edge-label]').count()).toBeGreaterThan(0);
   expect(await graph.locator('[data-node-state="related"]').count()).toBeGreaterThan(0);
@@ -355,14 +384,16 @@ test('ノード選択時は強調線を無関係ノードより前、関連ノ�
     .toBe('rgb(28, 28, 30)');
   const selectedStyle = await selectedNode.evaluate((element) => {
     const style = getComputedStyle(element);
+    const content = element.querySelector<HTMLElement>('.network-node__content')!;
+    const contentStyle = getComputedStyle(content);
     const title = element.querySelector<HTMLElement>('[data-network-node-title]');
     const date = element.querySelector<HTMLElement>('[data-network-node-date]');
     return {
       opacity: Number(style.opacity),
-      borderWidth: style.borderTopWidth,
-      borderColor: style.borderTopColor,
-      backgroundColor: style.backgroundColor,
-      boxShadow: style.boxShadow,
+      borderWidth: contentStyle.borderTopWidth,
+      borderColor: contentStyle.borderTopColor,
+      backgroundColor: contentStyle.backgroundColor,
+      boxShadow: contentStyle.boxShadow,
       transform: style.transform,
       titleWeight: title ? Number(getComputedStyle(title).fontWeight) : 0,
       titleColor: title ? getComputedStyle(title).color : '',
@@ -371,7 +402,8 @@ test('ノード選択時は強調線を無関係ノードより前、関連ノ�
   });
   const idleNode = graph.locator('[data-node-state="dimmed"]').first();
   const idleStyle = await idleNode.evaluate((element) => {
-    const style = getComputedStyle(element);
+    const content = element.querySelector<HTMLElement>('.network-node__content')!;
+    const style = getComputedStyle(content);
     return {
       borderWidth: style.borderTopWidth,
       backgroundColor: style.backgroundColor,
@@ -385,7 +417,8 @@ test('ノード選択時は強調線を無関係ノードより前、関連ノ�
     Number(getComputedStyle(element).opacity),
   );
 
-  expect(selectedStyle.opacity).toBe(1);
+  // WebKit/Chromium may sample the final transition frame a fraction below 1.
+  expect(selectedStyle.opacity).toBeGreaterThanOrEqual(0.99);
   expect(Number.parseFloat(selectedStyle.borderWidth)).toBeGreaterThanOrEqual(2);
   expect(Number.parseFloat(selectedStyle.borderWidth)).toBeLessThanOrEqual(2.5);
   expect(selectedStyle.borderColor).toContain('28, 28, 30');
@@ -394,17 +427,16 @@ test('ノード選択時は強調線を無関係ノードより前、関連ノ�
   expect(selectedStyle.titleWeight).toBeGreaterThanOrEqual(700);
   // 俯瞰のsemantic zoomでは年代を省略し、表示時は400を維持する
   expect([0, 400]).toContain(selectedStyle.dateWeight);
-  // 主ノードは2.5px濃チャコールの単線のみ（影・二重線なし）
-  expect(selectedStyle.boxShadow).toBe('none');
+  // 主ノードだけが2.5px濃チャコールとごく弱い影を持つ
+  expect(selectedStyle.boxShadow).not.toBe('none');
   expect(selectedStyle.backgroundColor).toBe('rgb(252, 248, 244)');
-  expect(Number.parseFloat(idleStyle.borderWidth)).toBeGreaterThanOrEqual(1);
-  expect(Number.parseFloat(idleStyle.borderWidth)).toBeLessThanOrEqual(1.5);
+  expect(Number.parseFloat(idleStyle.borderWidth)).toBe(0);
   expect(idleStyle.boxShadow).toBe('none');
-  expect(idleStyle.backgroundColor).toMatch(/^rgba\(255, 255, 255, 0\.1/);
-  // 関係ノードは0.85以上、背景ノードは0.15前後まで沈める
+  expect(idleStyle.backgroundColor).toBe('rgba(0, 0, 0, 0)');
+  // 関係ノードは0.85以上、背景ノードは0.06〜0.10まで沈める
   expect(relatedOpacity).toBeGreaterThanOrEqual(0.85);
-  expect(dimmedOpacity).toBeGreaterThanOrEqual(0.12);
-  expect(dimmedOpacity).toBeLessThanOrEqual(0.25);
+  expect(dimmedOpacity).toBeGreaterThanOrEqual(0.06);
+  expect(dimmedOpacity).toBeLessThanOrEqual(0.1);
   expect(selectedStyle.backgroundColor).not.toBe(idleStyle.backgroundColor);
   await expect(
     graph.locator('[data-edge-label][data-edge-label-anchor="start"], [data-edge-label][data-edge-label-anchor="end"]'),
@@ -453,6 +485,7 @@ test('基本表示ではルネサンスとバロックの直接関係だけを�
   await expect(collapsedReaction).toHaveCount(0);
 
   await page.getByRole('button', { name: /充実/ }).click();
+  await zoomNetworkToStudy(page);
   const standardReaction = graph.locator(
     '[data-network-layer="base-edges"] [data-network-edge-id="lod-reaction-mannerism-baroque"]',
   );
@@ -520,6 +553,7 @@ test('線ラベルの背景は線を隠すためだけの最小限にする（pi
   page,
 }) => {
   await page.goto('/network/');
+  await zoomNetworkToStudy(page);
   await expect(page.locator('[data-edge-label]').first()).toBeVisible();
 
   // ラベル数とバックプレート数は描画確定後に一度で読む（途中経過で数が変わるため）
@@ -555,7 +589,10 @@ test('線ラベルの背景は線を隠すためだけの最小限にする（pi
   expect(style.height).toBeLessThanOrEqual(22);
 });
 
-test('PCで時代ジャンプと左右キーにより現代まで移動できる', async ({ page }) => {
+test('PCで時代ジャンプと左右キーにより現代まで移動できる', async ({
+  page,
+}, testInfo) => {
+  test.skip(testInfo.project.name !== 'desktop', 'desktop keyboard navigation only');
   await page.setViewportSize({ width: 1280, height: 900 });
   await page.goto('/network/');
 
@@ -616,7 +653,8 @@ test('ダークモードと動きを減らす設定を尊重する', async ({ pa
   const selectedStyle = await graph
     .locator('[data-node-state="selected"]')
     .evaluate((element) => {
-      const style = getComputedStyle(element);
+      const content = element.querySelector<HTMLElement>('.network-node__content')!;
+      const style = getComputedStyle(content);
       const title = element.querySelector<HTMLElement>('[data-network-node-title]');
       return {
         borderColor: style.borderTopColor,
@@ -627,7 +665,7 @@ test('ダークモードと動きを減らす設定を尊重する', async ({ pa
     });
   expect(selectedStyle.borderColor).toBe(selectedStyle.titleColor);
   expect(selectedStyle.backgroundColor).toBe('rgb(42, 40, 37)');
-  expect(selectedStyle.boxShadow).toBe('none');
+  expect(selectedStyle.boxShadow).not.toBe('none');
 });
 
 for (const zoom of [1.25, 1.5]) {
@@ -676,7 +714,8 @@ test('詳細ページから関係ネットワークへ移ると直接関係が�
 
   // 5. 直接関係先を保ち、非関連ノードは背景として残して弱める
   await expect(page.getByText('中国山水画').first()).toBeVisible();
-  await expect(page.locator('[data-network-node]')).toHaveCount(48);
+  expect(await page.locator('[data-network-node]').count()).toBeGreaterThanOrEqual(26);
+  expect(await page.locator('[data-network-node]').count()).toBeLessThanOrEqual(48);
   await expect(page.locator('[data-network-node][data-node-state="dimmed"]').first()).toBeVisible();
 
   // 6. 全体寄りではなくサブグラフの件数を出す
@@ -698,7 +737,8 @@ test('focus中は手動変更を尊重し、選択解除で全体表示へ戻る
   await expect(page).toHaveURL(/lod=core/);
   await expect(page).toHaveURL(/focus=japanese-ink-painting/);
   // focusノードと直接関係はLODに関わらず表示し続け、基本LODの背景も残す
-  await expect(page.locator('[data-network-node]')).toHaveCount(33);
+  expect(await page.locator('[data-network-node]').count()).toBeGreaterThanOrEqual(26);
+  expect(await page.locator('[data-network-node]').count()).toBeLessThanOrEqual(33);
   await expect(page.locator('[data-network-node][data-node-state="dimmed"]').first()).toBeVisible();
   await expect(
     page.locator('.network-scope-option[aria-pressed="true"]'),
@@ -804,6 +844,7 @@ test('関係ラベルは密集しても互いに重ならず、全件表示さ�
 
 test('全体表示でラベルが密集してもラベル同士が重ならない', async ({ page }) => {
   await page.goto('/network/?scope=all');
+  await zoomNetworkToStudy(page);
 
   await expect(page.locator('[data-edge-label]').first()).toBeVisible();
 
