@@ -232,6 +232,9 @@ describe('LOD UI', () => {
     expect(trigger).toHaveAttribute('aria-expanded', 'false');
     expect(trigger).toHaveTextContent('基本');
     expect(trigger).not.toHaveTextContent('32');
+    expect(trigger.querySelector('select')).toBeNull();
+    expect(trigger.querySelector('svg')).not.toBeNull();
+    expect(trigger).not.toHaveTextContent('⌄');
 
     fireEvent.click(trigger);
     expect(trigger).toHaveAttribute('aria-expanded', 'true');
