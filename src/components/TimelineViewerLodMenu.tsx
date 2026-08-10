@@ -95,11 +95,11 @@ export function TimelineViewerLodMenu({ value, counts, onChange }: Props) {
         first.focus();
       }
     };
-    document.addEventListener('pointerdown', onPointerDown);
+    document.addEventListener('pointerdown', onPointerDown, true);
     document.addEventListener('keydown', onKeyDown, true);
     return () => {
       window.cancelAnimationFrame(frame);
-      document.removeEventListener('pointerdown', onPointerDown);
+      document.removeEventListener('pointerdown', onPointerDown, true);
       document.removeEventListener('keydown', onKeyDown, true);
     };
   }, [close, open]);
@@ -128,7 +128,7 @@ export function TimelineViewerLodMenu({ value, counts, onChange }: Props) {
             }
           >
             <div className="timeline-viewer-lod-panel__header">
-              <p>表示する範囲</p>
+              <p>LEVEL OF DETAIL</p>
               <button
                 type="button"
                 className="timeline-viewer-lod-panel__close"
