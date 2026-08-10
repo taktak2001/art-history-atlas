@@ -8,15 +8,15 @@ export type RelationLineStyle = {
 };
 
 export const RELATION_LINE_STYLE: Record<RelationKind, RelationLineStyle> = {
-  succession: { linecap: 'round', width: 2.8, arrow: true },
-  reaction: { dasharray: '9 6', linecap: 'butt', width: 2.8, arrow: true },
-  influence: { dasharray: '18 8', linecap: 'butt', width: 2.8, arrow: true },
-  contemporary: { dasharray: '1.5 6', linecap: 'round', width: 2.8, arrow: false },
-  'regional-variant': { dasharray: '5 4', linecap: 'butt', width: 2.8, arrow: true },
-  theoretical: { dasharray: '13 4 2 4', linecap: 'butt', width: 2.8, arrow: true },
-  technical: { dasharray: '1 3.5', linecap: 'round', width: 2.6, arrow: true },
-  revival: { dasharray: '9 5', linecap: 'butt', width: 2.8, arrow: true },
-  'shared-idea': { dasharray: '2 6', linecap: 'round', width: 3, arrow: false },
+  succession: { linecap: 'round', width: 1.7, arrow: true },
+  reaction: { dasharray: '9 6', linecap: 'butt', width: 1.7, arrow: true },
+  influence: { dasharray: '18 8', linecap: 'butt', width: 1.7, arrow: true },
+  contemporary: { dasharray: '1.5 6', linecap: 'round', width: 1.6, arrow: false },
+  'regional-variant': { dasharray: '5 4', linecap: 'butt', width: 1.65, arrow: true },
+  theoretical: { dasharray: '13 4 2 4', linecap: 'butt', width: 1.6, arrow: true },
+  technical: { dasharray: '1 3.5', linecap: 'round', width: 1.55, arrow: true },
+  revival: { dasharray: '9 5', linecap: 'butt', width: 1.65, arrow: true },
+  'shared-idea': { dasharray: '2 6', linecap: 'round', width: 1.75, arrow: false },
 };
 
 /**

@@ -1,6 +1,6 @@
 import { test, expect } from '@playwright/test';
 
-test('iPhone幅では重要関係と制限したノードだけを初期表示する', async ({ page }) => {
+test('iPhone幅では重要関係を絞り、基本LODの歴史的背景ノードを保つ', async ({ page }) => {
   await page.setViewportSize({ width: 390, height: 844 });
   await page.goto('/network/');
 
@@ -17,7 +17,7 @@ test('iPhone幅では重要関係と制限したノードだけを初期表示�
   expect(edgeCount).toBeLessThanOrEqual(18);
 
   const nodeCount = await graph.locator('[data-network-node]').count();
-  expect(nodeCount).toBeLessThanOrEqual(24);
+  expect(nodeCount).toBe(32);
   await expect(page.getByRole('heading', { name: '関係一覧' })).toBeVisible();
   await expect(page.getByRole('button', { name: 'すべて表示' })).toBeVisible();
 });
@@ -44,6 +44,64 @@ test('PCにも表示切替と件数を常時表示する', async ({ page }) => {
   await expect(page.getByRole('button', { name: '重要関係のみ' })).toBeVisible();
   await expect(page.getByRole('button', { name: 'すべて表示' })).toBeVisible();
   await expect(page.getByText(/関係・\d+ノード表示中/)).toBeVisible();
+});
+
+test('実年代X軸と地域Yレーンを表示し、両方向へスクロールできる', async ({ page }) => {
+  await page.setViewportSize({ width: 390, height: 844 });
+  await page.goto('/network/');
+
+  const graph = page.getByRole('group', { name: '美術運動の関係ネットワーク図' });
+  await expect(graph.locator('[data-network-region="france"]')).toBeAttached();
+  await expect(graph.locator('[data-network-region="japan"]')).toBeAttached();
+  await expect(graph.getByText('前4万', { exact: true })).toBeVisible();
+  await expect(graph.getByText('1900', { exact: true })).toBeAttached();
+
+  const overflow = await graph.evaluate((element) => ({
+    horizontal: element.scrollWidth > element.clientWidth,
+    vertical: element.scrollHeight > element.clientHeight,
+  }));
+  expect(overflow.horizontal).toBe(true);
+  expect(overflow.vertical).toBe(true);
+});
+
+test('semantic zoomでMovementからArtist・Work・Contextへ段階表示する', async ({ page }) => {
+  await page.goto('/network/?focus=mono-ha&scope=focus');
+  const graph = page.getByRole('group', { name: '美術運動の関係ネットワーク図' });
+  await expect(graph).toHaveAttribute('data-network-semantic-level', 'overview');
+  await expect(graph.locator('[data-network-entity="artist"]')).toHaveCount(0);
+
+  const zoomIn = page.getByRole('button', { name: 'ネットワークを拡大' });
+  await zoomIn.click();
+  await expect(graph).toHaveAttribute('data-network-semantic-level', 'study');
+  expect(await graph.locator('[data-network-entity="artist"]').count()).toBeGreaterThan(0);
+  await expect(graph.locator('[data-network-entity="work"]')).toHaveCount(0);
+
+  await zoomIn.click();
+  await zoomIn.click();
+  await expect(graph).toHaveAttribute('data-network-semantic-level', 'detail');
+  expect(await graph.locator('[data-network-entity="work"]').count()).toBeGreaterThan(0);
+  expect(await graph.locator('[data-network-entity="context"]').count()).toBeGreaterThan(0);
+  await expect(page.locator('[data-network-detail-panel]')).toContainText('Artists');
+  await expect(page.locator('[data-network-detail-panel]')).toContainText('Works');
+});
+
+test('選択時は直接関係、2-hop、背景の3段階で焦点化する', async ({ page }) => {
+  await page.goto('/network/');
+  const graph = page.getByRole('group', { name: '美術運動の関係ネットワーク図' });
+  await graph.getByRole('button', { name: 'イタリア・ルネサンスを選択' }).click();
+
+  expect(await graph.locator('[data-node-state="related"]').count()).toBeGreaterThan(0);
+  expect(await graph.locator('[data-node-state="secondary"]').count()).toBeGreaterThan(0);
+  expect(await graph.locator('[data-node-state="dimmed"]').count()).toBeGreaterThan(0);
+  const secondHopOpacity = await graph
+    .locator('[data-node-state="secondary"]')
+    .first()
+    .evaluate((element) => Number(getComputedStyle(element).opacity));
+  const backgroundOpacity = await graph
+    .locator('[data-node-state="dimmed"]')
+    .first()
+    .evaluate((element) => Number(getComputedStyle(element).opacity));
+  expect(secondHopOpacity).toBeGreaterThan(backgroundOpacity);
 });
 
 test('iPhoneでは本体が初期viewport内に入り、線の見方はoverlayで開く', async ({ page }) => {
@@ -113,7 +171,7 @@ test('関係タイプごとに線種・通常線幅・方向を使い分ける',
   const reaction = base.locator('[data-relation-kind="reaction"] [data-network-edge]').first();
   const influence = base.locator('[data-relation-kind="influence"] [data-network-edge]').first();
   const expectedNormalWidth =
-    (page.viewportSize()?.width ?? 1280) <= 639 ? '2' : '2.8';
+    (page.viewportSize()?.width ?? 1280) <= 639 ? '1.7' : '1.7';
 
   await expect(succession).toHaveAttribute('stroke-width', expectedNormalWidth);
   await expect(reaction).toHaveAttribute('stroke-dasharray', '9 6');
@@ -160,18 +218,18 @@ test('ノード選択時は強調線を無関係ノードより前、関連ノ�
   const highlightedLayer = graph.locator('[data-network-layer="highlighted-edges"]');
   const baseLayer = graph.locator('[data-network-layer="base-edges"]');
   const expectedHighlightWidth =
-    (page.viewportSize()?.width ?? 1280) <= 639 ? '3.6' : '4.6';
+    (page.viewportSize()?.width ?? 1280) <= 639 ? '3' : '3.4';
   await expect(highlightedLayer.locator('[data-network-edge]').first()).toHaveAttribute(
     'stroke-width',
     expectedHighlightWidth,
   );
   await expect(baseLayer.locator('[data-network-edge]').first()).toHaveAttribute(
     'stroke-width',
-    '1.1',
+    '0.9',
   );
   await expect(baseLayer.locator('[data-network-edge]').first()).toHaveAttribute(
     'opacity',
-    '0.075',
+    '0.06',
   );
   expect(await graph.locator('[data-edge-label]').count()).toBeGreaterThan(0);
   expect(await graph.locator('[data-node-state="related"]').count()).toBeGreaterThan(0);
@@ -523,9 +581,10 @@ test('詳細ページから関係ネットワークへ移ると直接関係が�
   await expect(scopeSelected).toHaveText('このムーブメント');
   await expect(page).toHaveURL(/scope=focus/);
 
-  // 5. 直接関係先（中国山水画）が表示され、非関連ノードは出ない
+  // 5. 直接関係先を保ち、非関連ノードは背景として残して弱める
   await expect(page.getByText('中国山水画').first()).toBeVisible();
-  await expect(page.locator('[data-network-node]')).toHaveCount(2);
+  await expect(page.locator('[data-network-node]')).toHaveCount(48);
+  await expect(page.locator('[data-network-node][data-node-state="dimmed"]').first()).toBeVisible();
 
   // 6. 全体寄りではなくサブグラフの件数を出す
   await expect(page.locator('.network-controls__count')).toContainText('直接関係');
@@ -545,8 +604,9 @@ test('focus中は手動変更を尊重し、選択解除で全体表示へ戻る
     .click();
   await expect(page).toHaveURL(/lod=core/);
   await expect(page).toHaveURL(/focus=japanese-ink-painting/);
-  // focusノードと直接関係はLODに関わらず表示し続ける
-  await expect(page.locator('[data-network-node]')).toHaveCount(2);
+  // focusノードと直接関係はLODに関わらず表示し続け、基本LODの背景も残す
+  await expect(page.locator('[data-network-node]')).toHaveCount(33);
+  await expect(page.locator('[data-network-node][data-node-state="dimmed"]').first()).toBeVisible();
   await expect(
     page.locator('.network-scope-option[aria-pressed="true"]'),
   ).toHaveText('このムーブメント');

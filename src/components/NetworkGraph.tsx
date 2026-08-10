@@ -2,16 +2,18 @@
 
 import {
   useEffect,
+  useLayoutEffect,
   useMemo,
   useRef,
   useState,
   type KeyboardEvent,
   type PointerEvent,
   type WheelEvent,
+  type CSSProperties,
 } from 'react';
 import Link from 'next/link';
 import type { Movement, Relationship, RelationKind, EraId } from '@/lib/schema';
-import { RELATION_LABELS, ERA_LABELS } from '@/lib/schema';
+import { RELATION_LABELS, REGION_LABELS } from '@/lib/schema';
 import {
   formatRelationshipStatement,
   isImportantRelationship,
@@ -32,6 +34,7 @@ import {
 import {
   estimateLabelWidth,
   layoutEdgeLabels,
+  segmentIntersectsRect,
   type LabelInput,
   type Obstacle,
 } from '@/lib/network-label-layout';
@@ -61,6 +64,21 @@ import {
 import { parseFocus, buildFocusQuery } from '@/lib/network';
 import { AccordionChevron } from '@/components/AccordionChevron';
 import { MovementPicker } from '@/components/MovementPicker';
+import { artistsOf, formatDateRange, regionOrder, worksOf } from '@/lib/dataset';
+import { regionRgb } from '@/lib/timeline-region-presentation';
+import {
+  buildChronologicalNetworkLayout,
+  clampNetworkZoom,
+  networkSemanticLevel,
+  type ChronologicalNetworkLayout,
+} from '@/lib/network-map-layout';
+import {
+  SURVEY_TICKS,
+  timelineModeById,
+  timelineXToYear,
+  yearToTimelineX,
+  formatTimelineYearLabel,
+} from '@/lib/timeline-presentation';
 
 type Props = {
   movements: Movement[];
@@ -70,16 +88,7 @@ type Props = {
 
 type RelationKindFilter = 'all' | RelationKind;
 
-type Layout = {
-  positions: Map<string, { x: number; y: number }>;
-  canvasW: number;
-  canvasH: number;
-  colStep: number;
-  nodeW: number;
-  nodeH: number;
-  pad: number;
-  safePad: number;
-};
+type Layout = ChronologicalNetworkLayout;
 
 const ALL_KINDS = RELATION_KINDS;
 
@@ -93,6 +102,22 @@ const ERA_JUMP_LABELS: Record<EraId, string> = {
   postwar: '戦後',
   contemporary: '現代',
 };
+
+const ERA_TIME_RANGES: Array<{
+  era: EraId;
+  start: number;
+  end: number;
+  jumpYear: number;
+}> = [
+  { era: 'prehistoric-ancient', start: -40_000, end: 500, jumpYear: -480 },
+  { era: 'medieval', start: 500, end: 1400, jumpYear: 1000 },
+  { era: 'renaissance', start: 1400, end: 1600, jumpYear: 1450 },
+  { era: 'baroque-rococo', start: 1600, end: 1750, jumpYear: 1650 },
+  { era: 'nineteenth', start: 1750, end: 1900, jumpYear: 1820 },
+  { era: 'modern', start: 1900, end: 1945, jumpYear: 1915 },
+  { era: 'postwar', start: 1945, end: 1980, jumpYear: 1960 },
+  { era: 'contemporary', start: 1980, end: 2027, jumpYear: 2000 },
+];
 
 function getEdgeGeometry(
   relationship: AggregatedRelationship,
@@ -145,9 +170,16 @@ export function NetworkGraph({ movements, relationships, eraOrder }: Props) {
     active: false,
     pointerId: -1,
     startX: 0,
+    startY: 0,
     scrollLeft: 0,
+    scrollTop: 0,
   });
   const scrollRafRef = useRef<number | null>(null);
+  const zoomAnchorRef = useRef<{
+    year: number;
+    screenX: number;
+    scrollTop: number;
+  } | null>(null);
   // 詳細ページ→ネットワークの文脈（?focus=）を扱うための参照
   const selectedNodeButtonRef = useRef<HTMLButtonElement | null>(null);
   const focusSkipSyncRef = useRef(true);
@@ -168,6 +200,7 @@ export function NetworkGraph({ movements, relationships, eraOrder }: Props) {
   const [isLineGuideOpen, setIsLineGuideOpen] = useState(false);
   const [activeEra, setActiveEra] = useState<EraId>(eraOrder[0]);
   const [expandedGroupIds, setExpandedGroupIds] = useState<Set<string>>(new Set());
+  const [networkZoom, setNetworkZoom] = useState(0.84);
   const { lod, setLod, applyPurposeDefault, clearLod, hasExplicitChoice } =
     useLodState('core');
 
@@ -372,20 +405,12 @@ export function NetworkGraph({ movements, relationships, eraOrder }: Props) {
   );
 
   const displayedMovements = useMemo(() => {
-    const base =
-      visibleEdges.length === 0
-        ? [...lodMovements]
-            .sort((a, b) => a.dates.start - b.dates.start)
-            .slice(0, isMobile ? 12 : 18)
-        : (() => {
-            const visibleIds = new Set(
-              visibleEdges.flatMap((relationship) => [
-                relationship.from,
-                relationship.to,
-              ]),
-            );
-            return lodMovements.filter((movement) => visibleIds.has(movement.id));
-          })();
+    // Relation filters change the lines, not the historical field itself.
+    // Keeping every movement in the selected LOD preserves regions and lets
+    // unrelated nodes recede instead of disappearing during selection.
+    const base = [...lodMovements].sort(
+      (a, b) => a.dates.start - b.dates.start || a.id.localeCompare(b.id),
+    );
 
     // フォーカス中のノードは関係が絞り込まれていても必ず表示（位置を確保し自動解除を防ぐ）
     if (selectedNodeId && !base.some((movement) => movement.id === selectedNodeId)) {
@@ -393,104 +418,40 @@ export function NetworkGraph({ movements, relationships, eraOrder }: Props) {
       if (focused) return [...base, focused];
     }
     return base;
-  }, [isMobile, lodMovements, movements, selectedNodeId, visibleEdges]);
+  }, [lodMovements, movements, selectedNodeId]);
 
-  const layout = useMemo<Layout>(() => {
-    const colStep = isMobile ? 212 : 248;
-    const baseRowStep = isMobile ? 84 : 88;
-    const nodeW = isMobile ? 148 : 166;
-    const nodeH = isMobile ? 58 : 60;
-    const top = 58;
-    const pad = isMobile ? 22 : 34;
-    const safePad = NETWORK_SVG_SAFE_PADDING;
-    const endPanSpace = isMobile ? 220 : 700;
-    const positions = new Map<string, { x: number; y: number }>();
+  const layout = useMemo<Layout>(
+    () =>
+      buildChronologicalNetworkLayout({
+        movements: displayedMovements,
+        regionOrder,
+        zoom: networkZoom,
+        compact: isMobile,
+        safePad: NETWORK_SVG_SAFE_PADDING,
+      }),
+    [displayedMovements, isMobile, networkZoom],
+  );
+  const semanticLevel = networkSemanticLevel(networkZoom);
 
-    // 密集した列だけ局所的にゆるめる量（全画面一律には広げない）
-    const denseRowGain = isMobile ? 16 : 20;
-    const denseColumnShift = isMobile ? 8 : 12;
-
-    /**
-     * 「その列が密集しているか」を、実際に描かれる関係から判定する。
-     * ここを緩めることで、ラベルが長い引き出し線に頼らず線の近くへ収まる。
-     */
-    const columnsByEra = new Map<EraId, Movement[]>();
-    eraOrder.forEach((era) => {
-      columnsByEra.set(
-        era,
-        displayedMovements
-          .filter((movement) => movement.era === era)
-          .sort((a, b) => a.dates.start - b.dates.start),
-      );
-    });
-    const eraOfMovement = new Map(
-      displayedMovements.map((movement) => [movement.id, movement.era]),
+  useLayoutEffect(() => {
+    const anchor = zoomAnchorRef.current;
+    const viewport = scrollRef.current;
+    if (!anchor || !viewport) return;
+    zoomAnchorRef.current = null;
+    const worldX =
+      layout.safePad +
+      layout.axisW +
+      layout.pad +
+      yearToTimelineX(anchor.year, timelineModeById('survey'), layout.timelineW);
+    viewport.scrollLeft = Math.max(
+      0,
+      Math.min(worldX - anchor.screenX, viewport.scrollWidth - viewport.clientWidth),
     );
-    const selectionDegree = selectedNodeId
-      ? visibleEdges.filter(
-          (edge) => edge.from === selectedNodeId || edge.to === selectedNodeId,
-        ).length
-      : 0;
-
-    const isDenseColumn = (era: EraId) => {
-      const inEra = columnsByEra.get(era) ?? [];
-      if (inEra.length < 3) return false;
-      // 同じ列の中を縦に走る関係が3本以上ある
-      const verticalEdges = visibleEdges.filter(
-        (edge) =>
-          eraOfMovement.get(edge.from) === era &&
-          eraOfMovement.get(edge.to) === era,
-      ).length;
-      if (verticalEdges >= 3) return true;
-      // 選択ノードの直接関係が多く、その列に選択ノードか相手がいる
-      if (selectionDegree >= 4) {
-        return inEra.some(
-          (movement) =>
-            movement.id === selectedNodeId ||
-            visibleEdges.some(
-              (edge) =>
-                (edge.from === selectedNodeId && edge.to === movement.id) ||
-                (edge.to === selectedNodeId && edge.from === movement.id),
-            ),
-        );
-      }
-      return false;
-    };
-
-    let maxColumnHeight = 0;
-    eraOrder.forEach((era, column) => {
-      const inEra = columnsByEra.get(era) ?? [];
-      const dense = isDenseColumn(era);
-      const rowStep = dense ? baseRowStep + denseRowGain : baseRowStep;
-      maxColumnHeight = Math.max(maxColumnHeight, inEra.length * rowStep);
-      inEra.forEach((movement, row) => {
-        // 密集列は左右交互に少しずらし、線とラベルの通り道を分ける
-        const shift = dense ? (row % 2 === 0 ? -1 : 1) * denseColumnShift : 0;
-        positions.set(movement.id, {
-          x: safePad + pad + column * colStep + shift,
-          y: safePad + top + row * rowStep,
-        });
-      });
-    });
-
-    return {
-      positions,
-      canvasW:
-        safePad * 2 +
-        pad * 2 +
-        (eraOrder.length - 1) * colStep +
-        nodeW +
-        denseColumnShift +
-        endPanSpace,
-      canvasH:
-        safePad * 2 + top + Math.max(maxColumnHeight, baseRowStep) + pad,
-      colStep,
-      nodeW,
-      nodeH,
-      pad,
-      safePad,
-    };
-  }, [displayedMovements, eraOrder, isMobile, selectedNodeId, visibleEdges]);
+    viewport.scrollTop = Math.max(
+      0,
+      Math.min(anchor.scrollTop, viewport.scrollHeight - viewport.clientHeight),
+    );
+  }, [layout]);
 
   const movementById = useMemo(
     () => new Map(movements.map((movement) => [movement.id, movement])),
@@ -536,6 +497,21 @@ export function NetworkGraph({ movements, relationships, eraOrder }: Props) {
     return ids;
   }, [highlightedEdges, selectedNodeId]);
 
+  const secondHopNodeIds = useMemo(() => {
+    const ids = new Set<string>();
+    if (!selectedNodeId) return ids;
+    for (const relationship of visibleEdges) {
+      if (
+        relatedNodeIds.has(relationship.from) ||
+        relatedNodeIds.has(relationship.to)
+      ) {
+        if (!relatedNodeIds.has(relationship.from)) ids.add(relationship.from);
+        if (!relatedNodeIds.has(relationship.to)) ids.add(relationship.to);
+      }
+    }
+    return ids;
+  }, [relatedNodeIds, selectedNodeId, visibleEdges]);
+
   const idleLabelIds = useMemo(
     () =>
       new Set(
@@ -574,11 +550,12 @@ export function NetworkGraph({ movements, relationships, eraOrder }: Props) {
   const prefersReducedMotion = () =>
     window.matchMedia('(prefers-reduced-motion: reduce)').matches;
 
-  const scrollToHorizontalCenter = (x: number) => {
+  const scrollToCenter = (x: number, y?: number) => {
     const viewport = scrollRef.current;
     if (!viewport) return;
     viewport.scrollTo({
       left: Math.max(0, x - viewport.clientWidth / 2),
+      top: y === undefined ? viewport.scrollTop : Math.max(0, y - viewport.clientHeight / 2),
       behavior: prefersReducedMotion() ? 'auto' : 'smooth',
     });
   };
@@ -586,12 +563,15 @@ export function NetworkGraph({ movements, relationships, eraOrder }: Props) {
   const centerNode = (id: string) => {
     const position = layout.positions.get(id);
     if (!position) return;
-    scrollToHorizontalCenter(position.x + layout.nodeW / 2);
+    scrollToCenter(
+      position.x + layout.nodeW / 2,
+      position.y + layout.nodeH / 2,
+    );
   };
 
   const centerEdge = (relationship: AggregatedRelationship) => {
     const geometry = getEdgeGeometry(relationship, layout, visibleEdges);
-    if (geometry) scrollToHorizontalCenter(geometry.midX);
+    if (geometry) scrollToCenter(geometry.midX, geometry.midY);
   };
 
   // deep-link/戻る等でURLから選択されたノードを中央へ寄せ、初回のみキーボードフォーカスを移す。
@@ -603,21 +583,36 @@ export function NetworkGraph({ movements, relationships, eraOrder }: Props) {
     if (!layout.positions.has(selectedNodeId)) return;
     if (focusCenteredForRef.current !== selectedNodeId) {
       focusCenteredForRef.current = selectedNodeId;
-      window.requestAnimationFrame(() => centerNode(selectedNodeId));
+      window.requestAnimationFrame(() => {
+        centerNode(selectedNodeId);
+        if (isMobile) {
+          scrollRef.current?.scrollIntoView({
+            block: 'start',
+            behavior: prefersReducedMotion() ? 'auto' : 'smooth',
+          });
+        }
+      });
     }
     if (!focusInitialFocusDoneRef.current && selectedNodeButtonRef.current) {
       focusInitialFocusDoneRef.current = true;
       selectedNodeButtonRef.current.focus({ preventScroll: true });
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [selectedNodeId, layout]);
+  }, [isMobile, selectedNodeId, layout]);
 
   const jumpToEra = (era: EraId) => {
-    const column = eraOrder.indexOf(era);
-    if (column < 0) return;
+    const band = ERA_TIME_RANGES.find((candidate) => candidate.era === era);
+    if (!band) return;
     setActiveEra(era);
-    scrollToHorizontalCenter(
-      layout.safePad + layout.pad + column * layout.colStep + layout.nodeW / 2,
+    scrollToCenter(
+      layout.safePad +
+        layout.axisW +
+        layout.pad +
+        yearToTimelineX(
+          band.jumpYear,
+          timelineModeById('survey'),
+          layout.timelineW,
+        ),
     );
   };
 
@@ -737,9 +732,20 @@ export function NetworkGraph({ movements, relationships, eraOrder }: Props) {
     const byId = new Map(entries.map((entry) => [entry.relationship.id, entry]));
     return placements.flatMap((placement) => {
       const entry = byId.get(placement.id);
-      return entry
-        ? [{ placement, relationship: entry.relationship, anchor: entry.anchor }]
-        : [];
+      if (!entry) return [];
+      const showLeader =
+        placement.needsLeader &&
+        !obstacles.some(
+          (obstacle) =>
+            obstacle.kind === 'node' &&
+            segmentIntersectsRect(placement.anchor, { x: placement.x, y: placement.y }, obstacle.rect),
+        );
+      return [{
+        placement,
+        relationship: entry.relationship,
+        anchor: entry.anchor,
+        showLeader,
+      }];
     });
   }, [
     displayedMovements,
@@ -797,22 +803,21 @@ export function NetworkGraph({ movements, relationships, eraOrder }: Props) {
       scrollRafRef.current = null;
       const viewport = scrollRef.current;
       if (!viewport) return;
-      const center = viewport.scrollLeft + viewport.clientWidth / 2;
-      let nearestEra = eraOrder[0];
-      let nearestDistance = Number.POSITIVE_INFINITY;
-
-      eraOrder.forEach((era, column) => {
-        const eraCenter =
-          layout.safePad +
-          layout.pad +
-          column * layout.colStep +
-          layout.nodeW / 2;
-        const distance = Math.abs(eraCenter - center);
-        if (distance < nearestDistance) {
-          nearestDistance = distance;
-          nearestEra = era;
-        }
-      });
+      const contentCenter =
+        viewport.scrollLeft +
+        layout.axisW +
+        Math.max(0, viewport.clientWidth - layout.axisW) / 2;
+      const timelineX =
+        contentCenter - layout.safePad - layout.axisW - layout.pad;
+      const year = timelineXToYear(
+        timelineX,
+        timelineModeById('survey'),
+        layout.timelineW,
+      );
+      const timeRange = ERA_TIME_RANGES.find(
+        (band) => year >= band.start && year < band.end,
+      );
+      const nearestEra = timeRange?.era ?? eraOrder[eraOrder.length - 1];
 
       setActiveEra((current) => (current === nearestEra ? current : nearestEra));
     });
@@ -829,19 +834,67 @@ export function NetworkGraph({ movements, relationships, eraOrder }: Props) {
 
   const handleGraphKeyDown = (event: KeyboardEvent<HTMLDivElement>) => {
     if (event.target !== event.currentTarget) return;
-    if (event.key !== 'ArrowLeft' && event.key !== 'ArrowRight') return;
+    if (event.key === '+' || event.key === '=') {
+      event.preventDefault();
+      changeNetworkZoom(0.16);
+      return;
+    }
+    if (event.key === '-') {
+      event.preventDefault();
+      changeNetworkZoom(-0.16);
+      return;
+    }
+    if (
+      event.key !== 'ArrowLeft' &&
+      event.key !== 'ArrowRight' &&
+      event.key !== 'ArrowUp' &&
+      event.key !== 'ArrowDown'
+    ) {
+      return;
+    }
     event.preventDefault();
     event.currentTarget.scrollBy({
-      left: event.key === 'ArrowLeft' ? -220 : 220,
+      left: event.key === 'ArrowLeft' ? -220 : event.key === 'ArrowRight' ? 220 : 0,
+      top: event.key === 'ArrowUp' ? -180 : event.key === 'ArrowDown' ? 180 : 0,
       behavior: prefersReducedMotion() ? 'auto' : 'smooth',
     });
   };
 
   const handleWheel = (event: WheelEvent<HTMLDivElement>) => {
+    if (event.ctrlKey || event.metaKey) {
+      event.preventDefault();
+      changeNetworkZoom(event.deltaY < 0 ? 0.12 : -0.12, event.clientX);
+      return;
+    }
     if (!event.shiftKey) return;
     event.preventDefault();
     event.currentTarget.scrollLeft += event.deltaY;
   };
+
+  function changeNetworkZoom(delta: number, pointerX?: number) {
+    const viewport = scrollRef.current;
+    if (!viewport) return;
+    const bounds = viewport.getBoundingClientRect();
+    const screenX = Math.max(
+      layout.axisW,
+      Math.min(
+        pointerX === undefined ? layout.axisW + (viewport.clientWidth - layout.axisW) / 2 : pointerX - bounds.left,
+        viewport.clientWidth,
+      ),
+    );
+    const worldTimelineX =
+      viewport.scrollLeft + screenX - layout.safePad - layout.axisW - layout.pad;
+    zoomAnchorRef.current = {
+      year: timelineXToYear(
+        worldTimelineX,
+        timelineModeById('survey'),
+        layout.timelineW,
+      ),
+      screenX,
+      scrollTop: viewport.scrollTop,
+    };
+    setNetworkZoom((current) => clampNetworkZoom(current + delta));
+  }
 
   const handlePointerDown = (event: PointerEvent<HTMLDivElement>) => {
     if (event.pointerType !== 'mouse') return;
@@ -851,7 +904,9 @@ export function NetworkGraph({ movements, relationships, eraOrder }: Props) {
       active: true,
       pointerId: event.pointerId,
       startX: event.clientX,
+      startY: event.clientY,
       scrollLeft: event.currentTarget.scrollLeft,
+      scrollTop: event.currentTarget.scrollTop,
     };
     event.currentTarget.setPointerCapture(event.pointerId);
     event.currentTarget.dataset.dragging = 'true';
@@ -861,6 +916,8 @@ export function NetworkGraph({ movements, relationships, eraOrder }: Props) {
     if (!dragRef.current.active || dragRef.current.pointerId !== event.pointerId) return;
     event.currentTarget.scrollLeft =
       dragRef.current.scrollLeft - (event.clientX - dragRef.current.startX);
+    event.currentTarget.scrollTop =
+      dragRef.current.scrollTop - (event.clientY - dragRef.current.startY);
   };
 
   const stopPointerDrag = (event: PointerEvent<HTMLDivElement>) => {
@@ -878,6 +935,23 @@ export function NetworkGraph({ movements, relationships, eraOrder }: Props) {
   const selectedGroup = selectedMovement
     ? getMovementGroup(selectedMovement.id, movements)
     : undefined;
+  const selectedArtists = useMemo(
+    () => (selectedMovement ? artistsOf(selectedMovement).slice(0, 3) : []),
+    [selectedMovement],
+  );
+  const selectedWorks = useMemo(
+    () => (selectedMovement ? worksOf(selectedMovement).slice(0, 3) : []),
+    [selectedMovement],
+  );
+  const selectedContexts = useMemo(() => {
+    if (!selectedMovement) return [];
+    return [
+      ...selectedMovement.keywords.slice(0, 2),
+      selectedMovement.technique.split(/[、。]/)[0],
+    ].filter((value, index, values): value is string =>
+      Boolean(value && values.indexOf(value) === index),
+    ).slice(0, 3);
+  }, [selectedMovement]);
 
   const renderPath = (
     relationship: AggregatedRelationship,
@@ -1090,6 +1164,38 @@ export function NetworkGraph({ movements, relationships, eraOrder }: Props) {
         )}
       </div>
 
+      <div className="network-map-tools" aria-label="ネットワークの表示階層">
+        <span>
+          SEMANTIC ZOOM
+          <small>
+            {semanticLevel === 'overview'
+              ? 'ムーブメント'
+              : semanticLevel === 'study'
+                ? 'ムーブメント＋作家'
+                : '作家・作品・文脈'}
+          </small>
+        </span>
+        <div className="network-zoom-control" role="group" aria-label="ネットワーク倍率">
+          <button
+            type="button"
+            onClick={() => changeNetworkZoom(-0.16)}
+            aria-label="ネットワークを縮小"
+            disabled={networkZoom <= 0.72}
+          >
+            −
+          </button>
+          <output aria-live="polite">{Math.round(networkZoom * 100)}%</output>
+          <button
+            type="button"
+            onClick={() => changeNetworkZoom(0.16)}
+            aria-label="ネットワークを拡大"
+            disabled={networkZoom >= 1.6}
+          >
+            ＋
+          </button>
+        </div>
+      </div>
+
       <nav className="network-era-nav" aria-label="ネットワークの時代移動">
         <div className="scroll-x flex h-full items-stretch">
           {eraOrder.map((era) => (
@@ -1107,8 +1213,12 @@ export function NetworkGraph({ movements, relationships, eraOrder }: Props) {
       </nav>
 
       <div
+        className="network-map-shell"
+        data-has-detail={Boolean(selectedMovement || selectedEdge)}
+      >
+      <div
         ref={scrollRef}
-        className="network-scroll scroll-x cursor-grab touch-pan-x overflow-y-hidden border hairline bg-raised focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent data-[dragging=true]:cursor-grabbing"
+        className="network-scroll cursor-grab overflow-auto border hairline bg-raised focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent data-[dragging=true]:cursor-grabbing"
         role="group"
         aria-label="美術運動の関係ネットワーク図"
         aria-describedby="network-operation-help"
@@ -1116,6 +1226,8 @@ export function NetworkGraph({ movements, relationships, eraOrder }: Props) {
         data-network-scope={relationScope}
         data-network-lod={lod}
         data-network-mobile={isMobile}
+        data-network-semantic-level={semanticLevel}
+        data-network-zoom={networkZoom.toFixed(2)}
         data-network-scroll
         onKeyDown={handleGraphKeyDown}
         onWheel={handleWheel}
@@ -1131,20 +1243,61 @@ export function NetworkGraph({ movements, relationships, eraOrder }: Props) {
           style={{ width: layout.canvasW, height: layout.canvasH }}
           data-network-canvas
         >
-          {eraOrder.map((era, column) => (
+          {layout.lanes.map((lane) => (
             <div
-              key={era}
-              className="pointer-events-none absolute z-40 text-center text-[10px] font-bold text-faint"
+              key={lane.region}
+              className="network-region-lane pointer-events-none absolute"
               style={{
-                left:
-                  layout.safePad + layout.pad + column * layout.colStep,
-                top: layout.safePad,
-                width: layout.nodeW,
-              }}
+                top: lane.top,
+                left: 0,
+                width: layout.canvasW,
+                height: lane.height,
+                '--network-region-rgb': regionRgb(lane.region),
+              } as CSSProperties}
+              data-network-region={lane.region}
             >
-              {ERA_LABELS[era]}
+              <div
+                className="network-region-lane__label sticky left-0"
+                style={{ width: layout.axisW, height: lane.height }}
+              >
+                <span aria-hidden="true" />
+                {REGION_LABELS[lane.region]}
+              </div>
             </div>
           ))}
+
+          <div
+            className="network-time-axis sticky top-0 z-50"
+            style={{ width: layout.canvasW, height: layout.headerH }}
+            aria-hidden="true"
+          >
+            <div
+              className="network-axis-corner sticky left-0 z-[2]"
+              style={{ width: layout.axisW, height: layout.headerH }}
+            >
+              <strong>地域</strong>
+              <span>年代 →</span>
+            </div>
+            {SURVEY_TICKS.map((tick) => (
+              <span
+                key={tick}
+                className="network-time-axis__tick"
+                style={{
+                  left:
+                    layout.safePad +
+                    layout.axisW +
+                    layout.pad +
+                    yearToTimelineX(
+                      tick,
+                      timelineModeById('survey'),
+                      layout.timelineW,
+                    ),
+                }}
+              >
+                {formatTimelineYearLabel(tick)}
+              </span>
+            ))}
+          </div>
 
           <svg
             className="absolute inset-0 z-0"
@@ -1207,7 +1360,8 @@ export function NetworkGraph({ movements, relationships, eraOrder }: Props) {
             if (!position) return null;
             const isSelected = selectedNodeId === movement.id;
             const isRelated = relatedNodeIds.has(movement.id);
-            const dimmed = selectionActive && !isRelated;
+            const isSecondHop = secondHopNodeIds.has(movement.id);
+            const dimmed = selectionActive && !isRelated && !isSecondHop;
             const isEdgeSource = selectedEdge?.from === movement.id;
             const isEdgeTarget = selectedEdge?.to === movement.id;
 
@@ -1221,6 +1375,8 @@ export function NetworkGraph({ movements, relationships, eraOrder }: Props) {
                       ? 'z-10'
                       : isRelated
                         ? 'z-30'
+                        : isSecondHop
+                          ? 'z-20'
                         : 'z-20'
                 }`}
                 style={{
@@ -1242,7 +1398,15 @@ export function NetworkGraph({ movements, relationships, eraOrder }: Props) {
                   className="network-node relative flex h-full w-full flex-col justify-center px-2 text-left text-xs"
                   data-network-node
                   data-node-state={
-                    isSelected ? 'selected' : isRelated ? 'related' : dimmed ? 'dimmed' : 'idle'
+                    isSelected
+                      ? 'selected'
+                      : isRelated
+                        ? 'related'
+                        : isSecondHop
+                          ? 'secondary'
+                          : dimmed
+                            ? 'dimmed'
+                            : 'idle'
                   }
                   data-node-role={
                     isEdgeSource ? 'source' : isEdgeTarget ? 'target' : undefined
@@ -1278,6 +1442,82 @@ export function NetworkGraph({ movements, relationships, eraOrder }: Props) {
             );
           })}
 
+          {selectedMovement && semanticLevel !== 'overview' && (() => {
+            const selectedPosition = layout.positions.get(selectedMovement.id);
+            if (!selectedPosition) return null;
+            const showDetail = semanticLevel === 'detail';
+            const preferredLeft = selectedPosition.x + layout.nodeW + 24;
+            const clusterWidth = showDetail ? 344 : 158;
+            const left = Math.min(
+              preferredLeft,
+              layout.canvasW - layout.safePad - clusterWidth,
+            );
+            const top = Math.max(
+              layout.headerH + layout.safePad,
+              selectedPosition.y - 10,
+            );
+
+            return (
+              <div
+                className="network-entity-cluster"
+                style={{ left, top, width: clusterWidth }}
+                data-network-entity-layer
+                data-semantic-level={semanticLevel}
+                aria-label={`${selectedMovement.nameJa}の関連情報`}
+              >
+                <div className="network-entity-cluster__column">
+                  <p>ARTISTS</p>
+                  {selectedArtists.length > 0 ? (
+                    selectedArtists.map((artist) => (
+                      <Link
+                        key={artist.id}
+                        href={`/artists/${artist.id}/`}
+                        className="network-entity-node"
+                        data-network-entity="artist"
+                      >
+                        {artist.nameJa}
+                      </Link>
+                    ))
+                  ) : (
+                    <span className="network-entity-node network-entity-node--muted">
+                      作家情報を確認中
+                    </span>
+                  )}
+                </div>
+                {showDetail && (
+                  <>
+                    <div className="network-entity-cluster__column">
+                      <p>WORKS</p>
+                      {selectedWorks.map((work) => (
+                        <Link
+                          key={work.id}
+                          href={`/works/${work.id}/`}
+                          className="network-entity-node"
+                          data-network-entity="work"
+                        >
+                          <span>{work.titleJa}</span>
+                          <small>{work.year}</small>
+                        </Link>
+                      ))}
+                    </div>
+                    <div className="network-entity-cluster__column network-entity-cluster__column--context">
+                      <p>CONTEXT / IDEA / TECHNOLOGY</p>
+                      {selectedContexts.map((context) => (
+                        <span
+                          key={context}
+                          className="network-entity-node network-entity-node--context"
+                          data-network-entity="context"
+                        >
+                          {context}
+                        </span>
+                      ))}
+                    </div>
+                  </>
+                )}
+              </div>
+            );
+          })()}
+
           {highlightedEdges.length > 0 && (
             <svg
               className="pointer-events-none absolute inset-0 z-20"
@@ -1305,12 +1545,12 @@ export function NetworkGraph({ movements, relationships, eraOrder }: Props) {
             aria-hidden="true"
             data-network-layer="edge-labels"
           >
-            {edgeLabelPlacements.map(({ placement, relationship, anchor }) => {
+            {edgeLabelPlacements.map(({ placement, relationship, anchor, showLeader }) => {
               const text = RELATION_LABELS[relationship.kind];
               return (
                 <g key={relationship.id}>
                   {/* 線から離して置いた場合は、どのエッジのラベルか分かるよう引き出し線を描く */}
-                  {placement.needsLeader && (
+                  {showLeader && (
                     <line
                       x1={placement.anchor.x}
                       y1={placement.anchor.y}
@@ -1381,9 +1621,70 @@ export function NetworkGraph({ movements, relationships, eraOrder }: Props) {
       )}
 
       {selectedMovement && (
-        <section className="mt-4 border-l-2 border-accent bg-surface px-4 py-3">
-          <h3 className="font-serif text-lg">{selectedMovement.nameJa}</h3>
-          <p className="mt-1 max-w-prose text-sm text-muted">{selectedMovement.summary}</p>
+        <section className="network-detail-panel" data-network-detail-panel>
+          <p className="network-detail-panel__eyebrow">SELECTED MOVEMENT</p>
+          <button
+            type="button"
+            className="network-detail-panel__close"
+            onClick={() => setSelectedNodeId(null)}
+            aria-label="選択中のムーブメント詳細を閉じる"
+          >
+            ×
+          </button>
+          <h3>{selectedMovement.nameJa}</h3>
+          <p className="network-detail-panel__meta">
+            {formatDateRange(selectedMovement)} ·{' '}
+            {selectedMovement.regionIds.map((region) => REGION_LABELS[region]).join('・')}
+          </p>
+          <p className="network-detail-panel__summary">{selectedMovement.summary}</p>
+
+          <div className="network-detail-panel__grid">
+            <section aria-labelledby="network-detail-artists">
+              <h4 id="network-detail-artists">Artists</h4>
+              {selectedArtists.length > 0 ? (
+                <ul>
+                  {selectedArtists.map((artist) => (
+                    <li key={artist.id}>
+                      <Link href={`/artists/${artist.id}/`}>{artist.nameJa}</Link>
+                    </li>
+                  ))}
+                </ul>
+              ) : (
+                <p>収録作家を確認中</p>
+              )}
+            </section>
+            <section aria-labelledby="network-detail-relations">
+              <h4 id="network-detail-relations">Relationships</h4>
+              <ul>
+                {selectedNodeEdges.slice(0, 5).map((relationship) => {
+                  const outgoing = relationship.from === selectedMovement.id;
+                  const otherId = outgoing ? relationship.to : relationship.from;
+                  return (
+                    <li key={relationship.id}>
+                      <span aria-hidden="true">{outgoing ? '→' : '←'}</span>{' '}
+                      {movementName(otherId)}
+                      <small>{RELATION_LABELS[relationship.kind]}</small>
+                    </li>
+                  );
+                })}
+              </ul>
+            </section>
+            <section aria-labelledby="network-detail-works">
+              <h4 id="network-detail-works">Works</h4>
+              {selectedWorks.length > 0 ? (
+                <ul>
+                  {selectedWorks.map((work) => (
+                    <li key={work.id}>
+                      <Link href={`/works/${work.id}/`}>{work.titleJa}</Link>
+                      <small>{work.year}</small>
+                    </li>
+                  ))}
+                </ul>
+              ) : (
+                <p>代表作品を確認中</p>
+              )}
+            </section>
+          </div>
           {selectedGroup &&
             selectedMovement.id === selectedGroup.representativeMovementId && (
               <button
@@ -1397,7 +1698,7 @@ export function NetworkGraph({ movements, relationships, eraOrder }: Props) {
                   })
                 }
                 aria-expanded={expandedGroupIds.has(selectedGroup.id)}
-                className="mt-3 min-h-11 border-l-2 border-accent px-3 text-xs font-bold text-ink hover:bg-raised"
+                className="network-detail-panel__group-toggle"
               >
                 {expandedGroupIds.has(selectedGroup.id)
                   ? `${selectedGroup.label}を集約`
@@ -1406,12 +1707,13 @@ export function NetworkGraph({ movements, relationships, eraOrder }: Props) {
             )}
           <Link
             href={`/movements/${selectedMovement.id}/`}
-            className="mt-2 inline-block text-sm prose-link"
+            className="network-detail-panel__link prose-link"
           >
             詳細ページへ →
           </Link>
         </section>
       )}
+      </div>
 
       <section
         className="mt-5 border-t hairline pt-4"

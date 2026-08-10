@@ -76,10 +76,10 @@ export function RelationLine({
   const strokeWidth =
     state === 'highlighted'
       ? mobile
-        ? 3.6
-        : 4.6
+        ? 3
+        : 3.4
       : state === 'dimmed'
-        ? 1.1
+        ? 0.9
         : mobile
           ? Math.min(style.width, 2)
           : style.width;
@@ -94,7 +94,7 @@ export function RelationLine({
       strokeDasharray={style.dasharray}
       strokeLinecap="round"
       strokeLinejoin="round"
-      opacity={state === 'highlighted' ? 1 : state === 'dimmed' ? 0.075 : 0.82}
+      opacity={state === 'highlighted' ? 1 : state === 'dimmed' ? 0.06 : 0.64}
       markerEnd={
         style.arrow ? `url(#${relationMarkerId(markerPrefix, kind)})` : undefined
       }

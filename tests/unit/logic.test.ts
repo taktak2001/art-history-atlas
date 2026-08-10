@@ -263,13 +263,13 @@ describe('関係ネットワークの表示設定', () => {
     expect(RELATION_LINE_STYLE.influence.arrow).toBe(true);
     expect(RELATION_LINE_STYLE.contemporary.arrow).toBe(false);
     expect(RELATION_LINE_STYLE.revival.arrow).toBe(true);
-    expect(RELATION_LINE_STYLE['shared-idea'].width).toBe(3);
+    expect(RELATION_LINE_STYLE['shared-idea'].width).toBe(1.75);
   });
 
-  it('通常時の線幅を2.5〜3pxに収める', () => {
+  it('通常時の線幅を1.5〜1.75pxに抑える', () => {
     for (const style of Object.values(RELATION_LINE_STYLE)) {
-      expect(style.width).toBeGreaterThanOrEqual(2.5);
-      expect(style.width).toBeLessThanOrEqual(3);
+      expect(style.width).toBeGreaterThanOrEqual(1.5);
+      expect(style.width).toBeLessThanOrEqual(1.75);
     }
   });
 
