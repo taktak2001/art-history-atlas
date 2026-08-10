@@ -9,6 +9,7 @@ import {
   type CSSProperties,
 } from 'react';
 import { createPortal } from 'react-dom';
+import { AccordionChevron } from '@/components/AccordionChevron';
 import { LOD_LEVELS } from '@/lib/movement-hierarchy';
 import {
   VISIBILITY_LEVEL_LABELS,
@@ -193,10 +194,13 @@ export function TimelineViewerLodMenu({ value, counts, onChange }: Props) {
         aria-controls={panelId}
         aria-label={`表示する範囲、現在は${VISIBILITY_LEVEL_LABELS[value]}`}
       >
-        <span>{VISIBILITY_LEVEL_LABELS[value]}</span>
-        <span className="timeline-viewer-lod-trigger__chevron" aria-hidden="true">
-          ⌄
+        <span className="timeline-viewer-lod-trigger__label">
+          {VISIBILITY_LEVEL_LABELS[value]}
         </span>
+        <AccordionChevron
+          open={open}
+          className="timeline-viewer-lod-trigger__chevron"
+        />
       </button>
       {panel}
     </div>

@@ -623,6 +623,33 @@ test('閲覧モード内でLODを切り替え、URLと年代・地域位置を�
   });
   await expect(trigger).toHaveAttribute('aria-haspopup', 'dialog');
   await expect(trigger).toHaveAttribute('aria-expanded', 'false');
+  const triggerTypography = await trigger.evaluate((element) => {
+    const style = getComputedStyle(element);
+    const svg = element.querySelector('svg');
+    return {
+      appearance: style.appearance,
+      backgroundColor: style.backgroundColor,
+      borderWidth: style.borderWidth,
+      boxShadow: style.boxShadow,
+      fontSize: Number.parseFloat(style.fontSize),
+      fontWeight: style.fontWeight,
+      letterSpacing: Number.parseFloat(style.letterSpacing),
+      lineHeight: Number.parseFloat(style.lineHeight),
+      hasCustomChevron: Boolean(svg),
+      hasNativeSelect: Boolean(element.querySelector('select')),
+    };
+  });
+  expect(triggerTypography.appearance).toBe('none');
+  expect(triggerTypography.backgroundColor).toBe('rgba(0, 0, 0, 0)');
+  expect(triggerTypography.borderWidth).toBe('0px');
+  expect(triggerTypography.boxShadow).toBe('none');
+  expect(triggerTypography.fontSize).toBeGreaterThanOrEqual(11);
+  expect(triggerTypography.fontSize).toBeLessThanOrEqual(12);
+  expect(triggerTypography.fontWeight).toBe('500');
+  expect(triggerTypography.letterSpacing).toBeGreaterThan(0);
+  expect(triggerTypography.lineHeight).toBeCloseTo(triggerTypography.fontSize, 0);
+  expect(triggerTypography.hasCustomChevron).toBe(true);
+  expect(triggerTypography.hasNativeSelect).toBe(false);
   await trigger.click();
 
   const panel = page.getByRole('dialog', { name: '表示する範囲' });
