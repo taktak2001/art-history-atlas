@@ -1,10 +1,10 @@
 import { test, expect } from '@playwright/test';
 
-test('主要3画面で図録型LODと基本・充実・すべてを共通表示する', async ({
+test('主要4画面で図録型LODと基本・充実・すべてを共通表示する', async ({
   page,
 }) => {
   // ムーブメント一覧はLODを持たない（常に全件が対象）
-  for (const route of ['/timeline/', '/chronology/', '/network/']) {
+  for (const route of ['/timeline/', '/chronology/', '/network/', '/matrix/']) {
     await page.goto(route);
     const control = page.locator('[data-lod-control]');
     await expect(control).toHaveClass(/lod-control--catalogue/);
@@ -38,7 +38,9 @@ test('基本・充実・すべてをURLへ反映し、リロード後も維持�
     'aria-pressed',
     'true',
   );
-  await expect(page.getByText('美術史の骨格となる主要項目を表示')).toBeVisible();
+  await expect(page.getByText('美術史の骨格となる主要項目を表示')).toHaveClass(
+    /sr-only/,
+  );
 
   await page.getByRole('button', { name: /すべて\s*54/ }).click();
   await expect(page).toHaveURL(/lod=detailed/);
@@ -47,7 +49,7 @@ test('基本・充実・すべてをURLへ反映し、リロード後も維持�
     'aria-pressed',
     'true',
   );
-  await expect(page.getByText('収録済みの全項目を表示')).toBeVisible();
+  await expect(page.getByText('収録済みの全項目を表示')).toHaveClass(/sr-only/);
   await expect(page.locator('[data-matrix-lod]')).toHaveAttribute(
     'data-matrix-lod',
     'detailed',
@@ -88,7 +90,7 @@ test('ムーブメント一覧はLODを持たず、常に全件から検索す�
 test('マトリクスはセル内件数を制限し、+Nでそのセルだけ展開する', async ({ page }) => {
   await page.goto('/matrix/?lod=core');
   const cell = page.locator('[data-matrix-cell="france:nineteenth"]');
-  const expandButton = cell.getByRole('button', { name: /\+2/ });
+  const expandButton = cell.getByRole('button', { name: /ほか2件/ });
   await expect(expandButton).toBeVisible();
   await expandButton.evaluate((button) => button.click());
   await expect(cell.getByText('ポスト印象派')).toBeVisible();

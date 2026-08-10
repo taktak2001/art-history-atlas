@@ -445,18 +445,172 @@ html.dark .relation-badge {
 }
 
 .matrix-table {
-  min-width: 88rem;
+  min-width: 84rem;
+  table-layout: fixed;
+  background: rgb(var(--c-paper));
 }
 
-.matrix-corner,
-.matrix-row-header {
-  width: 8.5rem;
-  min-width: 8.5rem;
-  max-width: 8.5rem;
+.matrix-scroll {
+  max-width: 100%;
+  border-block: 1px solid rgb(var(--c-line) / 0.72);
+  background: rgb(var(--c-paper));
+  scroll-padding-bottom: calc(1rem + env(safe-area-inset-bottom));
+}
+
+.matrix-table .data-table-column-header,
+.matrix-table .data-table-row-header,
+.matrix-table .data-table-corner {
+  background: rgb(var(--c-paper));
+  box-shadow: none;
+}
+
+.matrix-corner {
+  width: 9rem;
+  min-width: 9rem;
+  max-width: 9rem;
+  padding: 0.7rem 0.85rem;
+  border-right: 1px solid rgb(var(--c-line) / 0.84);
+  border-bottom: 1px solid rgb(var(--c-line) / 0.84);
+  color: rgb(var(--c-ink));
+  text-align: left;
+  vertical-align: bottom;
+}
+
+.matrix-axis-title,
+.matrix-axis-direction {
+  display: block;
+}
+
+.matrix-axis-title {
+  font-size: 0.75rem;
+  font-weight: 650;
+  line-height: 1.2;
+}
+
+.matrix-axis-direction {
+  margin-top: 0.25rem;
+  color: rgb(var(--c-faint));
+  font-size: 0.625rem;
+  font-weight: 500;
+  letter-spacing: 0.04em;
+  line-height: 1.2;
+}
+
+.matrix-column-header {
+  width: 9.375rem;
+  min-width: 9.375rem;
+  padding: 0.8rem 0.7rem 0.7rem;
+  border-bottom: 1px solid rgb(var(--c-line) / 0.84);
+  color: rgb(var(--c-ink));
+  font-family: var(--font-serif);
+  font-size: 0.875rem;
+  font-weight: 500;
+  line-height: 1.35;
+  text-align: left;
+  vertical-align: bottom;
+}
+
+.matrix-column-header + .matrix-column-header {
+  border-left: 1px solid rgb(var(--c-line) / 0.34);
 }
 
 .matrix-row-header {
-  background: rgb(var(--c-raised));
+  width: 9rem;
+  min-width: 9rem;
+  max-width: 9rem;
+  padding: 0.85rem;
+  border-right: 1px solid rgb(var(--c-line) / 0.84);
+  color: rgb(var(--c-muted));
+  font-size: 0.75rem;
+  font-weight: 550;
+  line-height: 1.45;
+  text-align: left;
+  vertical-align: middle;
+}
+
+.matrix-region-dot {
+  display: inline-block;
+  width: 0.45rem;
+  height: 0.45rem;
+  margin-right: 0.45rem;
+  border: 1px solid rgb(var(--matrix-region-rgb) / 0.9);
+  border-radius: 50%;
+  background: rgb(var(--matrix-region-rgb) / 0.8);
+  vertical-align: 0.05em;
+}
+
+.matrix-region-name {
+  overflow-wrap: normal;
+  word-break: keep-all;
+  line-break: strict;
+}
+
+.matrix-table tbody tr + tr > * {
+  border-top: 1px solid rgb(var(--c-line) / 0.38);
+}
+
+.matrix-cell {
+  width: 9.375rem;
+  min-width: 9.375rem;
+  padding: 0.65rem 0.55rem 0.85rem;
+  color: rgb(var(--c-ink));
+  vertical-align: top;
+}
+
+.matrix-cell + .matrix-cell {
+  border-left: 1px solid rgb(var(--c-line) / 0.3);
+}
+
+.matrix-cell-list {
+  display: grid;
+  gap: 0.3rem;
+}
+
+.matrix-movement-link {
+  display: flex;
+  min-height: 2.75rem;
+  align-items: center;
+  padding: 0.4rem 0.5rem 0.4rem 0.65rem;
+  border-left: 2px solid rgb(var(--matrix-region-rgb) / 0.76);
+  background: transparent;
+  color: rgb(var(--c-ink));
+  font-size: 0.75rem;
+  font-weight: 500;
+  line-height: 1.4;
+  text-decoration: none;
+  transition:
+    border-color 140ms ease,
+    background-color 140ms ease;
+}
+
+.matrix-movement-link:hover,
+.matrix-movement-link:focus-visible {
+  border-left-color: rgb(var(--matrix-region-rgb));
+  background: rgb(var(--matrix-region-rgb) / 0.07);
+}
+
+.matrix-empty {
+  color: rgb(var(--c-faint) / 0.42);
+  font-size: 0.7rem;
+}
+
+.matrix-cell-toggle {
+  display: inline-flex;
+  min-height: 2.75rem;
+  align-items: center;
+  gap: 0.35rem;
+  margin-top: 0.25rem;
+  padding: 0.25rem 0.4rem;
+  color: rgb(var(--c-muted));
+  font-size: 0.6875rem;
+  font-weight: 550;
+  line-height: 1;
+  text-align: left;
+  transition: color 140ms ease;
+}
+
+.matrix-cell-toggle:hover {
+  color: rgb(var(--c-ink));
 }
 
 .compare-controls {
@@ -629,18 +783,36 @@ html.dark .relation-badge {
   }
 
   .matrix-table {
-    min-width: 70rem;
+    min-width: 76.25rem;
   }
 
   .matrix-corner,
   .matrix-row-header {
-    width: 7.25rem;
-    min-width: 7.25rem;
-    max-width: 7.25rem;
+    width: 8.25rem;
+    min-width: 8.25rem;
+    max-width: 8.25rem;
   }
 
-  .matrix-table .data-table-column-header {
-    min-width: 8.75rem;
+  .matrix-column-header,
+  .matrix-cell {
+    width: 8.5rem;
+    min-width: 8.5rem;
+  }
+
+  .matrix-corner,
+  .matrix-row-header {
+    padding-inline: 0.7rem;
+  }
+
+  .matrix-scroll {
+    max-height: min(
+      70dvh,
+      calc(100dvh - 7.5rem - env(safe-area-inset-bottom))
+    );
+  }
+
+  .matrix-page {
+    padding-bottom: calc(2rem + env(safe-area-inset-bottom));
   }
 
   .compare-corner,
