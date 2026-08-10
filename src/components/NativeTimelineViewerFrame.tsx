@@ -1,6 +1,7 @@
 'use client';
 
 import Link from 'next/link';
+import { TimelineViewerLodMenu } from '@/components/TimelineViewerLodMenu';
 import {
   useCallback,
   useEffect,
@@ -72,10 +73,12 @@ type NativeRegionLayout = {
 };
 
 type PendingZoom = {
+  kind: 'zoom' | 'lod';
   anchorX: number;
   anchorY: number;
   year: number;
   regionAnchor: TimelineViewerRegionAnchor;
+  regionIndex: number;
 };
 
 type PinchGesture = {
@@ -165,8 +168,10 @@ export function NativeTimelineViewerFrame({
   timelineWidth,
   nodes,
   regions,
+  lod,
+  lodCounts,
   onClose,
-  onSemanticLevelChange,
+  onLodChange,
   children,
 }: TimelineViewerFrameProps) {
   const rootRef = useRef<HTMLDivElement>(null);
@@ -454,23 +459,13 @@ export function NativeTimelineViewerFrame({
     }));
   }, [scale, timelineMode, timelineWidth, viewportWidth]);
 
-  const commitScale = useCallback(
+  const captureViewportAnchor = useCallback(
     (
-      requestedScale: number,
+      kind: PendingZoom['kind'],
       requestedAnchor?: TimelineViewerPoint,
-    ) => {
+    ): PendingZoom | null => {
       const viewport = viewportRef.current;
-      if (!viewport) return;
-      wakeControls();
-      fitModeRef.current = false;
-      const currentScale = scaleRef.current;
-      const maximumScale = timelineViewerMaxScale(viewport.clientWidth);
-      const nextScale = clampTimelineViewerScale(
-        requestedScale,
-        maximumScale,
-      );
-      if (Math.abs(nextScale - currentScale) < 0.0001) return;
-
+      if (!viewport) return null;
       const viewportRect = viewport.getBoundingClientRect();
       const controlsRect = controlsRef.current?.getBoundingClientRect();
       const controlsTop = controlsRect
@@ -500,7 +495,6 @@ export function NativeTimelineViewerFrame({
           Math.max(metrics.timeHeight, requestedAnchor?.y ?? contentCenter.y),
         ),
       };
-      const existingPending = pendingZoomRef.current;
       const renderedScale = Math.max(0.0001, renderedScaleRef.current);
       const worldX =
         (viewport.scrollLeft + resolvedAnchor.x - metrics.regionWidth) /
@@ -514,28 +508,58 @@ export function NativeTimelineViewerFrame({
         regionId: layout.regionLayouts[0]?.id ?? regions[0]?.id ?? 'origin',
         ratio: 0.5,
       };
-      pendingZoomRef.current = {
-        anchorX: existingPending?.anchorX ?? resolvedAnchor.x,
-        anchorY: existingPending?.anchorY ?? resolvedAnchor.y,
-        year:
-          existingPending?.year ??
-          timelineXToYear(worldX, timelineMode, timelineWidth),
-        regionAnchor: existingPending?.regionAnchor ?? regionAnchor,
+      return {
+        kind,
+        anchorX: resolvedAnchor.x,
+        anchorY: resolvedAnchor.y,
+        year: timelineXToYear(worldX, timelineMode, timelineWidth),
+        regionAnchor,
+        regionIndex: Math.max(
+          0,
+          layout.regionLayouts.findIndex(
+            (region) => region.id === regionAnchor.regionId,
+          ),
+        ),
       };
-      scaleRef.current = nextScale;
-      onSemanticLevelChange(timelineViewerSemanticLevel(nextScale));
-      setScale(nextScale);
-      writeScaleOutput(nextScale);
     },
     [
       layout.regionLayouts,
       metrics.controlBottom,
       metrics.regionWidth,
       metrics.timeHeight,
-      onSemanticLevelChange,
       regions,
       timelineMode,
       timelineWidth,
+    ],
+  );
+
+  const commitScale = useCallback(
+    (
+      requestedScale: number,
+      requestedAnchor?: TimelineViewerPoint,
+    ) => {
+      const viewport = viewportRef.current;
+      if (!viewport) return;
+      wakeControls();
+      fitModeRef.current = false;
+      const currentScale = scaleRef.current;
+      const maximumScale = timelineViewerMaxScale(viewport.clientWidth);
+      const nextScale = clampTimelineViewerScale(
+        requestedScale,
+        maximumScale,
+      );
+      if (Math.abs(nextScale - currentScale) < 0.0001) return;
+
+      const existingPending = pendingZoomRef.current;
+      const captured = captureViewportAnchor('zoom', requestedAnchor);
+      if (!captured) return;
+      pendingZoomRef.current = existingPending ?? captured;
+      scaleRef.current = nextScale;
+      setScale(nextScale);
+      writeScaleOutput(nextScale);
+    },
+    [
+      captureViewportAnchor,
       wakeControls,
       writeScaleOutput,
     ],
@@ -562,19 +586,28 @@ export function NativeTimelineViewerFrame({
     pendingZoomRef.current = null;
     fitModeRef.current = true;
     scaleRef.current = nextScale;
-    onSemanticLevelChange(timelineViewerSemanticLevel(nextScale));
     setScale(nextScale);
     writeScaleOutput(nextScale);
     viewport.scrollLeft = 0;
     viewport.scrollTop = 0;
   }, [
     metrics.regionWidth,
-    onSemanticLevelChange,
     rightGutter,
     timelineWidth,
     wakeControls,
     writeScaleOutput,
   ]);
+
+  const handleLodChange = useCallback(
+    (nextLod: typeof lod) => {
+      if (nextLod === lod) return;
+      wakeControls();
+      fitModeRef.current = false;
+      pendingZoomRef.current = captureViewportAnchor('lod');
+      onLodChange(nextLod);
+    },
+    [captureViewportAnchor, lod, onLodChange, wakeControls],
+  );
 
   useLayoutEffect(() => {
     const viewport = viewportRef.current;
@@ -591,19 +624,31 @@ export function NativeTimelineViewerFrame({
         metrics.regionWidth + chronologicalX - pending.anchorX,
       ),
     );
+    const restoredRegionAnchor = layout.regionLayouts.some(
+      (region) => region.id === pending.regionAnchor.regionId,
+    )
+      ? pending.regionAnchor
+      : {
+          regionId:
+            layout.regionLayouts[
+              Math.min(
+                pending.regionIndex,
+                Math.max(0, layout.regionLayouts.length - 1),
+              )
+            ]?.id ?? layout.regionLayouts[0]?.id ?? 'origin',
+          ratio: pending.regionAnchor.ratio,
+        };
     viewport.scrollTop = timelineViewerScrollTopForRegionAnchor({
-      anchor: pending.regionAnchor,
+      anchor: restoredRegionAnchor,
       regions: layout.regionLayouts,
       anchorY: pending.anchorY,
       axisInset: metrics.timeHeight,
       maximumScrollTop: viewport.scrollHeight - viewport.clientHeight,
     });
     if (rootRef.current) {
-      rootRef.current.dataset.lastZoomAnchorRegion =
-        pending.regionAnchor.regionId;
-      rootRef.current.dataset.lastZoomAnchorYear = String(
-        Math.round(pending.year),
-      );
+      const prefix = pending.kind === 'lod' ? 'lastLodAnchor' : 'lastZoomAnchor';
+      rootRef.current.dataset[`${prefix}Region`] = restoredRegionAnchor.regionId;
+      rootRef.current.dataset[`${prefix}Year`] = String(Math.round(pending.year));
     }
   }, [
     active,
@@ -617,8 +662,7 @@ export function NativeTimelineViewerFrame({
 
   useEffect(() => {
     scaleRef.current = scale;
-    onSemanticLevelChange(semanticLevel);
-  }, [onSemanticLevelChange, scale, semanticLevel]);
+  }, [scale]);
 
   useEffect(() => {
     if (!active) return;
@@ -947,6 +991,7 @@ export function NativeTimelineViewerFrame({
       data-viewer-engine="native-scroll"
       data-native-one-finger-pan="browser"
       data-semantic-level={semanticLevel}
+      data-viewer-lod={lod}
       data-viewer-scale={scale}
       data-viewer-dom-node-count={nodes.length}
       data-viewer-render-count={renderCountRef.current}
@@ -990,13 +1035,11 @@ export function NativeTimelineViewerFrame({
           >
             <span aria-hidden="true">＋</span>
           </button>
-          <button
-            type="button"
-            onClick={fitContent}
-            aria-label="全体表示へ戻す"
-          >
-            全体
-          </button>
+          <TimelineViewerLodMenu
+            value={lod}
+            counts={lodCounts}
+            onChange={handleLodChange}
+          />
         </div>
       </div>
 

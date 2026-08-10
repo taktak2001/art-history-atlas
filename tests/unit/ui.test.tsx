@@ -12,6 +12,7 @@ import { RelationshipStandards } from '@/components/RelationshipStandards';
 import { getMovement, getSources } from '@/lib/dataset';
 import type { Work } from '@/lib/schema';
 import { LodControl } from '@/components/LodControl';
+import { TimelineViewerLodMenu } from '@/components/TimelineViewerLodMenu';
 import { MatrixView } from '@/components/MatrixView';
 import { MovementsExplorer } from '@/components/MovementsExplorer';
 import { movements, activeRegions } from '@/lib/dataset';
@@ -201,6 +202,67 @@ describe('RelationshipStandards', () => {
 });
 
 describe('LOD UI', () => {
+  it('閲覧モード用LODは現在値だけを示し、展開後に件数付きで選択する', async () => {
+    const onChange = vi.fn();
+    const { rerender } = render(
+      <TimelineViewerLodMenu
+        value="core"
+        counts={{ core: 32, standard: 48, detailed: 54 }}
+        onChange={onChange}
+      />,
+    );
+
+    const trigger = screen.getByRole('button', {
+      name: '表示する範囲、現在は基本',
+    });
+    expect(trigger).toHaveAttribute('aria-expanded', 'false');
+    expect(trigger).toHaveTextContent('基本');
+    expect(trigger).not.toHaveTextContent('32');
+
+    fireEvent.click(trigger);
+    expect(trigger).toHaveAttribute('aria-expanded', 'true');
+    const options = screen.getByRole('radiogroup', { name: '表示する範囲' });
+    expect(within(options).getByRole('radio', { name: /基本\s*32/ })).toHaveAttribute(
+      'aria-checked',
+      'true',
+    );
+    expect(within(options).getByRole('radio', { name: /充実\s*48/ })).toBeVisible();
+    expect(within(options).getByRole('radio', { name: /すべて\s*54/ })).toBeVisible();
+
+    fireEvent.click(within(options).getByRole('radio', { name: /充実\s*48/ }));
+    expect(onChange).toHaveBeenCalledWith('standard');
+    await waitFor(() => expect(trigger).toHaveFocus());
+
+    rerender(
+      <TimelineViewerLodMenu
+        value="standard"
+        counts={{ core: 32, standard: 48, detailed: 54 }}
+        onChange={onChange}
+      />,
+    );
+    expect(
+      screen.getByRole('button', { name: '表示する範囲、現在は充実' }),
+    ).toBeVisible();
+  });
+
+  it('閲覧モード用LODをEscapeで閉じ、トリガーへフォーカスを戻す', async () => {
+    render(
+      <TimelineViewerLodMenu
+        value="detailed"
+        counts={{ core: 32, standard: 48, detailed: 54 }}
+        onChange={vi.fn()}
+      />,
+    );
+    const trigger = screen.getByRole('button', {
+      name: '表示する範囲、現在はすべて',
+    });
+    fireEvent.click(trigger);
+    fireEvent.keyDown(document, { key: 'Escape' });
+
+    await waitFor(() => expect(trigger).toHaveAttribute('aria-expanded', 'false'));
+    await waitFor(() => expect(trigger).toHaveFocus());
+  });
+
   it('表示する範囲を説明とaria-pressedで切り替える', () => {
     const onChange = vi.fn();
     const { rerender } = render(<LodControl value="core" onChange={onChange} />);

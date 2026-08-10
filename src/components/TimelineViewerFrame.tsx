@@ -2,6 +2,7 @@
 
 import Link from 'next/link';
 import { NativeTimelineViewerFrame } from '@/components/NativeTimelineViewerFrame';
+import { TimelineViewerLodMenu } from '@/components/TimelineViewerLodMenu';
 import {
   useCallback,
   useEffect,
@@ -41,6 +42,7 @@ import {
   type TimelineViewerSemanticLevel,
   type TimelineViewerTransform,
 } from '@/lib/timeline-viewer';
+import type { VisibilityLevel } from '@/lib/schema';
 
 export type TimelineViewerNode = {
   key: string;
@@ -77,8 +79,10 @@ export type TimelineViewerFrameProps = {
   timelineWidth: number;
   nodes: TimelineViewerNode[];
   regions: TimelineViewerRegion[];
+  lod: VisibilityLevel;
+  lodCounts: Record<VisibilityLevel, number>;
   onClose: () => void;
-  onSemanticLevelChange: (level: TimelineViewerSemanticLevel) => void;
+  onLodChange: (lod: VisibilityLevel) => void;
   children: ReactNode;
 };
 
@@ -141,8 +145,10 @@ function LegacyTimelineViewerFrame({
   timelineWidth,
   nodes,
   regions,
+  lod,
+  lodCounts,
   onClose,
-  onSemanticLevelChange,
+  onLodChange,
   children,
 }: TimelineViewerFrameProps) {
   const rootRef = useRef<HTMLDivElement>(null);
@@ -782,13 +788,11 @@ function LegacyTimelineViewerFrame({
       if (nextSemanticLevel !== semanticLevelRef.current) {
         semanticLevelRef.current = nextSemanticLevel;
         setSemanticLevel(nextSemanticLevel);
-        onSemanticLevelChange(nextSemanticLevel);
       }
       scheduleFixedLayers(constrained);
     },
     [
       constrainTransform,
-      onSemanticLevelChange,
       scheduleFixedLayers,
       wakeControls,
       writeScaleOutput,
@@ -1354,13 +1358,11 @@ function LegacyTimelineViewerFrame({
               >
                 <span aria-hidden="true">＋</span>
               </button>
-              <button
-                type="button"
-                onClick={fitContent}
-                aria-label="全体表示へ戻す"
-              >
-                全体
-              </button>
+              <TimelineViewerLodMenu
+                value={lod}
+                counts={lodCounts}
+                onChange={onLodChange}
+              />
             </div>
           </div>
 

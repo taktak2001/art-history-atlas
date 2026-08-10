@@ -39,7 +39,6 @@ import {
   yearToTimelineX,
   type TimelineModeId,
 } from '@/lib/timeline-presentation';
-import type { TimelineViewerSemanticLevel } from '@/lib/timeline-viewer';
 import { timelineRegionRgb } from '@/lib/timeline-region-presentation';
 
 type Props = {
@@ -136,22 +135,20 @@ export function HorizontalTimeline({
   const [modeId, setModeId] = useState<TimelineModeId>('survey');
   const [isCompactTimeline, setIsCompactTimeline] = useState(false);
   const [isViewerMode, setIsViewerMode] = useState(false);
-  const [viewerSemanticLevel, setViewerSemanticLevel] =
-    useState<TimelineViewerSemanticLevel>('standard');
   const { lod, setLod, applyPurposeDefault } = useLodState('core');
 
   const mode = timelineModeById(modeId);
-  const viewerLod =
-    viewerSemanticLevel === 'detailed' ||
-    viewerSemanticLevel === 'contextual'
-      ? 'detailed'
-      : viewerSemanticLevel === 'standard'
-        ? 'standard'
-        : 'core';
-  const effectiveLod = isViewerMode ? viewerLod : lod;
+  const lodCounts = useMemo(
+    () => ({
+      core: filterMovementsByLod(movements, 'core').length,
+      standard: filterMovementsByLod(movements, 'standard').length,
+      detailed: filterMovementsByLod(movements, 'detailed').length,
+    }),
+    [movements],
+  );
   const lodMovements = useMemo(
-    () => filterMovementsByLod(movements, effectiveLod),
-    [effectiveLod, movements],
+    () => filterMovementsByLod(movements, lod),
+    [lod, movements],
   );
   const modeMovements = useMemo(
     () => lodMovements.filter((movement) => movementOverlapsMode(movement, mode)),
@@ -645,7 +642,6 @@ export function HorizontalTimeline({
 
   const openViewer = () => {
     viewerScrollLeft.current = scrollRef.current?.scrollLeft ?? 0;
-    setViewerSemanticLevel('standard');
     setIsViewerMode(true);
   };
 
@@ -657,11 +653,7 @@ export function HorizontalTimeline({
           onChange={(next) => {
             setLod(next);
           }}
-          counts={{
-            core: filterMovementsByLod(movements, 'core').length,
-            standard: filterMovementsByLod(movements, 'standard').length,
-            detailed: filterMovementsByLod(movements, 'detailed').length,
-          }}
+          counts={lodCounts}
           catalogue
         />
         <div className="timeline-era-control">
@@ -736,8 +728,10 @@ export function HorizontalTimeline({
         timelineWidth={timelineWidth}
         nodes={viewerNodes}
         regions={viewerRegions}
+        lod={lod}
+        lodCounts={lodCounts}
         onClose={() => setIsViewerMode(false)}
-        onSemanticLevelChange={setViewerSemanticLevel}
+        onLodChange={setLod}
       >
       <div className="timeline-shell timeline-chart mt-3 flex overflow-hidden">
         <div
