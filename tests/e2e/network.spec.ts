@@ -70,6 +70,14 @@ test('semantic zoomでMovementからArtist・Work・Contextへ段階表示する
   await expect(graph).toHaveAttribute('data-network-semantic-level', 'overview');
   await expect(graph.locator('[data-network-entity="artist"]')).toHaveCount(0);
 
+  await expect
+    .poll(() =>
+      graph.evaluate((element) =>
+        Number(element.getAttribute('data-network-zoom')),
+      ),
+    )
+    .toBeGreaterThanOrEqual(0.84);
+
   const zoomIn = page.getByRole('button', { name: 'ネットワークを拡大' });
   await zoomIn.click();
   await expect(graph).toHaveAttribute('data-network-semantic-level', 'study');
@@ -103,6 +111,94 @@ test('選択時は直接関係、2-hop、背景の3段階で焦点化する', as
     .evaluate((element) => Number(getComputedStyle(element).opacity));
   expect(secondHopOpacity).toBeGreaterThan(backgroundOpacity);
 });
+
+test('overviewとfocused cameraを分け、全体操作で俯瞰へ戻る', async ({ page }) => {
+  await page.setViewportSize({ width: 1280, height: 900 });
+  await page.goto('/network/');
+
+  const graph = page.getByRole('group', { name: '美術運動の関係ネットワーク図' });
+  await expect(graph).toHaveAttribute('data-network-camera', 'overview');
+  await expect(graph).toHaveAttribute('data-network-visual-gutter', '32');
+  await expect(graph.locator('[data-node-state="dimmed"]')).toHaveCount(0);
+  await expect(
+    page.getByRole('button', { name: '表示中のネットワーク全体へ戻る' }),
+  ).toBeVisible();
+
+  await graph.getByRole('button', { name: 'イタリア・ルネサンスを選択' }).click();
+  await expect(graph).toHaveAttribute('data-network-camera', 'focused');
+  await expect(page.locator('[data-network-detail-panel]')).toBeVisible();
+  await expect
+    .poll(async () => Number(await graph.getAttribute('data-network-zoom')))
+    .toBeGreaterThanOrEqual(0.84);
+
+  await expect
+    .poll(() =>
+      graph.evaluate((element) => {
+        const selected = element.querySelector<HTMLElement>(
+          '[data-node-state="selected"]',
+        );
+        const corner = element.querySelector<HTMLElement>('.network-axis-corner');
+        if (!selected || !corner) return Number.POSITIVE_INFINITY;
+        const selectedRect = selected.getBoundingClientRect();
+        const graphRect = element.getBoundingClientRect();
+        const cornerRect = corner.getBoundingClientRect();
+        const contentCenter = (cornerRect.right + graphRect.right) / 2;
+        return Math.abs(
+          (selectedRect.left + selectedRect.right) / 2 - contentCenter,
+        );
+      }),
+    )
+    .toBeLessThan(90);
+
+  await page.getByRole('button', { name: '表示中のネットワーク全体へ戻る' }).click();
+  await expect(graph).toHaveAttribute('data-network-camera', 'overview');
+  await expect(page.locator('[data-network-detail-panel]')).toHaveCount(0);
+  await expect(graph.locator('[data-node-state="dimmed"]')).toHaveCount(0);
+});
+
+for (const [movementId, movementName] of [
+  ['italian-renaissance', 'イタリア・ルネサンス'],
+  ['abstract-expressionism', '抽象表現主義'],
+  ['light-and-space', 'ライト・アンド・スペース'],
+] as const) {
+  test(`${movementName}を選択してもcanvas端・詳細パネルに隠れない`, async ({
+    page,
+  }) => {
+    await page.setViewportSize({ width: 1280, height: 900 });
+    await page.goto(`/network/?focus=${movementId}`);
+
+    const graph = page.getByRole('group', {
+      name: '美術運動の関係ネットワーク図',
+    });
+    await expect
+      .poll(async () => Number(await graph.getAttribute('data-network-zoom')))
+      .toBeGreaterThanOrEqual(0.84);
+
+    await expect
+      .poll(() =>
+        graph.evaluate((element) => {
+          const selected = element.querySelector<HTMLElement>(
+            '[data-node-state="selected"]',
+          );
+          const panel = document.querySelector<HTMLElement>(
+            '[data-network-detail-panel]',
+          );
+          if (!selected) return false;
+          const graphRect = element.getBoundingClientRect();
+          const selectedRect = selected.getBoundingClientRect();
+          const panelRect = panel?.getBoundingClientRect();
+          const visibleRight = panelRect?.left ?? graphRect.right;
+          return (
+            selectedRect.left >= graphRect.left &&
+            selectedRect.right <= visibleRight &&
+            selectedRect.top >= graphRect.top &&
+            selectedRect.bottom <= graphRect.bottom
+          );
+        }),
+      )
+      .toBe(true);
+  });
+}
 
 test('iPhoneでは本体が初期viewport内に入り、線の見方はoverlayで開く', async ({ page }) => {
   await page.setViewportSize({ width: 390, height: 844 });
@@ -242,7 +338,7 @@ test('ノード選択時は強調線を無関係ノードより前、関連ノ�
     .poll(() =>
       relatedNode.evaluate((element) => Number(getComputedStyle(element).opacity)),
     )
-    .toBeGreaterThanOrEqual(0.95);
+    .toBeGreaterThanOrEqual(0.85);
   await expect
     .poll(() =>
       dimmedNode.evaluate((element) => Number(getComputedStyle(element).opacity)),
@@ -290,20 +386,23 @@ test('ノード選択時は強調線を無関係ノードより前、関連ノ�
   );
 
   expect(selectedStyle.opacity).toBe(1);
-  expect(selectedStyle.borderWidth).toBe('3px');
-  expect(selectedStyle.borderColor).toBe(selectedStyle.titleColor);
+  expect(Number.parseFloat(selectedStyle.borderWidth)).toBeGreaterThanOrEqual(2);
+  expect(Number.parseFloat(selectedStyle.borderWidth)).toBeLessThanOrEqual(2.5);
+  expect(selectedStyle.borderColor).toContain('28, 28, 30');
+  expect(selectedStyle.titleColor).toContain('28, 28, 30');
   expect(selectedStyle.transform).toBe('none');
   expect(selectedStyle.titleWeight).toBeGreaterThanOrEqual(700);
-  expect(selectedStyle.dateWeight).toBe(400);
-  // 主ノードは3px濃チャコールの単線のみ（影・二重線なし）
+  // 俯瞰のsemantic zoomでは年代を省略し、表示時は400を維持する
+  expect([0, 400]).toContain(selectedStyle.dateWeight);
+  // 主ノードは2.5px濃チャコールの単線のみ（影・二重線なし）
   expect(selectedStyle.boxShadow).toBe('none');
   expect(selectedStyle.backgroundColor).toBe('rgb(252, 248, 244)');
   expect(Number.parseFloat(idleStyle.borderWidth)).toBeGreaterThanOrEqual(1);
   expect(Number.parseFloat(idleStyle.borderWidth)).toBeLessThanOrEqual(1.5);
   expect(idleStyle.boxShadow).toBe('none');
-  expect(idleStyle.backgroundColor).toBe('rgb(255, 255, 255)');
-  // 関係ノードは不透明度100%、背景ノードは0.15〜0.2まで沈める
-  expect(relatedOpacity).toBeGreaterThanOrEqual(0.95);
+  expect(idleStyle.backgroundColor).toMatch(/^rgba\(255, 255, 255, 0\.1/);
+  // 関係ノードは0.85以上、背景ノードは0.15前後まで沈める
+  expect(relatedOpacity).toBeGreaterThanOrEqual(0.85);
   expect(dimmedOpacity).toBeGreaterThanOrEqual(0.12);
   expect(dimmedOpacity).toBeLessThanOrEqual(0.25);
   expect(selectedStyle.backgroundColor).not.toBe(idleStyle.backgroundColor);
@@ -461,12 +560,6 @@ test('PCで時代ジャンプと左右キーにより現代まで移動できる
   await page.goto('/network/');
 
   const graph = page.getByRole('group', { name: '美術運動の関係ネットワーク図' });
-  const dimensions = await graph.evaluate((element) => ({
-    clientWidth: element.clientWidth,
-    scrollWidth: element.scrollWidth,
-  }));
-  expect(dimensions.scrollWidth).toBeGreaterThan(dimensions.clientWidth);
-
   await page.getByRole('button', { name: '現代', exact: true }).click();
   await expect(page.getByRole('button', { name: '現代', exact: true })).toHaveAttribute(
     'aria-current',

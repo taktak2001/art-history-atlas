@@ -3,6 +3,8 @@ import { movements, regionOrder, relationships } from '@/lib/dataset';
 import {
   buildChronologicalNetworkLayout,
   clampNetworkZoom,
+  getNetworkFitZoom,
+  getNetworkVisualBounds,
   networkSemanticLevel,
 } from '@/lib/network-map-layout';
 
@@ -68,11 +70,71 @@ describe('chronological network map layout', () => {
 
 describe('network semantic zoom', () => {
   it('clamps zoom and maps it to overview, study, and detail levels', () => {
-    expect(clampNetworkZoom(0.2)).toBe(0.72);
+    expect(clampNetworkZoom(0.1)).toBe(0.18);
     expect(clampNetworkZoom(3)).toBe(1.6);
     expect(networkSemanticLevel(0.84)).toBe('overview');
     expect(networkSemanticLevel(1)).toBe('study');
     expect(networkSemanticLevel(1.4)).toBe('detail');
+  });
+});
+
+describe('network visual bounds and camera fit', () => {
+  it('includes the complete visual rectangles and a 32px gutter', () => {
+    expect(
+      getNetworkVisualBounds(
+        [
+          { x: 100, y: 80, width: 160, height: 60 },
+          { x: 310, y: 160, width: 42, height: 18 },
+        ],
+        32,
+      ),
+    ).toEqual({
+      minX: 68,
+      minY: 48,
+      maxX: 384,
+      maxY: 210,
+      width: 316,
+      height: 162,
+    });
+  });
+
+  it('derives overview zoom from the actual network viewport', () => {
+    const bounds = getNetworkVisualBounds(
+      [{ x: 0, y: 0, width: 1200, height: 620 }],
+      32,
+    );
+    const zoom = getNetworkFitZoom({
+      currentZoom: 1,
+      bounds,
+      viewportWidth: 1000,
+      viewportHeight: 700,
+      axisW: 142,
+      headerH: 52,
+      padding: 0,
+    });
+
+    expect(zoom).toBeCloseTo(0.678, 2);
+  });
+
+  it('keeps every node visual box inside the expanded canvas', () => {
+    const selected = movements.filter((movement) =>
+      ['italian-renaissance', 'abstract-expressionism', 'light-and-space'].includes(
+        movement.id,
+      ),
+    );
+    const layout = buildChronologicalNetworkLayout({
+      movements: selected,
+      regionOrder,
+      zoom: 0.84,
+      compact: false,
+      visualGutter: 32,
+    });
+
+    expect(layout.visualGutter).toBe(32);
+    expect(layout.visualBounds.minX).toBeGreaterThanOrEqual(0);
+    expect(layout.visualBounds.minY).toBeGreaterThanOrEqual(0);
+    expect(layout.canvasW - layout.visualBounds.maxX).toBeGreaterThanOrEqual(32);
+    expect(layout.canvasH - layout.visualBounds.maxY).toBeGreaterThanOrEqual(32);
   });
 });
 

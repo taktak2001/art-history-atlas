@@ -69,8 +69,14 @@ import { regionRgb } from '@/lib/timeline-region-presentation';
 import {
   buildChronologicalNetworkLayout,
   clampNetworkZoom,
+  getNetworkFitZoom,
+  getNetworkVisualBounds,
+  NETWORK_ZOOM_MAX,
+  NETWORK_ZOOM_MIN,
   networkSemanticLevel,
   type ChronologicalNetworkLayout,
+  type NetworkVisualBounds,
+  type NetworkVisualRect,
 } from '@/lib/network-map-layout';
 import {
   SURVEY_TICKS,
@@ -174,18 +180,29 @@ export function NetworkGraph({ movements, relationships, eraOrder }: Props) {
     scrollLeft: 0,
     scrollTop: 0,
   });
+  const lastNodeActivationRef = useRef({ id: '', at: 0 });
   const scrollRafRef = useRef<number | null>(null);
   const zoomAnchorRef = useRef<{
     year: number;
     screenX: number;
     scrollTop: number;
   } | null>(null);
+  const pendingCameraFitRef = useRef<{
+    kind: 'overview' | 'focus';
+    pass: number;
+    allowWhileSelected: boolean;
+  } | null>(null);
+  const overviewFitAppliedRef = useRef(false);
+  const focusFitAppliedForRef = useRef<string | null>(null);
+  const cameraChangedAfterFocusRef = useRef(false);
+  const returnToOverviewOnClearRef = useRef(false);
   // 詳細ページ→ネットワークの文脈（?focus=）を扱うための参照
   const selectedNodeButtonRef = useRef<HTMLButtonElement | null>(null);
   const focusSkipSyncRef = useRef(true);
-  const focusCenteredForRef = useRef<string | null>(null);
   const focusInitialFocusDoneRef = useRef(false);
   const [selectedNodeId, setSelectedNodeId] = useState<string | null>(null);
+  const selectedNodeIdRef = useRef<string | null>(null);
+  selectedNodeIdRef.current = selectedNodeId;
   const [selectedEdgeId, setSelectedEdgeId] = useState<string | null>(null);
   const [focusedEdgeId, setFocusedEdgeId] = useState<string | null>(null);
   const [relationKindFilter, setRelationKindFilter] =
@@ -200,11 +217,11 @@ export function NetworkGraph({ movements, relationships, eraOrder }: Props) {
   const [isLineGuideOpen, setIsLineGuideOpen] = useState(false);
   const [activeEra, setActiveEra] = useState<EraId>(eraOrder[0]);
   const [expandedGroupIds, setExpandedGroupIds] = useState<Set<string>>(new Set());
-  const [networkZoom, setNetworkZoom] = useState(0.84);
+  const [networkZoom, setNetworkZoom] = useState(NETWORK_ZOOM_MIN);
   const { lod, setLod, applyPurposeDefault, clearLod, hasExplicitChoice } =
     useLodState('core');
 
-  useEffect(() => {
+  useLayoutEffect(() => {
     const media = window.matchMedia('(max-width: 639px)');
     const update = () => setIsMobile(media.matches);
     update();
@@ -517,10 +534,10 @@ export function NetworkGraph({ movements, relationships, eraOrder }: Props) {
       new Set(
         visibleEdges
           .filter(isImportantRelationship)
-          .slice(0, isMobile ? 3 : 8)
+          .slice(0, isMobile || semanticLevel === 'overview' ? 3 : 8)
           .map((relationship) => relationship.id),
       ),
-    [isMobile, visibleEdges],
+    [isMobile, semanticLevel, visibleEdges],
   );
 
   const relationshipCountByNode = useMemo(() => {
@@ -560,50 +577,27 @@ export function NetworkGraph({ movements, relationships, eraOrder }: Props) {
     });
   };
 
-  const centerNode = (id: string) => {
-    const position = layout.positions.get(id);
-    if (!position) return;
-    scrollToCenter(
-      position.x + layout.nodeW / 2,
-      position.y + layout.nodeH / 2,
-    );
-  };
-
   const centerEdge = (relationship: AggregatedRelationship) => {
     const geometry = getEdgeGeometry(relationship, layout, visibleEdges);
     if (geometry) scrollToCenter(geometry.midX, geometry.midY);
   };
 
-  // deep-link/戻る等でURLから選択されたノードを中央へ寄せ、初回のみキーボードフォーカスを移す。
-  useEffect(() => {
-    if (!selectedNodeId) {
-      focusCenteredForRef.current = null;
-      return;
-    }
-    if (!layout.positions.has(selectedNodeId)) return;
-    if (focusCenteredForRef.current !== selectedNodeId) {
-      focusCenteredForRef.current = selectedNodeId;
-      window.requestAnimationFrame(() => {
-        centerNode(selectedNodeId);
-        if (isMobile) {
-          scrollRef.current?.scrollIntoView({
-            block: 'start',
-            behavior: prefersReducedMotion() ? 'auto' : 'smooth',
-          });
-        }
-      });
-    }
-    if (!focusInitialFocusDoneRef.current && selectedNodeButtonRef.current) {
-      focusInitialFocusDoneRef.current = true;
-      selectedNodeButtonRef.current.focus({ preventScroll: true });
-    }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [isMobile, selectedNodeId, layout]);
-
   const jumpToEra = (era: EraId) => {
     const band = ERA_TIME_RANGES.find((candidate) => candidate.era === era);
     if (!band) return;
+    cameraChangedAfterFocusRef.current = true;
     setActiveEra(era);
+    const viewport = scrollRef.current;
+    if (viewport && networkZoom < 0.72) {
+      zoomAnchorRef.current = {
+        year: band.jumpYear,
+        screenX:
+          layout.axisW + Math.max(0, viewport.clientWidth - layout.axisW) / 2,
+        scrollTop: viewport.scrollTop,
+      };
+      setNetworkZoom(0.72);
+      return;
+    }
     scrollToCenter(
       layout.safePad +
         layout.axisW +
@@ -617,10 +611,21 @@ export function NetworkGraph({ movements, relationships, eraOrder }: Props) {
   };
 
   const selectNode = (movement: Movement) => {
+    const now = performance.now();
+    if (
+      lastNodeActivationRef.current.id === movement.id &&
+      now - lastNodeActivationRef.current.at < 450
+    ) {
+      return;
+    }
+    lastNodeActivationRef.current = { id: movement.id, at: now };
     if (selectedNodeId === movement.id) {
+      returnToOverviewOnClearRef.current = !cameraChangedAfterFocusRef.current;
       setSelectedNodeId(null);
       return;
     }
+    cameraChangedAfterFocusRef.current = false;
+    focusFitAppliedForRef.current = null;
     setSelectedEdgeId(null);
     setSelectedNodeId(movement.id);
     setActiveEra(movement.era);
@@ -628,7 +633,6 @@ export function NetworkGraph({ movements, relationships, eraOrder }: Props) {
     if (group && movement.id === group.representativeMovementId) {
       setExpandedGroupIds((current) => new Set(current).add(group.id));
     }
-    window.requestAnimationFrame(() => centerNode(movement.id));
   };
 
   const selectEdge = (relationship: AggregatedRelationship) => {
@@ -641,7 +645,7 @@ export function NetworkGraph({ movements, relationships, eraOrder }: Props) {
   };
 
   // 注釈として読める大きさを確保する（縮小より配置で衝突を解く方針）
-  const labelFontSize = 12;
+  const labelFontSize = semanticLevel === 'overview' ? 8 : 12;
 
   /**
    * 関係ラベルの配置。中点固定をやめ、線の近くで衝突しない位置を選ぶ。
@@ -685,8 +689,11 @@ export function NetworkGraph({ movements, relationships, eraOrder }: Props) {
           input: {
             id: relationship.id,
             geometry,
-            width: estimateLabelWidth(text, labelFontSize) + 6,
-            height: labelFontSize + 4,
+            // SVG text rendering differs slightly between Japanese fallback
+            // fonts, especially on iOS. Reserve a real visual gutter so the
+            // collision solver never treats touching glyph boxes as separate.
+            width: estimateLabelWidth(text, labelFontSize) + 12,
+            height: labelFontSize + 8,
             priority: touchesSelection ? 0 : inSubgraph ? 1 : 2,
           } satisfies LabelInput,
         };
@@ -727,7 +734,12 @@ export function NetworkGraph({ movements, relationships, eraOrder }: Props) {
     const placements = layoutEdgeLabels(
       entries.map((entry) => entry.input),
       obstacles,
-      { x: 0, y: 0, width: layout.canvasW, height: layout.canvasH },
+      {
+        x: layout.visualGutter,
+        y: layout.visualGutter,
+        width: Math.max(1, layout.canvasW - layout.visualGutter * 2),
+        height: Math.max(1, layout.canvasH - layout.visualGutter * 2),
+      },
     );
     const byId = new Map(entries.map((entry) => [entry.relationship.id, entry]));
     return placements.flatMap((placement) => {
@@ -760,6 +772,241 @@ export function NetworkGraph({ movements, relationships, eraOrder }: Props) {
     visibleEdges,
   ]);
 
+  const getCameraBounds = (nodeIds?: Set<string>): NetworkVisualBounds => {
+    const rects: NetworkVisualRect[] = [];
+    for (const movement of displayedMovements) {
+      if (nodeIds && !nodeIds.has(movement.id)) continue;
+      const position = layout.positions.get(movement.id);
+      if (!position) continue;
+      rects.push({
+        x: position.x - 4,
+        y: position.y - 4,
+        width: layout.nodeW + 8,
+        height: layout.nodeH + 8,
+      });
+    }
+
+    for (const relationship of visibleEdges) {
+      if (
+        nodeIds &&
+        (!nodeIds.has(relationship.from) || !nodeIds.has(relationship.to))
+      ) {
+        continue;
+      }
+      const geometry = getEdgeGeometry(relationship, layout, visibleEdges);
+      if (!geometry) continue;
+      const points = [
+        geometry.start,
+        geometry.end,
+        geometry.firstControl,
+        geometry.secondControl,
+        geometry.targetBoundary,
+      ];
+      const minX = Math.min(...points.map((point) => point.x));
+      const minY = Math.min(...points.map((point) => point.y));
+      const maxX = Math.max(...points.map((point) => point.x));
+      const maxY = Math.max(...points.map((point) => point.y));
+      // 12px includes the marker head and the highlighted stroke.
+      rects.push({
+        x: minX - 12,
+        y: minY - 12,
+        width: maxX - minX + 24,
+        height: maxY - minY + 24,
+      });
+    }
+
+    for (const { placement, relationship } of edgeLabelPlacements) {
+      if (
+        nodeIds &&
+        (!nodeIds.has(relationship.from) || !nodeIds.has(relationship.to))
+      ) {
+        continue;
+      }
+      rects.push(placement.rect);
+    }
+
+    return getNetworkVisualBounds(rects, layout.visualGutter);
+  };
+
+  const overviewCameraBounds = useMemo(
+    () => getCameraBounds(),
+    // getCameraBounds is intentionally derived from these stable layout inputs.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [displayedMovements, edgeLabelPlacements, layout, visibleEdges],
+  );
+  const focusedCameraBounds = useMemo(
+    () => getCameraBounds(relatedNodeIds),
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [displayedMovements, edgeLabelPlacements, layout, relatedNodeIds, visibleEdges],
+  );
+
+  // Edge nodes need extra scrollable space while focused. This is camera
+  // travel room, not part of the historical-map bounds, so overview fit still
+  // uses only the visible visual bounds. Without it, right/bottom nodes cannot
+  // reach the centre of the viewport once the desktop detail panel opens.
+  const focusPanReserveX = selectedNodeId ? (isMobile ? 340 : 720) : 0;
+  const focusPanReserveY = selectedNodeId ? (isMobile ? 320 : 560) : 0;
+  const canvasWidth = Math.ceil(
+    Math.max(layout.canvasW, overviewCameraBounds.maxX + layout.visualGutter) +
+      focusPanReserveX,
+  );
+  const canvasHeight = Math.ceil(
+    Math.max(layout.canvasH, overviewCameraBounds.maxY + layout.visualGutter) +
+      focusPanReserveY,
+  );
+
+  const centerCameraBounds = (
+    bounds: NetworkVisualBounds,
+    behavior: ScrollBehavior,
+    kind: 'overview' | 'focus',
+  ) => {
+    const viewport = scrollRef.current;
+    if (!viewport) return;
+    const contentWidth = Math.max(1, viewport.clientWidth - layout.axisW);
+    const contentHeight = Math.max(1, viewport.clientHeight - layout.headerH);
+    const screenCenterX = layout.axisW + contentWidth / 2;
+    const screenCenterY = layout.headerH + contentHeight / 2;
+    const selectedPosition = selectedNodeId
+      ? layout.positions.get(selectedNodeId)
+      : undefined;
+    const anchorX =
+      kind === 'focus' && selectedPosition
+        ? selectedPosition.x + layout.nodeW / 2
+        : (bounds.minX + bounds.maxX) / 2;
+    const anchorY =
+      kind === 'focus' && selectedPosition
+        ? selectedPosition.y + layout.nodeH / 2
+        : (bounds.minY + bounds.maxY) / 2;
+    const left = anchorX - screenCenterX;
+    const top = anchorY - screenCenterY;
+    viewport.scrollTo({
+      left: Math.max(0, Math.min(left, viewport.scrollWidth - viewport.clientWidth)),
+      top: Math.max(0, Math.min(top, viewport.scrollHeight - viewport.clientHeight)),
+      behavior,
+    });
+  };
+
+  const requestCameraFit = (
+    kind: 'overview' | 'focus',
+    allowWhileSelected = false,
+  ) => {
+    if (
+      kind === 'overview' &&
+      selectedNodeIdRef.current &&
+      !allowWhileSelected
+    ) {
+      return;
+    }
+    const viewport = scrollRef.current;
+    if (!viewport) return;
+    const bounds = kind === 'focus' ? focusedCameraBounds : overviewCameraBounds;
+    const calculatedZoom = getNetworkFitZoom({
+      currentZoom: networkZoom,
+      bounds,
+      viewportWidth: viewport.clientWidth,
+      viewportHeight: viewport.clientHeight,
+      axisW: layout.axisW,
+      headerH: layout.headerH,
+      padding: 8,
+      maxZoom: kind === 'focus' ? 1.12 : 0.84,
+    });
+    const targetZoom = kind === 'focus' ? Math.max(0.84, calculatedZoom) : calculatedZoom;
+    zoomAnchorRef.current = null;
+    if (Math.abs(targetZoom - networkZoom) > 0.015) {
+      pendingCameraFitRef.current = { kind, pass: 1, allowWhileSelected };
+      setNetworkZoom(targetZoom);
+      return;
+    }
+    centerCameraBounds(
+      bounds,
+      kind === 'overview' || prefersReducedMotion() ? 'auto' : 'smooth',
+      kind,
+    );
+  };
+
+  useLayoutEffect(() => {
+    const pending = pendingCameraFitRef.current;
+    if (!pending) return;
+    if (
+      pending.kind === 'overview' &&
+      selectedNodeIdRef.current &&
+      !pending.allowWhileSelected
+    ) {
+      pendingCameraFitRef.current = null;
+      return;
+    }
+    const viewport = scrollRef.current;
+    if (!viewport) return;
+    const bounds = pending.kind === 'focus' ? focusedCameraBounds : overviewCameraBounds;
+    const calculatedZoom = getNetworkFitZoom({
+      currentZoom: networkZoom,
+      bounds,
+      viewportWidth: viewport.clientWidth,
+      viewportHeight: viewport.clientHeight,
+      axisW: layout.axisW,
+      headerH: layout.headerH,
+      padding: 8,
+      maxZoom: pending.kind === 'focus' ? 1.12 : 0.84,
+    });
+    const targetZoom =
+      pending.kind === 'focus' ? Math.max(0.84, calculatedZoom) : calculatedZoom;
+    if (pending.pass < 2 && Math.abs(targetZoom - networkZoom) > 0.015) {
+      pendingCameraFitRef.current = { ...pending, pass: pending.pass + 1 };
+      setNetworkZoom(targetZoom);
+      return;
+    }
+    pendingCameraFitRef.current = null;
+    window.requestAnimationFrame(() => {
+      centerCameraBounds(
+        bounds,
+        pending.kind === 'overview' || prefersReducedMotion() ? 'auto' : 'smooth',
+        pending.kind,
+      );
+    });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [focusedCameraBounds, layout, networkZoom, overviewCameraBounds]);
+
+  useLayoutEffect(() => {
+    if (selectedNodeId) {
+      if (
+        layout.positions.has(selectedNodeId) &&
+        focusFitAppliedForRef.current !== selectedNodeId
+      ) {
+        focusFitAppliedForRef.current = selectedNodeId;
+        cameraChangedAfterFocusRef.current = false;
+        // Let a possible double-click/tap gesture finish before moving the
+        // canvas, otherwise its second activation can land on another node.
+        window.setTimeout(() => {
+          if (
+            selectedNodeIdRef.current === selectedNodeId &&
+            !cameraChangedAfterFocusRef.current
+          ) {
+            requestCameraFit('focus');
+          }
+        }, 420);
+        if (isMobile) {
+          scrollRef.current?.scrollIntoView({
+            block: 'start',
+            behavior: prefersReducedMotion() ? 'auto' : 'smooth',
+          });
+        }
+      }
+      if (!focusInitialFocusDoneRef.current && selectedNodeButtonRef.current) {
+        focusInitialFocusDoneRef.current = true;
+        selectedNodeButtonRef.current.focus({ preventScroll: true });
+      }
+      return;
+    }
+
+    focusFitAppliedForRef.current = null;
+    if (!overviewFitAppliedRef.current || returnToOverviewOnClearRef.current) {
+      overviewFitAppliedRef.current = true;
+      returnToOverviewOnClearRef.current = false;
+      window.requestAnimationFrame(() => requestCameraFit('overview'));
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isMobile, layout.positions, selectedNodeId]);
+
   /**
    * 検索から特定のムーブメントへフォーカスする。
    * 詳細ページからの ?focus= 到着と同じ扱いにして、
@@ -770,7 +1017,8 @@ export function NetworkGraph({ movements, relationships, eraOrder }: Props) {
     // URL由来のfocusと同じ経路に載せる（自動調整の対象にする）
     urlFocusRef.current = id;
     focusAutoAppliedForRef.current = null;
-    focusCenteredForRef.current = null;
+    focusFitAppliedForRef.current = null;
+    cameraChangedAfterFocusRef.current = false;
     setScopeTouched(false);
     setRelationKindFilter('all');
     setSelectedEdgeId(null);
@@ -778,6 +1026,7 @@ export function NetworkGraph({ movements, relationships, eraOrder }: Props) {
   };
 
   const setKindFilter = (kind: RelationKindFilter) => {
+    returnToOverviewOnClearRef.current = !cameraChangedAfterFocusRef.current;
     setSelectedNodeId(null);
     setSelectedEdgeId(null);
     setRelationKindFilter(kind);
@@ -789,6 +1038,7 @@ export function NetworkGraph({ movements, relationships, eraOrder }: Props) {
     setRelationKindFilter('all');
     // 「このムーブメント」は選択ノードが前提なので選択を保持する
     if (scope !== 'focus') {
+      returnToOverviewOnClearRef.current = !cameraChangedAfterFocusRef.current;
       setSelectedNodeId(null);
       setSelectedEdgeId(null);
     }
@@ -853,6 +1103,7 @@ export function NetworkGraph({ movements, relationships, eraOrder }: Props) {
       return;
     }
     event.preventDefault();
+    cameraChangedAfterFocusRef.current = true;
     event.currentTarget.scrollBy({
       left: event.key === 'ArrowLeft' ? -220 : event.key === 'ArrowRight' ? 220 : 0,
       top: event.key === 'ArrowUp' ? -180 : event.key === 'ArrowDown' ? 180 : 0,
@@ -868,12 +1119,14 @@ export function NetworkGraph({ movements, relationships, eraOrder }: Props) {
     }
     if (!event.shiftKey) return;
     event.preventDefault();
+    cameraChangedAfterFocusRef.current = true;
     event.currentTarget.scrollLeft += event.deltaY;
   };
 
   function changeNetworkZoom(delta: number, pointerX?: number) {
     const viewport = scrollRef.current;
     if (!viewport) return;
+    cameraChangedAfterFocusRef.current = true;
     const bounds = viewport.getBoundingClientRect();
     const screenX = Math.max(
       layout.axisW,
@@ -914,6 +1167,7 @@ export function NetworkGraph({ movements, relationships, eraOrder }: Props) {
 
   const handlePointerMove = (event: PointerEvent<HTMLDivElement>) => {
     if (!dragRef.current.active || dragRef.current.pointerId !== event.pointerId) return;
+    cameraChangedAfterFocusRef.current = true;
     event.currentTarget.scrollLeft =
       dragRef.current.scrollLeft - (event.clientX - dragRef.current.startX);
     event.currentTarget.scrollTop =
@@ -927,6 +1181,26 @@ export function NetworkGraph({ movements, relationships, eraOrder }: Props) {
     if (event.currentTarget.hasPointerCapture(event.pointerId)) {
       event.currentTarget.releasePointerCapture(event.pointerId);
     }
+  };
+
+  const clearSelection = (restoreDefaults = false) => {
+    returnToOverviewOnClearRef.current = !cameraChangedAfterFocusRef.current;
+    setSelectedNodeId(null);
+    setSelectedEdgeId(null);
+    if (!restoreDefaults) return;
+    setRelationScope('important');
+    setScopeTouched(false);
+    focusAutoAppliedForRef.current = null;
+    if (!hasExplicitChoice) clearLod();
+  };
+
+  const showNetworkOverview = () => {
+    returnToOverviewOnClearRef.current = false;
+    overviewFitAppliedRef.current = true;
+    setSelectedNodeId(null);
+    setSelectedEdgeId(null);
+    if (relationScope === 'focus') setRelationScope('important');
+    window.requestAnimationFrame(() => requestCameraFit('overview', true));
   };
 
   const selectedMovement = selectedNodeId
@@ -1148,15 +1422,7 @@ export function NetworkGraph({ movements, relationships, eraOrder }: Props) {
         {(selectedNodeId || selectedEdgeId) && (
           <button
             type="button"
-            onClick={() => {
-              setSelectedNodeId(null);
-              setSelectedEdgeId(null);
-              // 自動調整を巻き戻し、全体表示の既定へ戻す
-              setRelationScope('important');
-              setScopeTouched(false);
-              focusAutoAppliedForRef.current = null;
-              if (!hasExplicitChoice) clearLod();
-            }}
+            onClick={() => clearSelection(true)}
             className="network-clear-selection"
           >
             選択を解除
@@ -1180,7 +1446,7 @@ export function NetworkGraph({ movements, relationships, eraOrder }: Props) {
             type="button"
             onClick={() => changeNetworkZoom(-0.16)}
             aria-label="ネットワークを縮小"
-            disabled={networkZoom <= 0.72}
+            disabled={networkZoom <= NETWORK_ZOOM_MIN}
           >
             −
           </button>
@@ -1189,9 +1455,17 @@ export function NetworkGraph({ movements, relationships, eraOrder }: Props) {
             type="button"
             onClick={() => changeNetworkZoom(0.16)}
             aria-label="ネットワークを拡大"
-            disabled={networkZoom >= 1.6}
+            disabled={networkZoom >= NETWORK_ZOOM_MAX}
           >
             ＋
+          </button>
+          <button
+            type="button"
+            onClick={showNetworkOverview}
+            aria-label="表示中のネットワーク全体へ戻る"
+            className="network-zoom-control__fit"
+          >
+            全体
           </button>
         </div>
       </div>
@@ -1228,6 +1502,9 @@ export function NetworkGraph({ movements, relationships, eraOrder }: Props) {
         data-network-mobile={isMobile}
         data-network-semantic-level={semanticLevel}
         data-network-zoom={networkZoom.toFixed(2)}
+        data-network-compact-overview={networkZoom < 0.52}
+        data-network-camera={selectedNodeId ? 'focused' : 'overview'}
+        data-network-visual-gutter={layout.visualGutter}
         data-network-scroll
         onKeyDown={handleGraphKeyDown}
         onWheel={handleWheel}
@@ -1240,7 +1517,7 @@ export function NetworkGraph({ movements, relationships, eraOrder }: Props) {
       >
         <div
           className="relative"
-          style={{ width: layout.canvasW, height: layout.canvasH }}
+          style={{ width: canvasWidth, height: canvasHeight }}
           data-network-canvas
         >
           {layout.lanes.map((lane) => (
@@ -1250,7 +1527,7 @@ export function NetworkGraph({ movements, relationships, eraOrder }: Props) {
               style={{
                 top: lane.top,
                 left: 0,
-                width: layout.canvasW,
+                width: canvasWidth,
                 height: lane.height,
                 '--network-region-rgb': regionRgb(lane.region),
               } as CSSProperties}
@@ -1268,7 +1545,7 @@ export function NetworkGraph({ movements, relationships, eraOrder }: Props) {
 
           <div
             className="network-time-axis sticky top-0 z-50"
-            style={{ width: layout.canvasW, height: layout.headerH }}
+            style={{ width: canvasWidth, height: layout.headerH }}
             aria-hidden="true"
           >
             <div
@@ -1301,9 +1578,9 @@ export function NetworkGraph({ movements, relationships, eraOrder }: Props) {
 
           <svg
             className="absolute inset-0 z-0"
-            width={layout.canvasW}
-            height={layout.canvasH}
-            viewBox={getNetworkViewBox(layout.canvasW, layout.canvasH)}
+            width={canvasWidth}
+            height={canvasHeight}
+            viewBox={getNetworkViewBox(canvasWidth, canvasHeight)}
             overflow="visible"
             aria-label="関係線。Tabキーで線を選択できます"
             data-network-layer="base-edges"
@@ -1421,17 +1698,19 @@ export function NetworkGraph({ movements, relationships, eraOrder }: Props) {
                     className="network-node__title truncate pr-7 font-serif text-ink"
                     data-network-node-title
                   >
-                    {movement.nameJa}
+                    {networkZoom < 0.52 ? movement.shortLabel : movement.nameJa}
                   </span>
-                  <span
-                    className="network-node__date truncate text-[10px] text-faint"
-                    data-network-node-date
-                  >
-                    {movement.dates.start < 0
-                      ? `前${Math.abs(movement.dates.start)}`
-                      : movement.dates.start}
-                    〜
-                  </span>
+                  {networkZoom >= 0.52 && (
+                    <span
+                      className="network-node__date truncate text-[10px] text-faint"
+                      data-network-node-date
+                    >
+                      {movement.dates.start < 0
+                        ? `前${Math.abs(movement.dates.start)}`
+                        : movement.dates.start}
+                      〜
+                    </span>
+                  )}
                   {isSelected && (relationshipCountByNode.get(movement.id) ?? 0) > 1 && (
                     <span className="truncate text-[9px] font-bold text-muted">
                       関連 {relationshipCountByNode.get(movement.id)}
@@ -1450,11 +1729,15 @@ export function NetworkGraph({ movements, relationships, eraOrder }: Props) {
             const clusterWidth = showDetail ? 344 : 158;
             const left = Math.min(
               preferredLeft,
-              layout.canvasW - layout.safePad - clusterWidth,
+              canvasWidth - layout.visualGutter - clusterWidth,
             );
-            const top = Math.max(
-              layout.headerH + layout.safePad,
-              selectedPosition.y - 10,
+            const clusterHeight = showDetail ? 224 : 148;
+            const top = Math.min(
+              Math.max(
+                layout.headerH + layout.visualGutter,
+                selectedPosition.y - 10,
+              ),
+              canvasHeight - layout.visualGutter - clusterHeight,
             );
 
             return (
@@ -1521,9 +1804,9 @@ export function NetworkGraph({ movements, relationships, eraOrder }: Props) {
           {highlightedEdges.length > 0 && (
             <svg
               className="pointer-events-none absolute inset-0 z-20"
-              width={layout.canvasW}
-              height={layout.canvasH}
-              viewBox={getNetworkViewBox(layout.canvasW, layout.canvasH)}
+              width={canvasWidth}
+              height={canvasHeight}
+              viewBox={getNetworkViewBox(canvasWidth, canvasHeight)}
               overflow="visible"
               aria-hidden="true"
               data-network-layer="highlighted-edges"
@@ -1538,9 +1821,9 @@ export function NetworkGraph({ movements, relationships, eraOrder }: Props) {
 
           <svg
             className="pointer-events-none absolute inset-0 z-40"
-            width={layout.canvasW}
-            height={layout.canvasH}
-            viewBox={getNetworkViewBox(layout.canvasW, layout.canvasH)}
+            width={canvasWidth}
+            height={canvasHeight}
+            viewBox={getNetworkViewBox(canvasWidth, canvasHeight)}
             overflow="visible"
             aria-hidden="true"
             data-network-layer="edge-labels"
@@ -1626,7 +1909,7 @@ export function NetworkGraph({ movements, relationships, eraOrder }: Props) {
           <button
             type="button"
             className="network-detail-panel__close"
-            onClick={() => setSelectedNodeId(null)}
+            onClick={() => clearSelection()}
             aria-label="選択中のムーブメント詳細を閉じる"
           >
             ×
