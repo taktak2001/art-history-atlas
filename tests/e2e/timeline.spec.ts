@@ -643,8 +643,7 @@ test('閲覧モード内でLODを切り替え、URLと年代・地域位置を�
   expect(triggerTypography.backgroundColor).toBe('rgba(0, 0, 0, 0)');
   expect(triggerTypography.borderWidth).toBe('0px');
   expect(triggerTypography.boxShadow).toBe('none');
-  expect(triggerTypography.fontSize).toBeGreaterThanOrEqual(11);
-  expect(triggerTypography.fontSize).toBeLessThanOrEqual(12);
+  expect(triggerTypography.fontSize).toBe(12);
   expect(triggerTypography.fontWeight).toBe('500');
   expect(triggerTypography.letterSpacing).toBeGreaterThan(0);
   expect(triggerTypography.lineHeight).toBeCloseTo(triggerTypography.fontSize, 0);
@@ -655,6 +654,7 @@ test('閲覧モード内でLODを切り替え、URLと年代・地域位置を�
   const panel = page.getByRole('dialog', { name: '表示する範囲' });
   const options = panel.getByRole('radiogroup', { name: '表示する範囲' });
   await expect(panel).toBeVisible();
+  await expect(panel.getByText('LEVEL OF DETAIL')).toBeVisible();
   await expect(options.getByRole('radio', { name: /基本\s*32/ })).toHaveAttribute(
     'aria-checked',
     'true',
@@ -675,6 +675,11 @@ test('閲覧モード内でLODを切り替え、URLと年代・地域位置を�
       expect(panelRect.y + panelRect.height).toBeLessThan(triggerRect.y);
     }
   }
+
+  await page.locator('.timeline-viewer-lod-backdrop').click({ position: { x: 2, y: 2 } });
+  await expect(panel).toHaveCount(0);
+  await trigger.click();
+  await expect(panel).toBeVisible();
 
   await options.getByRole('radio', { name: /充実\s*48/ }).click();
   await expect(viewer).toHaveAttribute('data-viewer-lod', 'standard');

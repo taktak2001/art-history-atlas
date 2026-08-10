@@ -238,6 +238,7 @@ describe('LOD UI', () => {
 
     fireEvent.click(trigger);
     expect(trigger).toHaveAttribute('aria-expanded', 'true');
+    expect(screen.getByText('LEVEL OF DETAIL')).toBeVisible();
     const options = screen.getByRole('radiogroup', { name: '表示する範囲' });
     expect(within(options).getByRole('radio', { name: /基本\s*32/ })).toHaveAttribute(
       'aria-checked',
@@ -260,6 +261,27 @@ describe('LOD UI', () => {
     expect(
       screen.getByRole('button', { name: '表示する範囲、現在は充実' }),
     ).toBeVisible();
+  });
+
+  it('閲覧モード用LODはパネル外のpointerdownで閉じる', () => {
+    render(
+      <TimelineViewerLodMenu
+        value="detailed"
+        counts={{ core: 32, standard: 48, detailed: 54 }}
+        onChange={vi.fn()}
+      />,
+    );
+
+    const trigger = screen.getByRole('button', {
+      name: '表示する範囲、現在はすべて',
+    });
+    fireEvent.click(trigger);
+    expect(screen.getByRole('dialog', { name: '表示する範囲' })).toBeVisible();
+
+    fireEvent.pointerDown(document.body);
+
+    expect(screen.queryByRole('dialog', { name: '表示する範囲' })).toBeNull();
+    expect(trigger).toHaveAttribute('aria-expanded', 'false');
   });
 
   it('閲覧モード用LODをEscapeで閉じ、トリガーへフォーカスを戻す', async () => {
