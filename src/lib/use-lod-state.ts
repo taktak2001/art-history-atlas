@@ -4,9 +4,17 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import type { VisibilityLevel } from '@/lib/schema';
 import { parseMovementLod } from '@/lib/movement-hierarchy';
 
-function replaceLodQuery(lod: VisibilityLevel) {
+function writeLodQuery(
+  lod: VisibilityLevel,
+  mode: 'push' | 'replace' = 'replace',
+) {
   const url = new URL(window.location.href);
+  if (url.searchParams.get('lod') === lod) return;
   url.searchParams.set('lod', lod);
+  if (mode === 'push') {
+    window.history.pushState(window.history.state, '', url);
+    return;
+  }
   window.history.replaceState(window.history.state, '', url);
 }
 
@@ -35,14 +43,16 @@ export function useLodState(defaultLod: VisibilityLevel) {
   const setLod = useCallback((next: VisibilityLevel, userInitiated = true) => {
     setLodState(next);
     if (userInitiated) setHasExplicitChoice(true);
-    if (typeof window !== 'undefined') replaceLodQuery(next);
+    if (typeof window !== 'undefined') {
+      writeLodQuery(next, userInitiated ? 'push' : 'replace');
+    }
   }, []);
 
   const applyPurposeDefault = useCallback(
     (next: VisibilityLevel) => {
       if (hasExplicitChoice || !initialized.current) return;
       setLodState(next);
-      replaceLodQuery(next);
+      writeLodQuery(next);
     },
     [hasExplicitChoice],
   );

@@ -537,7 +537,7 @@ test('ダークモードとPWA standalone設定を維持する', async ({ page, 
   expect((await manifest.json()).display).toBe('standalone');
 });
 
-test('閲覧モードは全画面へ入り、倍率操作・全体表示・終了後の復帰に対応する', async ({
+test('閲覧モードは全画面へ入り、倍率操作・LOD・終了後の復帰に対応する', async ({
   page,
 }) => {
   await page.goto('/timeline/');
@@ -581,15 +581,141 @@ test('閲覧モードは全画面へ入り、倍率操作・全体表示・終�
   await expect
     .poll(async () => Number((await viewer.getAttribute('data-viewer-scale')) ?? 0))
     .toBeGreaterThan(1);
-  await viewer.getByRole('button', { name: '全体表示へ戻す' }).click();
-  await expect
-    .poll(async () => Number((await viewer.getAttribute('data-viewer-scale')) ?? 0))
-    .toBeGreaterThan(0);
+  await expect(
+    viewer.getByRole('button', { name: '全体表示へ戻す' }),
+  ).toHaveCount(0);
+  await expect(
+    viewer.getByRole('button', {
+      name: /表示する範囲、現在は(?:基本|充実|すべて)/,
+    }),
+  ).toBeVisible();
 
   await stage.press('Escape');
   await expect(page.locator('[data-timeline-viewer="active"]')).toHaveCount(0);
   await expect(trigger).toBeFocused();
   await expect(modeButton(page, '近代')).toHaveAttribute('aria-current', 'true');
+});
+
+test('閲覧モード内でLODを切り替え、URLと年代・地域位置を維持する', async ({
+  page,
+}, testInfo) => {
+  await page.goto('/timeline/?lod=core');
+  await page.getByRole('button', { name: 'タイムラインを全画面で表示' }).click();
+
+  const viewer = page.locator('[data-timeline-viewer="active"]');
+  const stage = viewer.locator('[data-timeline-viewer-stage]');
+  const zoomIn = viewer.getByRole('button', { name: '拡大' });
+  await zoomIn.click();
+  await zoomIn.click();
+  await stage.evaluate((element) => {
+    element.scrollLeft = Math.min(
+      420,
+      Math.max(0, element.scrollWidth - element.clientWidth),
+    );
+    element.scrollTop = Math.min(
+      260,
+      Math.max(0, element.scrollHeight - element.clientHeight),
+    );
+  });
+
+  const trigger = viewer.getByRole('button', {
+    name: '表示する範囲、現在は基本',
+  });
+  await expect(trigger).toHaveAttribute('aria-haspopup', 'dialog');
+  await expect(trigger).toHaveAttribute('aria-expanded', 'false');
+  await trigger.click();
+
+  const panel = page.getByRole('dialog', { name: '表示する範囲' });
+  const options = panel.getByRole('radiogroup', { name: '表示する範囲' });
+  await expect(panel).toBeVisible();
+  await expect(options.getByRole('radio', { name: /基本\s*32/ })).toHaveAttribute(
+    'aria-checked',
+    'true',
+  );
+  await expect(options.getByRole('radio', { name: /充実\s*48/ })).toBeVisible();
+  await expect(options.getByRole('radio', { name: /すべて\s*54/ })).toBeVisible();
+
+  const panelRect = await panel.boundingBox();
+  const triggerRect = await trigger.boundingBox();
+  expect(panelRect).not.toBeNull();
+  expect(triggerRect).not.toBeNull();
+  if (panelRect && triggerRect) {
+    if (testInfo.project.name === 'mobile') {
+      expect(panelRect.width).toBeGreaterThanOrEqual(360);
+      expect(panelRect.x).toBeLessThanOrEqual(10);
+    } else {
+      expect(panelRect.width).toBeLessThanOrEqual(220);
+      expect(panelRect.y + panelRect.height).toBeLessThan(triggerRect.y);
+    }
+  }
+
+  await options.getByRole('radio', { name: /充実\s*48/ }).click();
+  await expect(viewer).toHaveAttribute('data-viewer-lod', 'standard');
+  await expect(page).toHaveURL(/lod=standard/);
+  await expect(page.getByRole('dialog', { name: '表示する範囲' })).toHaveCount(0);
+  const standardTrigger = viewer.getByRole('button', {
+    name: '表示する範囲、現在は充実',
+  });
+  await expect(standardTrigger).toBeFocused();
+  await expect(viewer).toHaveAttribute('data-last-lod-anchor-region');
+  await expect(viewer).toHaveAttribute('data-last-lod-anchor-year');
+  const firstAnchor = {
+    region: await viewer.getAttribute('data-last-lod-anchor-region'),
+    year: Number(await viewer.getAttribute('data-last-lod-anchor-year')),
+  };
+
+  await standardTrigger.click();
+  await page
+    .getByRole('dialog', { name: '表示する範囲' })
+    .getByRole('radio', { name: /すべて\s*54/ })
+    .click();
+  await expect(viewer).toHaveAttribute('data-viewer-lod', 'detailed');
+  await expect(page).toHaveURL(/lod=detailed/);
+  const secondAnchor = {
+    region: await viewer.getAttribute('data-last-lod-anchor-region'),
+    year: Number(await viewer.getAttribute('data-last-lod-anchor-year')),
+  };
+  expect(secondAnchor.region).toBe(firstAnchor.region);
+  expect(Math.abs(secondAnchor.year - firstAnchor.year)).toBeLessThanOrEqual(5);
+
+  await page.goBack();
+  await expect(page).toHaveURL(/lod=standard/);
+  await expect(viewer).toHaveAttribute('data-viewer-lod', 'standard');
+  await expect(
+    viewer.getByRole('button', { name: '表示する範囲、現在は充実' }),
+  ).toBeVisible();
+  await page.goForward();
+  await expect(page).toHaveURL(/lod=detailed/);
+  await expect(viewer).toHaveAttribute('data-viewer-lod', 'detailed');
+
+  await viewer.getByRole('button', {
+    name: '表示する範囲、現在はすべて',
+  }).click();
+  await page.keyboard.press('Escape');
+  await expect(page.getByRole('dialog', { name: '表示する範囲' })).toHaveCount(0);
+  await expect(viewer).toBeVisible();
+  await expect(
+    viewer.getByRole('button', { name: '表示する範囲、現在はすべて' }),
+  ).toBeFocused();
+
+  const accessibilityScanResults = await new AxeBuilder({ page })
+    .include('[data-timeline-viewer="active"]')
+    .analyze();
+  expect(accessibilityScanResults.violations).toEqual([]);
+
+  await viewer.getByRole('button', { name: '閲覧モードを閉じる' }).click();
+  await expect(
+    page
+      .getByRole('group', { name: '表示する範囲' })
+      .getByRole('button', { name: /すべて\s*54/ }),
+  ).toHaveAttribute('aria-pressed', 'true');
+  await page.reload();
+  await expect(page).toHaveURL(/lod=detailed/);
+  await expect(
+    page
+      .getByRole('group', { name: '表示する範囲' })
+      .getByRole('button', { name: /すべて\s*54/ }),
+  ).toHaveAttribute('aria-pressed', 'true');
 });
 
 test('閲覧モードの年代軸は縮小・拡大時も短い表記を重ねない', async ({
@@ -1032,7 +1158,7 @@ test('iPhone幅の閲覧モードは2本指の中点を保ってピンチズー�
 
   await page.setViewportSize({ width: 844, height: 390 });
   await expect(viewer).toBeVisible();
-  await viewer.getByRole('button', { name: '全体表示へ戻す' }).tap();
+  await stage.press('0');
   await expect
     .poll(async () => Number((await viewer.getAttribute('data-viewer-scale')) ?? 0))
     .toBeGreaterThan(0);
@@ -1554,7 +1680,7 @@ test('閲覧モードは年代位置を保ち、地域反復を静かに示す',
   await page.getByRole('button', { name: 'タイムラインを全画面で表示' }).click();
 
   const viewer = page.locator('[data-timeline-viewer="active"]');
-  await viewer.getByRole('button', { name: '全体表示へ戻す' }).click();
+  await viewer.locator('[data-timeline-viewer-stage]').press('0');
   const nodeLayer = viewer.locator('[data-viewer-node-layer]');
   const maskImage = await nodeLayer.evaluate(
     (element) =>
