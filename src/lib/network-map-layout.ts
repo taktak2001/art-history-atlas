@@ -1,7 +1,13 @@
-import type { Movement, RegionId } from '@/lib/schema';
+import type {
+  Movement,
+  RegionId,
+  Relationship,
+  VisibilityLevel,
+} from '@/lib/schema';
 import { timelineModeById, yearToTimelineX } from '@/lib/timeline-presentation';
 
 export type NetworkSemanticLevel = 'overview' | 'study' | 'detail';
+export type NetworkNodeProminence = 'hub' | 'major';
 
 export type NetworkRegionLane = {
   region: RegionId;
@@ -25,7 +31,9 @@ export type ChronologicalNetworkLayout = {
   zoom: number;
 };
 
-export const NETWORK_ZOOM_MIN = 0.72;
+// Overview keeps labels at their normal CSS size and reduces the dataset, so
+// the camera can travel much farther out without turning text into microcopy.
+export const NETWORK_ZOOM_MIN = 0.18;
 export const NETWORK_ZOOM_MAX = 1.6;
 
 export function clampNetworkZoom(value: number) {
@@ -36,6 +44,121 @@ export function networkSemanticLevel(zoom: number): NetworkSemanticLevel {
   if (zoom < 0.94) return 'overview';
   if (zoom < 1.28) return 'study';
   return 'detail';
+}
+
+/**
+ * Information density is intentionally independent from camera scale.
+ * The public LOD control remains the single user-facing density control.
+ */
+export function networkSemanticLevelForLod(
+  lod: VisibilityLevel,
+): NetworkSemanticLevel {
+  if (lod === 'core') return 'overview';
+  if (lod === 'standard') return 'study';
+  return 'detail';
+}
+
+function movementDegree(
+  movementId: string,
+  relationships: Pick<Relationship, 'from' | 'to'>[],
+) {
+  return relationships.reduce(
+    (count, relationship) =>
+      count +
+      Number(
+        relationship.from === movementId || relationship.to === movementId,
+      ),
+    0,
+  );
+}
+
+export function networkMovementImportance(
+  movement: Movement,
+  relationships: Pick<Relationship, 'from' | 'to'>[],
+) {
+  const visibilityScore =
+    movement.visibilityLevel === 'core'
+      ? 58
+      : movement.visibilityLevel === 'standard'
+        ? 24
+        : 4;
+  const representativeScore = movement.isRepresentative ? 34 : 0;
+  const degreeScore = Math.min(8, movementDegree(movement.id, relationships)) * 6;
+  const editorialOrderScore = Math.max(
+    0,
+    12 - Math.floor((movement.displayOrder ?? 120) / 10),
+  );
+  return visibilityScore + representativeScore + degreeScore + editorialOrderScore;
+}
+
+/**
+ * Overview is an editorial map, not the entire graph made smaller. The greedy
+ * pass balances historical importance with era and region coverage so a
+ * degree-heavy cluster cannot consume the whole overview.
+ */
+export function selectNetworkOverviewMovements(
+  movements: Movement[],
+  relationships: Pick<Relationship, 'from' | 'to'>[],
+  limit: number,
+) {
+  const remaining = new Map(movements.map((movement) => [movement.id, movement]));
+  const selected: Movement[] = [];
+  const coveredEras = new Set<string>();
+  const coveredRegions = new Set<string>();
+
+  while (remaining.size > 0 && selected.length < limit) {
+    const next = [...remaining.values()].sort((a, b) => {
+      const adjusted = (movement: Movement) =>
+        networkMovementImportance(movement, relationships) +
+        (coveredEras.has(movement.era) ? 0 : 20) +
+        (coveredRegions.has(movement.regionIds[0] ?? 'other') ? 0 : 14);
+      return adjusted(b) - adjusted(a) || a.id.localeCompare(b.id);
+    })[0];
+    if (!next) break;
+    selected.push(next);
+    remaining.delete(next.id);
+    coveredEras.add(next.era);
+    coveredRegions.add(next.regionIds[0] ?? 'other');
+  }
+
+  return selected.sort(
+    (a, b) => a.dates.start - b.dates.start || a.id.localeCompare(b.id),
+  );
+}
+
+export function networkNodeProminence(
+  movement: Movement,
+  relationships: Pick<Relationship, 'from' | 'to'>[],
+): NetworkNodeProminence {
+  const degree = movementDegree(movement.id, relationships);
+  return movement.isRepresentative && degree >= 3 || degree >= 6
+    ? 'hub'
+    : 'major';
+}
+
+export function getNetworkMovementBounds(
+  movementIds: Iterable<string>,
+  layout: ChronologicalNetworkLayout,
+  gutter = 32,
+) {
+  const positions = [...movementIds]
+    .map((id) => layout.positions.get(id))
+    .filter((position): position is { x: number; y: number } => Boolean(position));
+  if (positions.length === 0) return null;
+  const minX = Math.min(...positions.map((position) => position.x)) - gutter;
+  const minY = Math.min(...positions.map((position) => position.y)) - gutter;
+  const maxX =
+    Math.max(...positions.map((position) => position.x + layout.nodeW)) + gutter;
+  const maxY =
+    Math.max(...positions.map((position) => position.y + layout.nodeH)) + gutter;
+  return {
+    x: Math.max(0, minX),
+    y: Math.max(0, minY),
+    width: maxX - minX,
+    height: maxY - minY,
+    centerX: (minX + maxX) / 2,
+    centerY: (minY + maxY) / 2,
+  };
 }
 
 const primaryRegion = (movement: Movement): RegionId =>
@@ -61,7 +184,7 @@ export function buildChronologicalNetworkLayout({
 }): ChronologicalNetworkLayout {
   const resolvedZoom = clampNetworkZoom(zoom);
   const mode = timelineModeById('survey');
-  const axisW = compact ? 104 : 142;
+  const axisW = compact ? 88 : 142;
   const headerH = compact ? 48 : 52;
   const pad = compact ? 24 : 36;
   const nodeW = compact ? 150 : 174;

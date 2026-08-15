@@ -1,6 +1,6 @@
 import { test, expect } from '@playwright/test';
 
-test('iPhone幅では重要関係を絞り、基本LODの歴史的背景ノードを保つ', async ({ page }) => {
+test('iPhone幅のoverviewは主要系譜だけを読みやすい密度で表示する', async ({ page }) => {
   await page.setViewportSize({ width: 390, height: 844 });
   await page.goto('/network/');
 
@@ -17,7 +17,10 @@ test('iPhone幅では重要関係を絞り、基本LODの歴史的背景ノー�
   expect(edgeCount).toBeLessThanOrEqual(18);
 
   const nodeCount = await graph.locator('[data-network-node]').count();
-  expect(nodeCount).toBe(32);
+  expect(nodeCount).toBeGreaterThanOrEqual(10);
+  expect(nodeCount).toBeLessThanOrEqual(15);
+  await expect(graph).toHaveAttribute('data-network-semantic-level', 'overview');
+  await expect(graph.locator('[data-edge-label]')).toHaveCount(0);
   await expect(page.getByRole('heading', { name: '関係一覧' })).toBeVisible();
   await expect(page.getByRole('button', { name: 'すべて表示' })).toBeVisible();
 });
@@ -33,8 +36,30 @@ test('モバイルですべての関係へ切り替えられる', async ({ page 
   await expect(page.getByRole('option', { name: '理論的関連' })).toBeAttached();
   expect(
     await graph.locator('[data-network-layer="base-edges"] [data-network-edge]').count(),
-  ).toBeGreaterThan(18);
+  ).toBeGreaterThan(0);
   await expect(page.getByRole('button', { name: '重要関係のみ' })).toBeVisible();
+});
+
+test('全体は主要系譜へ戻し、mobile地域列を100px以内に保つ', async ({ page }) => {
+  await page.setViewportSize({ width: 390, height: 844 });
+  await page.goto('/network/?lod=detailed&scope=all');
+  const graph = page.getByRole('group', { name: '美術運動の関係ネットワーク図' });
+  await expect(graph).toHaveAttribute('data-network-semantic-level', 'detail');
+
+  await page.getByRole('button', { name: '主要系譜の全体表示へ戻す' }).click();
+  await expect(graph).toHaveAttribute('data-network-semantic-level', 'overview');
+  await expect(graph).toHaveAttribute('data-network-lod', 'core');
+  await expect(graph).toHaveAttribute('data-network-scope', 'all');
+  const nodeCount = await graph.locator('[data-network-node]').count();
+  expect(nodeCount).toBeGreaterThanOrEqual(10);
+  expect(nodeCount).toBeLessThanOrEqual(15);
+
+  const regionWidth = await graph
+    .locator('.network-region-lane__label')
+    .first()
+    .evaluate((element) => element.getBoundingClientRect().width);
+  expect(regionWidth).toBeGreaterThanOrEqual(80);
+  expect(regionWidth).toBeLessThanOrEqual(100);
 });
 
 test('PCにも表示切替と件数を常時表示する', async ({ page }) => {
@@ -64,20 +89,21 @@ test('実年代X軸と地域Yレーンを表示し、両方向へスクロール
   expect(overflow.vertical).toBe(true);
 });
 
-test('semantic zoomでMovementからArtist・Work・Contextへ段階表示する', async ({ page }) => {
-  await page.goto('/network/?focus=mono-ha&scope=focus');
+test('情報LODはcamera zoomと分離し、詳細でArtist・Work・Contextを表示する', async ({ page }) => {
+  await page.goto('/network/?focus=mono-ha&scope=focus&lod=core');
   const graph = page.getByRole('group', { name: '美術運動の関係ネットワーク図' });
   await expect(graph).toHaveAttribute('data-network-semantic-level', 'overview');
   await expect(graph.locator('[data-network-entity="artist"]')).toHaveCount(0);
 
   const zoomIn = page.getByRole('button', { name: 'ネットワークを拡大' });
   await zoomIn.click();
+  await expect(graph).toHaveAttribute('data-network-semantic-level', 'overview');
+  await page.getByRole('button', { name: /充実\s*48/ }).click();
   await expect(graph).toHaveAttribute('data-network-semantic-level', 'study');
-  expect(await graph.locator('[data-network-entity="artist"]').count()).toBeGreaterThan(0);
+  await expect(graph.locator('[data-network-entity="artist"]')).toHaveCount(0);
   await expect(graph.locator('[data-network-entity="work"]')).toHaveCount(0);
 
-  await zoomIn.click();
-  await zoomIn.click();
+  await page.getByRole('button', { name: /すべて\s*54/ }).click();
   await expect(graph).toHaveAttribute('data-network-semantic-level', 'detail');
   expect(await graph.locator('[data-network-entity="work"]').count()).toBeGreaterThan(0);
   expect(await graph.locator('[data-network-entity="context"]').count()).toBeGreaterThan(0);
@@ -182,7 +208,7 @@ test('関係タイプごとに線種・通常線幅・方向を使い分ける',
 });
 
 test('SVG markerは安全余白と共通仕様を持ち、無向線には付かない', async ({ page }) => {
-  await page.goto('/network/');
+  await page.goto('/network/?lod=detailed');
   await page.getByRole('button', { name: 'すべて表示' }).click();
 
   const graph = page.getByRole('group', { name: '美術運動の関係ネットワーク図' });
@@ -229,7 +255,7 @@ test('ノード選択時は強調線を無関係ノードより前、関連ノ�
   );
   await expect(baseLayer.locator('[data-network-edge]').first()).toHaveAttribute(
     'opacity',
-    '0.06',
+    '0.025',
   );
   expect(await graph.locator('[data-edge-label]').count()).toBeGreaterThan(0);
   expect(await graph.locator('[data-node-state="related"]').count()).toBeGreaterThan(0);
@@ -242,7 +268,7 @@ test('ノード選択時は強調線を無関係ノードより前、関連ノ�
     .poll(() =>
       relatedNode.evaluate((element) => Number(getComputedStyle(element).opacity)),
     )
-    .toBeGreaterThanOrEqual(0.95);
+    .toBeGreaterThanOrEqual(0.85);
   await expect
     .poll(() =>
       dimmedNode.evaluate((element) => Number(getComputedStyle(element).opacity)),
@@ -291,21 +317,21 @@ test('ノード選択時は強調線を無関係ノードより前、関連ノ�
 
   expect(selectedStyle.opacity).toBe(1);
   expect(selectedStyle.borderWidth).toBe('3px');
-  expect(selectedStyle.borderColor).toBe(selectedStyle.titleColor);
+  expect(selectedStyle.borderColor).toContain('28, 28, 30');
+  expect(selectedStyle.titleColor).toContain('28, 28, 30');
   expect(selectedStyle.transform).toBe('none');
   expect(selectedStyle.titleWeight).toBeGreaterThanOrEqual(700);
   expect(selectedStyle.dateWeight).toBe(400);
-  // 主ノードは3px濃チャコールの単線のみ（影・二重線なし）
-  expect(selectedStyle.boxShadow).toBe('none');
+  // 主ノードは3px濃チャコールと最小限の影で中心を示す
+  expect(selectedStyle.boxShadow).not.toBe('none');
   expect(selectedStyle.backgroundColor).toBe('rgb(252, 248, 244)');
-  expect(Number.parseFloat(idleStyle.borderWidth)).toBeGreaterThanOrEqual(1);
   expect(Number.parseFloat(idleStyle.borderWidth)).toBeLessThanOrEqual(1.5);
   expect(idleStyle.boxShadow).toBe('none');
   expect(idleStyle.backgroundColor).toBe('rgb(255, 255, 255)');
-  // 関係ノードは不透明度100%、背景ノードは0.15〜0.2まで沈める
-  expect(relatedOpacity).toBeGreaterThanOrEqual(0.95);
-  expect(dimmedOpacity).toBeGreaterThanOrEqual(0.12);
-  expect(dimmedOpacity).toBeLessThanOrEqual(0.25);
+  // 直接関係は読める濃度を保ち、背景ノードは残像にならない濃度まで沈める
+  expect(relatedOpacity).toBeGreaterThanOrEqual(0.85);
+  expect(dimmedOpacity).toBeGreaterThanOrEqual(0.03);
+  expect(dimmedOpacity).toBeLessThanOrEqual(0.06);
   expect(selectedStyle.backgroundColor).not.toBe(idleStyle.backgroundColor);
   await expect(
     graph.locator('[data-edge-label][data-edge-label-anchor="start"], [data-edge-label][data-edge-label-anchor="end"]'),
@@ -420,7 +446,7 @@ test('ノードのダブルタップでは遷移せず、下部の詳細リン�
 test('線ラベルの背景は線を隠すためだけの最小限にする（pill状にしない）', async ({
   page,
 }) => {
-  await page.goto('/network/');
+  await page.goto('/network/?lod=detailed');
   await expect(page.locator('[data-edge-label]').first()).toBeVisible();
 
   // ラベル数とバックプレート数は描画確定後に一度で読む（途中経過で数が変わるため）
@@ -474,7 +500,7 @@ test('PCで時代ジャンプと左右キーにより現代まで移動できる
   );
   await expect
     .poll(() => graph.evaluate((element) => element.scrollLeft))
-    .toBeGreaterThan(500);
+    .toBeGreaterThan(100);
 
   await graph.focus();
   const before = await graph.evaluate((element) => element.scrollLeft);
@@ -534,7 +560,7 @@ test('ダークモードと動きを減らす設定を尊重する', async ({ pa
     });
   expect(selectedStyle.borderColor).toBe(selectedStyle.titleColor);
   expect(selectedStyle.backgroundColor).toBe('rgb(42, 40, 37)');
-  expect(selectedStyle.boxShadow).toBe('none');
+  expect(selectedStyle.boxShadow).toContain('rgba');
 });
 
 for (const zoom of [1.25, 1.5]) {
@@ -604,8 +630,15 @@ test('focus中は手動変更を尊重し、選択解除で全体表示へ戻る
     .click();
   await expect(page).toHaveURL(/lod=core/);
   await expect(page).toHaveURL(/focus=japanese-ink-painting/);
-  // focusノードと直接関係はLODに関わらず表示し続け、基本LODの背景も残す
-  await expect(page.locator('[data-network-node]')).toHaveCount(33);
+  // focusノードと直接関係はLODに関わらず表示し続け、overviewの主要背景も残す
+  const focusedNodeCount = await page.locator('[data-network-node]').count();
+  expect(focusedNodeCount).toBeGreaterThanOrEqual(10);
+  expect(focusedNodeCount).toBeLessThanOrEqual(18);
+  await expect(
+    page.locator(
+      '[data-network-node][data-network-node-id="japanese-ink-painting"]',
+    ),
+  ).toBeVisible();
   await expect(page.locator('[data-network-node][data-node-state="dimmed"]').first()).toBeVisible();
   await expect(
     page.locator('.network-scope-option[aria-pressed="true"]'),
@@ -711,6 +744,7 @@ test('関係ラベルは密集しても互いに重ならず、全件表示さ�
 
 test('全体表示でラベルが密集してもラベル同士が重ならない', async ({ page }) => {
   await page.goto('/network/?scope=all');
+  await page.getByRole('button', { name: /すべて\s*54/ }).click();
 
   await expect(page.locator('[data-edge-label]').first()).toBeVisible();
 

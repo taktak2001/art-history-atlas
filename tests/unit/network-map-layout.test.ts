@@ -3,7 +3,11 @@ import { movements, regionOrder, relationships } from '@/lib/dataset';
 import {
   buildChronologicalNetworkLayout,
   clampNetworkZoom,
+  getNetworkMovementBounds,
+  networkNodeProminence,
   networkSemanticLevel,
+  networkSemanticLevelForLod,
+  selectNetworkOverviewMovements,
 } from '@/lib/network-map-layout';
 
 describe('chronological network map layout', () => {
@@ -68,11 +72,64 @@ describe('chronological network map layout', () => {
 
 describe('network semantic zoom', () => {
   it('clamps zoom and maps it to overview, study, and detail levels', () => {
-    expect(clampNetworkZoom(0.2)).toBe(0.72);
+    expect(clampNetworkZoom(0.1)).toBe(0.18);
+    expect(clampNetworkZoom(0.2)).toBe(0.2);
     expect(clampNetworkZoom(3)).toBe(1.6);
     expect(networkSemanticLevel(0.84)).toBe('overview');
     expect(networkSemanticLevel(1)).toBe('study');
     expect(networkSemanticLevel(1.4)).toBe('detail');
+  });
+
+  it('keeps information density independent from camera zoom', () => {
+    expect(networkSemanticLevelForLod('core')).toBe('overview');
+    expect(networkSemanticLevelForLod('standard')).toBe('study');
+    expect(networkSemanticLevelForLod('detailed')).toBe('detail');
+  });
+
+  it('reduces mobile overview to a balanced editorial set', () => {
+    const overview = selectNetworkOverviewMovements(
+      movements,
+      relationships,
+      12,
+    );
+    expect(overview).toHaveLength(12);
+    expect(new Set(overview.map((movement) => movement.era)).size).toBeGreaterThanOrEqual(6);
+    expect(new Set(overview.map((movement) => movement.regionIds[0])).size).toBeGreaterThanOrEqual(6);
+    expect(overview.every((movement) => movement.visibilityLevel !== 'detailed')).toBe(true);
+  });
+
+  it('derives hub prominence from editorial priority and relation degree', () => {
+    const renaissance = movements.find(
+      (movement) => movement.id === 'italian-renaissance',
+    )!;
+    expect(networkNodeProminence(renaissance, relationships)).toBe('hub');
+  });
+
+  it('includes the full visual node box and safe gutter in focus bounds', () => {
+    const selected = movements.filter((movement) =>
+      ['italian-renaissance', 'baroque'].includes(movement.id),
+    );
+    const layout = buildChronologicalNetworkLayout({
+      movements: selected,
+      regionOrder,
+      zoom: 1,
+      compact: true,
+    });
+    const bounds = getNetworkMovementBounds(
+      selected.map((movement) => movement.id),
+      layout,
+      32,
+    )!;
+    const left = Math.min(
+      ...selected.map((movement) => layout.positions.get(movement.id)!.x),
+    );
+    const right = Math.max(
+      ...selected.map(
+        (movement) => layout.positions.get(movement.id)!.x + layout.nodeW,
+      ),
+    );
+    expect(bounds.x).toBeLessThanOrEqual(left - 32);
+    expect(bounds.x + bounds.width).toBeGreaterThanOrEqual(right + 32);
   });
 });
 
