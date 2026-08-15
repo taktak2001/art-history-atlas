@@ -70,6 +70,36 @@ describe('chronological network map layout', () => {
     expect(new Set(selected.map((movement) => layout.positions.get(movement.id)!.y)).size)
       .toBeGreaterThan(1);
   });
+
+  it('compacts unrelated mobile lanes while preserving related region order', () => {
+    const selected = movements.filter((movement) =>
+      ['italian-renaissance', 'baroque', 'impressionism', 'cubism'].includes(
+        movement.id,
+      ),
+    );
+    const overview = buildChronologicalNetworkLayout({
+      movements: selected,
+      regionOrder,
+      zoom: 0.84,
+      compact: true,
+    });
+    const focused = buildChronologicalNetworkLayout({
+      movements: selected,
+      regionOrder,
+      zoom: 0.84,
+      compact: true,
+      focusNodeIds: new Set(['italian-renaissance', 'baroque']),
+    });
+    const overviewFrance = overview.lanes.find((lane) => lane.region === 'france')!;
+    const focusedFrance = focused.lanes.find((lane) => lane.region === 'france')!;
+
+    expect(focusedFrance.relevance).toBe('context');
+    expect(focusedFrance.relevantNodeCount).toBe(0);
+    expect(focusedFrance.height).toBeLessThan(overviewFrance.height);
+    expect(focused.lanes.map((lane) => lane.region)).toEqual(
+      overview.lanes.map((lane) => lane.region),
+    );
+  });
 });
 
 describe('network semantic zoom', () => {
