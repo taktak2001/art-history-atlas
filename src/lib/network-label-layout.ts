@@ -18,8 +18,8 @@ export const LABEL_PROGRESS_CANDIDATES = [
   0.85,
 ];
 /** 線からの法線方向オフセット候補（px） */
-// バックプレートが線を隠すため、線上(0)も有効な候補にする
-export const LABEL_NORMAL_OFFSETS = [0, -8, 8, -14, 14, -20, 20];
+// 関係名は線へ直置きせず、最小限ずらして線・矢印と分離する。
+export const LABEL_NORMAL_OFFSETS = [-10, 10, -16, 16, -22, 22];
 /** 第2フォールバックで使う拡張オフセット */
 export const LABEL_FALLBACK_OFFSETS = [-26, 26, -32, 32, -40, 40];
 /**
@@ -62,7 +62,7 @@ export const LABEL_MAX_DISTANCE_PENALTY_AT = 40;
 /** ラベル同士・ノードとの最小すき間（px） */
 // ノードの隙間（モバイルは行間84 - ノード高58 = 26px）へ収まる値にする。
 // 大きくしすぎると隙間に入れず、かえってノードの上に載る。
-export const LABEL_GAP = { label: 4, node: 5, arrow: 4 } as const;
+export const LABEL_GAP = { label: 6, node: 7, arrow: 6 } as const;
 
 export type ObstacleKind = 'node' | 'arrow' | 'label';
 export type Obstacle = { rect: Rect; kind: ObstacleKind };

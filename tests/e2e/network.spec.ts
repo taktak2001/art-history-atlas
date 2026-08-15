@@ -1047,3 +1047,123 @@ test('引き出し線はノードのブロックを貫通しない', async ({ pa
   expect(result.crossings).toEqual([]);
   expect(result.labelHits).toEqual([]);
 });
+
+test('390pxのoverviewは内容量に応じてregion laneを圧縮する', async ({ page }) => {
+  await page.setViewportSize({ width: 390, height: 844 });
+  await page.goto('/network/?lod=core');
+  await page.getByRole('button', { name: 'ルネサンス', exact: true }).click();
+  await expect(page.locator('[data-network-zoom]')).toHaveAttribute(
+    'data-network-zoom',
+    '0.72',
+  );
+
+  const lanes = await page.locator('[data-network-region]').evaluateAll((elements) =>
+    elements.map((element) => ({
+      relevance: element.getAttribute('data-lane-relevance'),
+      nodes: Number(element.getAttribute('data-lane-visible-nodes')),
+      height: Number(element.getAttribute('data-lane-height')),
+    })),
+  );
+  expect(lanes.every((lane) => lane.relevance === 'overview')).toBe(true);
+  expect(lanes.filter((lane) => lane.nodes <= 1).every((lane) => lane.height <= 60)).toBe(
+    true,
+  );
+});
+
+test('390pxのBaroque focusは文字とstationを分離し、無関係laneを圧縮する', async ({
+  page,
+}) => {
+  await page.setViewportSize({ width: 390, height: 844 });
+  await page.goto('/network/?focus=baroque&lod=standard');
+  await expect(page.locator('[data-network-node-id="baroque"]')).toHaveAttribute(
+    'aria-pressed',
+    'true',
+  );
+
+  const result = await page.evaluate(() => {
+    const stationLabelCollisions: string[] = [];
+    const routeTextCollisions = new Set<string>();
+    for (const node of Array.from(
+      document.querySelectorAll<HTMLElement>('[data-network-node]'),
+    )) {
+      const station = node.querySelector<HTMLElement>('.network-node__station');
+      const content = node.querySelector<HTMLElement>('.network-node__content');
+      if (!station || !content || content.offsetParent === null) continue;
+      const stationRect = station.getBoundingClientRect();
+      const contentRect = content.getBoundingClientRect();
+      const gap = 6;
+      if (
+        stationRect.left < contentRect.right + gap &&
+        stationRect.right + gap > contentRect.left &&
+        stationRect.top < contentRect.bottom + gap &&
+        stationRect.bottom + gap > contentRect.top
+      ) {
+        stationLabelCollisions.push(node.dataset.networkNodeId ?? 'unknown');
+      }
+    }
+    const textBoxes = Array.from(
+      document.querySelectorAll<HTMLElement>('.network-node__content'),
+    ).flatMap((content) => {
+      if (content.offsetParent === null) return [];
+      const rect = content.getBoundingClientRect();
+      const id = content.closest<HTMLElement>('[data-network-node]')?.dataset
+        .networkNodeId;
+      return [{
+        id: id ?? 'unknown',
+        left: rect.left - 6,
+        right: rect.right + 6,
+        top: rect.top - 6,
+        bottom: rect.bottom + 6,
+      }];
+    });
+    for (const path of Array.from(
+      document.querySelectorAll<SVGPathElement>(
+        '[data-network-layer="base-edges"] [data-network-edge], [data-network-layer="highlighted-edges"] [data-network-edge]',
+      ),
+    )) {
+      const matrix = path.getScreenCTM();
+      if (!matrix) continue;
+      const length = path.getTotalLength();
+      const steps = Math.max(20, Math.ceil(length / 3));
+      for (let step = 0; step <= steps; step += 1) {
+        const point = path.getPointAtLength((length * step) / steps);
+        const screenPoint = new DOMPoint(point.x, point.y).matrixTransform(matrix);
+        for (const textBox of textBoxes) {
+          if (
+            screenPoint.x >= textBox.left &&
+            screenPoint.x <= textBox.right &&
+            screenPoint.y >= textBox.top &&
+            screenPoint.y <= textBox.bottom
+          ) {
+            routeTextCollisions.add(
+              `${path.dataset.networkEdgeId ?? 'edge'}×${textBox.id}`,
+            );
+          }
+        }
+      }
+    }
+    const lanes = Array.from(
+      document.querySelectorAll<HTMLElement>('[data-network-region]'),
+    ).map((lane) => ({
+      region: lane.dataset.networkRegion,
+      relevance: lane.dataset.laneRelevance,
+      height: Number(lane.dataset.laneHeight),
+    }));
+    return {
+      stationLabelCollisions,
+      routeTextCollisions: [...routeTextCollisions],
+      lanes,
+    };
+  });
+
+  expect(result.stationLabelCollisions).toEqual([]);
+  expect(result.routeTextCollisions).toEqual([]);
+  const contextLanes = result.lanes.filter((lane) => lane.relevance === 'context');
+  expect(contextLanes.length).toBeGreaterThan(0);
+  expect(contextLanes.every((lane) => lane.height <= 60)).toBe(true);
+  expect(result.lanes.find((lane) => lane.region === 'italy')?.relevance).toBe('active');
+  await expect(page.locator('[data-edge-label-backplate]').first()).toHaveAttribute(
+    'fill-opacity',
+    '0.98',
+  );
+});

@@ -2,6 +2,7 @@ import { render } from '@testing-library/react';
 import { describe, expect, it } from 'vitest';
 import { ArrowMarkerDefs, RelationLine } from '@/components/RelationLine';
 import {
+  getCollisionAvoidingNetworkMetroEdgeGeometry,
   getNetworkEdgeGeometry,
   getNetworkEdgeLabelPoint,
   getNetworkMetroEdgeGeometry,
@@ -12,6 +13,7 @@ import {
   NETWORK_ARROW_GAP,
   NETWORK_SVG_SAFE_PADDING,
   getSharedCorridorOffset,
+  networkRouteCollisionCount,
 } from '@/lib/network-geometry';
 import { RELATION_LINE_STYLE } from '@/lib/network-presentation';
 import { RELATION_LABELS, type RelationKind } from '@/lib/schema';
@@ -181,6 +183,26 @@ describe('network geometry', () => {
     expect(start.x).toBeLessThan(end.x);
     expect(Number.isFinite(start.y)).toBe(true);
     expect(Number.isFinite(end.y)).toBe(true);
+  });
+
+  it('movement labelのcollision boxを避けて近いmetro corridorへ迂回する', () => {
+    const obstacle = {
+      id: 'label-between-stations',
+      rect: { x: 170, y: 42, width: 90, height: 22 },
+    };
+    const geometry = getCollisionAvoidingNetworkMetroEdgeGeometry({
+      fromPosition: { x: 20, y: 0 },
+      toPosition: { x: 420, y: 0 },
+      nodeWidth: 140,
+      nodeHeight: 58,
+      stationY: 52,
+      directed: true,
+      obstacles: [obstacle],
+    });
+
+    expect(networkRouteCollisionCount(geometry, [obstacle])).toBe(0);
+    expect(geometry.collisionAvoidanceBends).toBe(2);
+    expect(geometry.pathPoints!.length).toBeGreaterThan(2);
   });
 });
 

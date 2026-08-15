@@ -29,6 +29,9 @@ export type NetworkRegionLane = {
   top: number;
   height: number;
   trackCount: number;
+  visibleNodeCount: number;
+  relevantNodeCount: number;
+  relevance: 'overview' | 'active' | 'context';
 };
 
 export type ChronologicalNetworkLayout = {
@@ -39,6 +42,7 @@ export type ChronologicalNetworkLayout = {
   timelineW: number;
   nodeW: number;
   nodeH: number;
+  stationY: number;
   axisW: number;
   headerH: number;
   pad: number;
@@ -231,6 +235,7 @@ export function buildChronologicalNetworkLayout({
   compact,
   safePad = 16,
   visualGutter = NETWORK_VISUAL_GUTTER,
+  focusNodeIds,
 }: {
   movements: Movement[];
   regionOrder: RegionId[];
@@ -238,6 +243,7 @@ export function buildChronologicalNetworkLayout({
   compact: boolean;
   safePad?: number;
   visualGutter?: number;
+  focusNodeIds?: ReadonlySet<string>;
 }): ChronologicalNetworkLayout {
   const resolvedZoom = clampNetworkZoom(zoom);
   const mode = timelineModeById('survey');
@@ -253,9 +259,12 @@ export function buildChronologicalNetworkLayout({
   const baseTimelineW = compact ? 1540 : 2240;
   const pad = Math.round(basePad * resolvedZoom);
   const nodeW = Math.round(baseNodeW * resolvedZoom);
-  const nodeH = Math.max(compact ? 12 : 14, Math.round(baseNodeH * resolvedZoom));
+  // Labels keep a readable CSS size while the historical world zooms. Give
+  // every station enough physical height to keep its route below the label.
+  const nodeH = Math.max(compact ? 34 : 40, Math.round(baseNodeH * resolvedZoom));
+  const stationY = Math.max(20, nodeH - (compact ? 7 : 9));
   const trackStep = Math.max(
-    compact ? 16 : 18,
+    compact ? 48 : 54,
     Math.round(baseTrackStep * resolvedZoom),
   );
   const lanePadding = Math.max(
@@ -263,8 +272,8 @@ export function buildChronologicalNetworkLayout({
     Math.round(baseLanePadding * resolvedZoom),
   );
   const minimumLaneHeight = Math.max(
-    compact ? 21 : 25,
-    Math.round(baseMinimumLaneHeight * resolvedZoom),
+    nodeH + (compact ? 8 : 12),
+    compact ? 0 : Math.round(baseMinimumLaneHeight * resolvedZoom),
   );
   const regionGap = Math.max(6, Math.round(baseRegionGap * resolvedZoom));
   const timelineW = Math.round(baseTimelineW * resolvedZoom);
@@ -283,6 +292,19 @@ export function buildChronologicalNetworkLayout({
     const inRegion = movements
       .filter((movement) => primaryRegion(movement) === region)
       .sort((a, b) => a.dates.start - b.dates.start || a.id.localeCompare(b.id));
+    const relevantInRegion = focusNodeIds
+      ? inRegion.filter((movement) => focusNodeIds.has(movement.id))
+      : inRegion;
+    const relevance: NetworkRegionLane['relevance'] = focusNodeIds
+      ? relevantInRegion.length > 0
+        ? 'active'
+        : 'context'
+      : 'overview';
+    // During focus, faded context stations remain as geographic context but
+    // no longer reserve full collision tracks. This concentrates space in
+    // the regions that actually participate in the selected subgraph.
+    const movementsForTracks = focusNodeIds ? relevantInRegion : inRegion;
+    const trackedIds = new Set(movementsForTracks.map((movement) => movement.id));
     const trackEnds: number[] = [];
     const placements = inRegion.map((movement) => {
       // Collision tracks are resolved in the unscaled historical world. This
@@ -307,26 +329,51 @@ export function buildChronologicalNetworkLayout({
         Math.min(originX - nodeW / 2, safePad + axisW + pad + timelineW - nodeW / 2),
       );
       const minimumGap = compact ? 12 : 16;
-      let track = trackEnds.findIndex((end) => baseX >= end + minimumGap);
-      if (track < 0) {
-        track = trackEnds.length;
-        trackEnds.push(baseX + baseNodeW);
-      } else {
-        trackEnds[track] = baseX + baseNodeW;
+      let track = 0;
+      if (trackedIds.has(movement.id)) {
+        track = trackEnds.findIndex((end) => baseX >= end + minimumGap);
+        if (track < 0) {
+          track = trackEnds.length;
+          trackEnds.push(baseX + baseNodeW);
+        } else {
+          trackEnds[track] = baseX + baseNodeW;
+        }
       }
       return { movement, x, track };
     });
 
-    const trackCount = Math.max(1, trackEnds.length);
-    const height = Math.max(
-      minimumLaneHeight,
-      lanePadding * 2 + nodeH + (trackCount - 1) * trackStep,
-    );
-    lanes.push({ region, top: laneTop, height, trackCount });
+    const trackCount = trackEnds.length;
+    const compactPadding = compact
+      ? focusNodeIds
+        ? 5
+        : 8
+      : Math.max(6, lanePadding);
+    const contentHeight =
+      nodeH + Math.max(0, trackCount - 1) * trackStep + compactPadding * 2;
+    const contextHeight = nodeH + (compact ? 6 : 10);
+    const height =
+      relevance === 'context'
+        ? contextHeight
+        : Math.max(
+            focusNodeIds ? nodeH + compactPadding * 2 : minimumLaneHeight,
+            contentHeight,
+          );
+    lanes.push({
+      region,
+      top: laneTop,
+      height,
+      trackCount,
+      visibleNodeCount: inRegion.length,
+      relevantNodeCount: relevantInRegion.length,
+      relevance,
+    });
     for (const placement of placements) {
       positions.set(placement.movement.id, {
         x: placement.x,
-        y: laneTop + lanePadding + placement.track * trackStep,
+        y:
+          laneTop +
+          (relevance === 'context' ? Math.max(0, (height - nodeH) / 2) : compactPadding) +
+          placement.track * trackStep,
       });
     }
     laneTop += height + regionGap;
@@ -360,6 +407,7 @@ export function buildChronologicalNetworkLayout({
     timelineW,
     nodeW,
     nodeH,
+    stationY,
     axisW,
     headerH,
     pad,

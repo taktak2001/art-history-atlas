@@ -14,6 +14,12 @@ export type NetworkEdgeGeometry = {
   midX: number;
   midY: number;
   routeOffset: number;
+  collisionAvoidanceBends?: number;
+};
+
+export type NetworkRouteObstacle = {
+  id: string;
+  rect: { x: number; y: number; width: number; height: number };
 };
 
 export const NETWORK_SVG_SAFE_PADDING = 16;
@@ -171,15 +177,16 @@ export function getNetworkMetroEdgeGeometry(
   arrowGap = NETWORK_ARROW_GAP,
   routeOffset = 0,
   corridorOffset = 0,
+  stationY = nodeHeight / 2,
 ): NetworkEdgeGeometry {
   const stationInset = Math.min(14, Math.max(8, nodeWidth * 0.08));
   const sourceStation = {
     x: fromPosition.x + stationInset,
-    y: fromPosition.y + nodeHeight / 2,
+    y: fromPosition.y + stationY,
   };
   const targetStation = {
     x: toPosition.x + stationInset,
-    y: toPosition.y + nodeHeight / 2,
+    y: toPosition.y + stationY,
   };
   const direction = targetStation.x >= sourceStation.x ? 1 : -1;
   const start = insetPointToward(sourceStation, targetStation, 4);
@@ -194,7 +201,17 @@ export function getNetworkMetroEdgeGeometry(
   let points: Point[];
 
   if (sameTrack) {
-    points = [start, end];
+    if (routeOffset === 0) {
+      points = [start, end];
+    } else {
+      const routedY = start.y + routeOffset;
+      points = [
+        start,
+        { x: start.x, y: routedY },
+        { x: end.x, y: routedY },
+        end,
+      ];
+    }
   } else if (horizontalDistance < 28) {
     const corridorX = start.x + corridorOffset;
     points = [
@@ -247,6 +264,121 @@ export function getNetworkMetroEdgeGeometry(
     midX: (middleStart.x + middleEnd.x) / 2,
     midY: (middleStart.y + middleEnd.y) / 2,
     routeOffset,
+  };
+}
+
+function networkSegmentIntersectsRect(
+  from: Point,
+  to: Point,
+  rect: NetworkRouteObstacle['rect'],
+): boolean {
+  const dx = to.x - from.x;
+  const dy = to.y - from.y;
+  let tMin = 0;
+  let tMax = 1;
+  const clip = (delta: number, start: number, min: number, max: number) => {
+    if (delta === 0) return start >= min && start <= max;
+    const first = (min - start) / delta;
+    const second = (max - start) / delta;
+    tMin = Math.max(tMin, Math.min(first, second));
+    tMax = Math.min(tMax, Math.max(first, second));
+    return tMax >= tMin;
+  };
+  return (
+    clip(dx, from.x, rect.x, rect.x + rect.width) &&
+    clip(dy, from.y, rect.y, rect.y + rect.height)
+  );
+}
+
+export function networkRouteCollisionCount(
+  geometry: NetworkEdgeGeometry,
+  obstacles: readonly NetworkRouteObstacle[],
+): number {
+  const points = geometry.pathPoints ?? [geometry.start, geometry.end];
+  const collisions = new Set<string>();
+  for (let index = 1; index < points.length; index += 1) {
+    for (const obstacle of obstacles) {
+      if (networkSegmentIntersectsRect(points[index - 1], points[index], obstacle.rect)) {
+        collisions.add(obstacle.id);
+      }
+    }
+  }
+  return collisions.size;
+}
+
+/**
+ * Keep Metro geometry, but choose the nearest parallel corridor that does not
+ * cross a movement label. The solver runs only when layout inputs change.
+ */
+export function getCollisionAvoidingNetworkMetroEdgeGeometry({
+  fromPosition,
+  toPosition,
+  nodeWidth,
+  nodeHeight,
+  directed,
+  arrowGap = NETWORK_ARROW_GAP,
+  routeOffset = 0,
+  corridorOffset = 0,
+  stationY = nodeHeight / 2,
+  obstacles,
+}: {
+  fromPosition: Point;
+  toPosition: Point;
+  nodeWidth: number;
+  nodeHeight: number;
+  directed: boolean;
+  arrowGap?: number;
+  routeOffset?: number;
+  corridorOffset?: number;
+  stationY?: number;
+  obstacles: readonly NetworkRouteObstacle[];
+}): NetworkEdgeGeometry {
+  const clearance = Math.max(18, nodeHeight + 8);
+  const candidates = [
+    routeOffset,
+    routeOffset - clearance,
+    routeOffset + clearance,
+    routeOffset - clearance * 2,
+    routeOffset + clearance * 2,
+  ];
+  let best: NetworkEdgeGeometry | null = null;
+  let bestCollisions = Number.POSITIVE_INFINITY;
+
+  for (const candidate of candidates) {
+    const geometry = getNetworkMetroEdgeGeometry(
+      fromPosition,
+      toPosition,
+      nodeWidth,
+      nodeHeight,
+      directed,
+      arrowGap,
+      candidate,
+      corridorOffset,
+      stationY,
+    );
+    const collisions = networkRouteCollisionCount(geometry, obstacles);
+    if (collisions < bestCollisions) {
+      best = geometry;
+      bestCollisions = collisions;
+    }
+    if (collisions === 0) break;
+  }
+
+  const resolved = best ?? getNetworkMetroEdgeGeometry(
+    fromPosition,
+    toPosition,
+    nodeWidth,
+    nodeHeight,
+    directed,
+    arrowGap,
+    routeOffset,
+    corridorOffset,
+    stationY,
+  );
+  const usedDetour = resolved.routeOffset !== routeOffset;
+  return {
+    ...resolved,
+    collisionAvoidanceBends: usedDetour ? 2 : 0,
   };
 }
 

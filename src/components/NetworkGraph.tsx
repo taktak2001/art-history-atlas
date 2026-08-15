@@ -39,13 +39,14 @@ import {
   type Obstacle,
 } from '@/lib/network-label-layout';
 import {
-  getNetworkMetroEdgeGeometry,
+  getCollisionAvoidingNetworkMetroEdgeGeometry,
   getNetworkEdgeRouteOffset,
   getNetworkViewBox,
   getParallelEdgeRouteOffset,
   getSharedCorridorOffset,
   NETWORK_SVG_SAFE_PADDING,
   type NetworkEdgeGeometry,
+  type NetworkRouteObstacle,
 } from '@/lib/network-geometry';
 import {
   aggregateRelationshipsForVisibleMovements,
@@ -139,6 +140,7 @@ function getEdgeGeometry(
   relationship: AggregatedRelationship,
   layout: Layout,
   visibleEdges: AggregatedRelationship[],
+  textObstacles: readonly NetworkRouteObstacle[] = [],
 ): NetworkEdgeGeometry | null {
   const fromPosition = layout.positions.get(relationship.from);
   const toPosition = layout.positions.get(relationship.to);
@@ -166,16 +168,17 @@ function getEdgeGeometry(
       ? parallelOffset
       : obstacleOffset + Math.sign(obstacleOffset) * Math.abs(parallelOffset);
 
-  return getNetworkMetroEdgeGeometry(
+  return getCollisionAvoidingNetworkMetroEdgeGeometry({
     fromPosition,
     toPosition,
-    layout.nodeW,
-    layout.nodeH,
-    RELATION_LINE_STYLE[relationship.kind].arrow,
-    undefined,
+    nodeWidth: layout.nodeW,
+    nodeHeight: layout.nodeH,
+    directed: RELATION_LINE_STYLE[relationship.kind].arrow,
     routeOffset,
     corridorOffset,
-  );
+    stationY: layout.stationY,
+    obstacles: textObstacles,
+  });
 }
 
 const ORBIT_POINTS = [
@@ -609,6 +612,38 @@ export function NetworkGraph({ movements, relationships, eraOrder }: Props) {
     semanticLevel,
   ]);
 
+  const layoutFocusNodeIds = useMemo(() => {
+    if (!selectedNodeId && !selectedEdgeId) return undefined;
+    const direct = new Set<string>();
+    if (selectedNodeId) direct.add(selectedNodeId);
+    const selectedRelationship = selectedEdgeId
+      ? visibleEdges.find((relationship) => relationship.id === selectedEdgeId)
+      : undefined;
+    if (selectedRelationship) {
+      direct.add(selectedRelationship.from);
+      direct.add(selectedRelationship.to);
+    }
+    if (selectedNodeId) {
+      for (const relationship of visibleEdges) {
+        if (
+          relationship.from === selectedNodeId ||
+          relationship.to === selectedNodeId
+        ) {
+          direct.add(relationship.from);
+          direct.add(relationship.to);
+        }
+      }
+    }
+    const focusIds = new Set(direct);
+    for (const relationship of visibleEdges) {
+      if (direct.has(relationship.from) || direct.has(relationship.to)) {
+        focusIds.add(relationship.from);
+        focusIds.add(relationship.to);
+      }
+    }
+    return focusIds;
+  }, [selectedEdgeId, selectedNodeId, visibleEdges]);
+
   const layout = useMemo<Layout>(
     () =>
       buildChronologicalNetworkLayout({
@@ -617,8 +652,9 @@ export function NetworkGraph({ movements, relationships, eraOrder }: Props) {
         zoom: networkZoom,
         compact: isMobile,
         safePad: NETWORK_SVG_SAFE_PADDING,
+        focusNodeIds: layoutFocusNodeIds,
       }),
-    [displayedMovements, isMobile, networkZoom],
+    [displayedMovements, isMobile, layoutFocusNodeIds, networkZoom],
   );
 
   useLayoutEffect(() => {
@@ -700,6 +736,49 @@ export function NetworkGraph({ movements, relationships, eraOrder }: Props) {
     return ids;
   }, [relatedNodeIds, visibleEdges, selectedNodeId]);
 
+  const nodeTextObstacles = useMemo<NetworkRouteObstacle[]>(() => {
+    return displayedMovements.flatMap((movement) => {
+      const position = layout.positions.get(movement.id);
+      if (!position) return [];
+      const isSelected = movement.id === selectedNodeId;
+      const contentVisible =
+        isSelected ||
+        ((!layoutFocusNodeIds || layoutFocusNodeIds.has(movement.id)) &&
+          (networkZoom >= 0.52 || overviewLandmarkIds.has(movement.id)));
+      if (!contentVisible) return [];
+
+      const padding = isSelected ? 10 : 7;
+      const labelWidth = isSelected
+        ? Math.max(layout.nodeW - 18, 160)
+        : networkZoom < 0.52
+          ? Math.max(layout.nodeW - 18, 124)
+          : Math.max(56, layout.nodeW - 18);
+      const labelHeight = isSelected
+        ? 44
+        : semanticLevel === 'overview'
+          ? 18
+          : 31;
+      const labelBottom = position.y + layout.stationY - 12;
+      return [{
+        id: movement.id,
+        rect: {
+          x: position.x + 18 - padding,
+          y: labelBottom - labelHeight - padding,
+          width: labelWidth + padding * 2,
+          height: labelHeight + padding * 2,
+        },
+      }];
+    });
+  }, [
+    displayedMovements,
+    layout,
+    layoutFocusNodeIds,
+    networkZoom,
+    overviewLandmarkIds,
+    selectedNodeId,
+    semanticLevel,
+  ]);
+
   const idleLabelIds = useMemo(
     () => {
       if (semanticLevel === 'overview') return new Set<string>();
@@ -751,7 +830,12 @@ export function NetworkGraph({ movements, relationships, eraOrder }: Props) {
   };
 
   const centerEdge = (relationship: AggregatedRelationship) => {
-    const geometry = getEdgeGeometry(relationship, layout, visibleEdges);
+    const geometry = getEdgeGeometry(
+      relationship,
+      layout,
+      visibleEdges,
+      nodeTextObstacles,
+    );
     if (geometry) scrollToCenter(geometry.midX, geometry.midY);
   };
 
@@ -838,7 +922,12 @@ export function NetworkGraph({ movements, relationships, eraOrder }: Props) {
   const edgeLabelPlacements = useMemo(() => {
     const entries = visibleEdges
       .map((relationship) => {
-        const geometry = getEdgeGeometry(relationship, layout, visibleEdges);
+        const geometry = getEdgeGeometry(
+          relationship,
+          layout,
+          visibleEdges,
+          nodeTextObstacles,
+        );
         if (!geometry) return null;
         const showLabel =
           selectedEdgeId === relationship.id ||
@@ -889,18 +978,19 @@ export function NetworkGraph({ movements, relationships, eraOrder }: Props) {
     const obstacles: Obstacle[] = displayedMovements.flatMap((movement) => {
       const position = layout.positions.get(movement.id);
       if (!position) return [];
-      return [
-        {
-          rect: {
-            x: position.x,
-            y: position.y,
-            width: layout.nodeW,
-            height: layout.nodeH,
-          },
-          kind: 'node' as const,
+      return [{
+        rect: {
+          x: position.x,
+          y: position.y,
+          width: layout.nodeW,
+          height: layout.nodeH,
         },
-      ];
+        kind: 'node' as const,
+      }];
     });
+    for (const obstacle of nodeTextObstacles) {
+      obstacles.push({ rect: obstacle.rect, kind: 'node' });
+    }
     // 矢印先端付近も避ける
     for (const entry of entries) {
       obstacles.push({
@@ -949,6 +1039,7 @@ export function NetworkGraph({ movements, relationships, eraOrder }: Props) {
     idleLabelIds,
     labelFontSize,
     layout,
+    nodeTextObstacles,
     selectedEdgeId,
     selectedNodeId,
     selectionActive,
@@ -987,7 +1078,12 @@ export function NetworkGraph({ movements, relationships, eraOrder }: Props) {
       ) {
         continue;
       }
-      const geometry = getEdgeGeometry(relationship, layout, visibleEdges);
+      const geometry = getEdgeGeometry(
+        relationship,
+        layout,
+        visibleEdges,
+        nodeTextObstacles,
+      );
       if (!geometry) continue;
       const points = geometry.pathPoints ?? [
         geometry.start,
@@ -1026,12 +1122,12 @@ export function NetworkGraph({ movements, relationships, eraOrder }: Props) {
     () => getCameraBounds(),
     // getCameraBounds is intentionally derived from these stable layout inputs.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    [displayedMovements, edgeLabelPlacements, editorialDegreeByNode, layout, networkZoom, visibleEdges],
+    [displayedMovements, edgeLabelPlacements, editorialDegreeByNode, layout, networkZoom, nodeTextObstacles, visibleEdges],
   );
   const focusedCameraBounds = useMemo(
     () => getCameraBounds(relatedNodeIds),
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    [displayedMovements, edgeLabelPlacements, editorialDegreeByNode, layout, networkZoom, relatedNodeIds, visibleEdges],
+    [displayedMovements, edgeLabelPlacements, editorialDegreeByNode, layout, networkZoom, nodeTextObstacles, relatedNodeIds, visibleEdges],
   );
 
   // Edge nodes need extra scrollable space while focused. This is camera
@@ -1435,7 +1531,12 @@ export function NetworkGraph({ movements, relationships, eraOrder }: Props) {
     relationship: AggregatedRelationship,
     mode: 'base' | 'highlight',
   ) => {
-    const geometry = getEdgeGeometry(relationship, layout, visibleEdges);
+    const geometry = getEdgeGeometry(
+      relationship,
+      layout,
+      visibleEdges,
+      nodeTextObstacles,
+    );
     if (!geometry) return null;
     const dimmed = selectionActive && mode === 'base';
     const isHighlighted = mode === 'highlight';
@@ -1453,6 +1554,7 @@ export function NetworkGraph({ movements, relationships, eraOrder }: Props) {
         data-network-edge-id={relationship.id}
         data-route-grammar="metro"
         data-route-offset={String(geometry.routeOffset)}
+        data-route-collision-bends={String(geometry.collisionAvoidanceBends ?? 0)}
         data-edge-layer={mode}
         data-edge-related={
           selectionActive ? String(highlightedEdges.some((edge) => edge.id === relationship.id)) : 'idle'
@@ -1737,6 +1839,10 @@ export function NetworkGraph({ movements, relationships, eraOrder }: Props) {
                 '--network-region-rgb': regionRgb(lane.region),
               } as CSSProperties}
               data-network-region={lane.region}
+              data-lane-relevance={lane.relevance}
+              data-lane-height={Math.round(lane.height)}
+              data-lane-visible-nodes={lane.visibleNodeCount}
+              data-lane-relevant-nodes={lane.relevantNodeCount}
             >
               <div
                 className="network-region-lane__label sticky left-0"
@@ -1800,6 +1906,7 @@ export function NetworkGraph({ movements, relationships, eraOrder }: Props) {
                 relationship,
                 layout,
                 visibleEdges,
+                nodeTextObstacles,
               );
               if (!geometry) return null;
 
@@ -1853,6 +1960,10 @@ export function NetworkGraph({ movements, relationships, eraOrder }: Props) {
               movement,
               editorialDegreeByNode.get(movement.id) ?? 0,
             );
+            const movementRegion = movement.regionIds[0] ?? 'other';
+            const laneRelevance =
+              layout.lanes.find((lane) => lane.region === movementRegion)?.relevance ??
+              'overview';
 
             return (
               <div
@@ -1873,7 +1984,8 @@ export function NetworkGraph({ movements, relationships, eraOrder }: Props) {
                   top: position.y,
                   width: layout.nodeW,
                   height: layout.nodeH,
-                }}
+                  '--network-station-y': `${layout.stationY}px`,
+                } as CSSProperties}
               >
                 <button
                   ref={isSelected ? selectedNodeButtonRef : undefined}
@@ -1889,6 +2001,8 @@ export function NetworkGraph({ movements, relationships, eraOrder }: Props) {
                   data-network-node-id={movement.id}
                   data-node-prominence={prominence}
                   data-overview-landmark={overviewLandmarkIds.has(movement.id)}
+                  data-lane-relevance={laneRelevance}
+                  data-label-collision-padding={isSelected ? '10' : '7'}
                   data-node-state={
                     isSelected
                       ? 'selected'
@@ -2074,7 +2188,7 @@ export function NetworkGraph({ movements, relationships, eraOrder }: Props) {
                     width={placement.rect.width}
                     height={placement.rect.height}
                     fill="rgb(var(--c-raised))"
-                    fillOpacity="0.88"
+                    fillOpacity="0.98"
                     data-edge-label-backplate
                   />
                   <text
