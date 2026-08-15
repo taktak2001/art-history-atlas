@@ -94,7 +94,7 @@ export function RelationLine({
       strokeDasharray={style.dasharray}
       strokeLinecap="round"
       strokeLinejoin="round"
-      opacity={state === 'highlighted' ? 1 : state === 'dimmed' ? 0.04 : 0.26}
+      opacity={state === 'highlighted' ? 1 : state === 'dimmed' ? 0.025 : 0.26}
       markerEnd={
         style.arrow ? `url(#${relationMarkerId(markerPrefix, kind)})` : undefined
       }

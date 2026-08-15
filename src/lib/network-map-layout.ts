@@ -1,4 +1,8 @@
-import type { Movement, RegionId } from '@/lib/schema';
+import type {
+  Movement,
+  RegionId,
+  VisibilityLevel,
+} from '@/lib/schema';
 import { timelineModeById, yearToTimelineX } from '@/lib/timeline-presentation';
 
 export type NetworkSemanticLevel = 'overview' | 'study' | 'detail';
@@ -44,6 +48,8 @@ export type ChronologicalNetworkLayout = {
   zoom: number;
 };
 
+// Overview keeps labels at their normal CSS size and reduces the dataset, so
+// the camera can travel much farther out without turning text into microcopy.
 export const NETWORK_ZOOM_MIN = 0.18;
 export const NETWORK_ZOOM_MAX = 1.6;
 export const NETWORK_VISUAL_GUTTER = 32;
@@ -56,6 +62,18 @@ export function clampNetworkZoom(value: number) {
 export function networkSemanticLevel(zoom: number): NetworkSemanticLevel {
   if (zoom < 0.94) return 'overview';
   if (zoom < 1.28) return 'study';
+  return 'detail';
+}
+
+/**
+ * Information density is intentionally independent from camera scale.
+ * The public LOD control remains the single user-facing density control.
+ */
+export function networkSemanticLevelForLod(
+  lod: VisibilityLevel,
+): NetworkSemanticLevel {
+  if (lod === 'core') return 'overview';
+  if (lod === 'standard') return 'study';
   return 'detail';
 }
 
@@ -101,19 +119,39 @@ export function selectNetworkOverviewMovements(
       networkNodeImportanceScore(a, relationshipDegreeById.get(a.id) ?? 0);
     return scoreDifference || a.dates.start - b.dates.start || a.id.localeCompare(b.id);
   });
+  const remaining = new Map(ranked.map((movement) => [movement.id, movement]));
   const selected = new Map<string, Movement>();
   const seenRegions = new Set<RegionId>();
+  const seenEras = new Set<Movement['era']>();
 
+  // Give every active region one readable landmark before adding a second
+  // movement from a well-connected Western cluster.
   for (const movement of ranked) {
     const region = primaryRegion(movement);
     if (seenRegions.has(region)) continue;
     selected.set(movement.id, movement);
+    remaining.delete(movement.id);
     seenRegions.add(region);
+    seenEras.add(movement.era);
     if (selected.size >= limit) break;
   }
-  for (const movement of ranked) {
-    if (selected.size >= limit) break;
-    selected.set(movement.id, movement);
+
+  while (remaining.size > 0 && selected.size < limit) {
+    const next = [...remaining.values()].sort((a, b) => {
+      const adjustedScore = (movement: Movement) =>
+        networkNodeImportanceScore(
+          movement,
+          relationshipDegreeById.get(movement.id) ?? 0,
+        ) +
+        (seenRegions.has(primaryRegion(movement)) ? 0 : 8) +
+        (seenEras.has(movement.era) ? 0 : 10);
+      return adjustedScore(b) - adjustedScore(a) || a.id.localeCompare(b.id);
+    })[0];
+    if (!next) break;
+    selected.set(next.id, next);
+    remaining.delete(next.id);
+    seenRegions.add(primaryRegion(next));
+    seenEras.add(next.era);
   }
 
   return [...selected.values()].sort(
@@ -203,7 +241,7 @@ export function buildChronologicalNetworkLayout({
 }): ChronologicalNetworkLayout {
   const resolvedZoom = clampNetworkZoom(zoom);
   const mode = timelineModeById('survey');
-  const axisW = compact ? 104 : 142;
+  const axisW = compact ? 88 : 142;
   const headerH = compact ? 48 : 52;
   const basePad = compact ? 24 : 36;
   const baseNodeW = compact ? 150 : 174;

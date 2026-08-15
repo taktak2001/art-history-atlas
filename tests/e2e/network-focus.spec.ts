@@ -15,7 +15,8 @@ test('選択解除でfocusのみURLから消え、全体表示に戻る', async 
   await page.goto('/network/?focus=surrealism');
   await expect(page.getByRole('button', { name: '選択を解除' })).toBeVisible();
   await page.getByRole('button', { name: '選択を解除' }).click();
-  await expect(page).toHaveURL(/\/network\/?$/);
+  await expect(page).not.toHaveURL(/focus=/);
+  await expect(page).not.toHaveURL(/lod=/);
   await expect(page.getByRole('button', { name: '選択を解除' })).toHaveCount(0);
 });
 

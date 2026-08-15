@@ -8,6 +8,7 @@ import {
   NETWORK_OVERVIEW_NODE_LIMIT,
   networkNodeProminence,
   networkSemanticLevel,
+  networkSemanticLevelForLod,
   selectNetworkOverviewMovements,
 } from '@/lib/network-map-layout';
 
@@ -74,10 +75,17 @@ describe('chronological network map layout', () => {
 describe('network semantic zoom', () => {
   it('clamps zoom and maps it to overview, study, and detail levels', () => {
     expect(clampNetworkZoom(0.1)).toBe(0.18);
+    expect(clampNetworkZoom(0.2)).toBe(0.2);
     expect(clampNetworkZoom(3)).toBe(1.6);
     expect(networkSemanticLevel(0.84)).toBe('overview');
     expect(networkSemanticLevel(1)).toBe('study');
     expect(networkSemanticLevel(1.4)).toBe('detail');
+  });
+
+  it('keeps information density independent from camera zoom', () => {
+    expect(networkSemanticLevelForLod('core')).toBe('overview');
+    expect(networkSemanticLevelForLod('standard')).toBe('study');
+    expect(networkSemanticLevelForLod('detailed')).toBe('detail');
   });
 
   it('limits overview to an editorial set while preserving regional landmarks', () => {
@@ -99,6 +107,19 @@ describe('network semantic zoom', () => {
       new Set(movements.map((movement) => movement.regionIds[0])).size,
     );
     expect(overview.map((movement) => movement.id)).toContain('italian-renaissance');
+
+    const mobileOverview = selectNetworkOverviewMovements(
+      movements,
+      degreeById,
+      12,
+    );
+    expect(mobileOverview).toHaveLength(12);
+    expect(
+      new Set(mobileOverview.map((movement) => movement.era)).size,
+    ).toBeGreaterThanOrEqual(6);
+    expect(
+      new Set(mobileOverview.map((movement) => movement.regionIds[0])).size,
+    ).toBeGreaterThanOrEqual(6);
   });
 
   it('assigns stronger station hierarchy to connected representative movements', () => {

@@ -75,7 +75,7 @@ import {
   getNetworkVisualBounds,
   NETWORK_ZOOM_MAX,
   NETWORK_ZOOM_MIN,
-  networkSemanticLevel,
+  networkSemanticLevelForLod,
   selectNetworkOverviewMovements,
   type ChronologicalNetworkLayout,
   type NetworkVisualBounds,
@@ -127,6 +127,13 @@ const ERA_TIME_RANGES: Array<{
   { era: 'postwar', start: 1945, end: 1980, jumpYear: 1960 },
   { era: 'contemporary', start: 1980, end: 2027, jumpYear: 2000 },
 ];
+
+const MOBILE_REGION_LABELS: Partial<Record<Movement['regionIds'][number], string>> = {
+  germany: '中央ヨーロッパ',
+  mediterranean: '地中海・古代',
+  'pan-european': 'ヨーロッパ',
+  global: '国際',
+};
 
 function getEdgeGeometry(
   relationship: AggregatedRelationship,
@@ -267,6 +274,8 @@ export function NetworkGraph({ movements, relationships, eraOrder }: Props) {
   });
   const lastNodeActivationRef = useRef({ id: '', at: 0 });
   const scrollRafRef = useRef<number | null>(null);
+  const eraJumpTimerRef = useRef<number | null>(null);
+  const eraJumpLockRef = useRef<EraId | null>(null);
   const zoomAnchorRef = useRef<{
     year: number;
     screenX: number;
@@ -498,7 +507,9 @@ export function NetworkGraph({ movements, relationships, eraOrder }: Props) {
     relationScope,
   ]);
 
-  const semanticLevel = networkSemanticLevel(networkZoom);
+  // Information density follows the explicit LOD control. Camera zoom only
+  // changes how much of the historical map is visible.
+  const semanticLevel = networkSemanticLevelForLod(lod);
 
   const editorialDegreeByNode = useMemo(() => {
     const degrees = new Map<string, number>();
@@ -512,7 +523,11 @@ export function NetworkGraph({ movements, relationships, eraOrder }: Props) {
   const displayedMovements = useMemo(() => {
     const overviewBase =
       semanticLevel === 'overview'
-        ? selectNetworkOverviewMovements(lodMovements, editorialDegreeByNode)
+        ? selectNetworkOverviewMovements(
+            lodMovements,
+            editorialDegreeByNode,
+            isMobile ? 12 : 16,
+          )
         : lodMovements;
     const ids = new Set(overviewBase.map((movement) => movement.id));
 
@@ -531,17 +546,20 @@ export function NetworkGraph({ movements, relationships, eraOrder }: Props) {
       }
     }
 
-    const base = movements.filter((movement) => ids.has(movement.id)).sort(
-      (a, b) => a.dates.start - b.dates.start || a.id.localeCompare(b.id),
-    );
-
-    // フォーカス中のノードは関係が絞り込まれていても必ず表示（位置を確保し自動解除を防ぐ）
-    if (selectedNodeId && !base.some((movement) => movement.id === selectedNodeId)) {
-      const focused = movements.find((movement) => movement.id === selectedNodeId);
-      if (focused) return [...base, focused];
-    }
-    return base;
-  }, [editorialDegreeByNode, lodMovements, movements, scopedEdges, selectedNodeId, semanticLevel]);
+    return movements
+      .filter((movement) => ids.has(movement.id))
+      .sort(
+        (a, b) => a.dates.start - b.dates.start || a.id.localeCompare(b.id),
+      );
+  }, [
+    editorialDegreeByNode,
+    isMobile,
+    lodMovements,
+    movements,
+    scopedEdges,
+    selectedNodeId,
+    semanticLevel,
+  ]);
 
   const displayedMovementIds = useMemo(
     () => new Set(displayedMovements.map((movement) => movement.id)),
@@ -574,12 +592,22 @@ export function NetworkGraph({ movements, relationships, eraOrder }: Props) {
     const withinMap = scopedEdges.filter(
       (relationship) =>
         displayedMovementIds.has(relationship.from) &&
-        displayedMovementIds.has(relationship.to),
+        displayedMovementIds.has(relationship.to) &&
+        (semanticLevel !== 'overview' ||
+          selectedNodeId ||
+          isImportantRelationship(relationship)),
     );
     return isMobile && relationScope === 'important'
       ? limitMobileRelationships(withinMap)
       : withinMap;
-  }, [displayedMovementIds, isMobile, relationScope, scopedEdges]);
+  }, [
+    displayedMovementIds,
+    isMobile,
+    relationScope,
+    scopedEdges,
+    selectedNodeId,
+    semanticLevel,
+  ]);
 
   const layout = useMemo<Layout>(
     () =>
@@ -670,7 +698,7 @@ export function NetworkGraph({ movements, relationships, eraOrder }: Props) {
       }
     }
     return ids;
-  }, [relatedNodeIds, selectedNodeId, visibleEdges]);
+  }, [relatedNodeIds, visibleEdges, selectedNodeId]);
 
   const idleLabelIds = useMemo(
     () => {
@@ -707,7 +735,7 @@ export function NetworkGraph({ movements, relationships, eraOrder }: Props) {
     if (selectedEdgeId && !visibleEdges.some((edge) => edge.id === selectedEdgeId)) {
       setSelectedEdgeId(null);
     }
-  }, [layout.positions, selectedEdgeId, selectedNodeId, visibleEdges]);
+  }, [layout.positions, visibleEdges, selectedEdgeId, selectedNodeId]);
 
   const prefersReducedMotion = () =>
     window.matchMedia('(prefers-reduced-motion: reduce)').matches;
@@ -731,6 +759,14 @@ export function NetworkGraph({ movements, relationships, eraOrder }: Props) {
     const band = ERA_TIME_RANGES.find((candidate) => candidate.era === era);
     if (!band) return;
     cameraChangedAfterFocusRef.current = true;
+    eraJumpLockRef.current = era;
+    if (eraJumpTimerRef.current !== null) {
+      window.clearTimeout(eraJumpTimerRef.current);
+    }
+    eraJumpTimerRef.current = window.setTimeout(() => {
+      eraJumpLockRef.current = null;
+      eraJumpTimerRef.current = null;
+    }, 700);
     setActiveEra(era);
     const viewport = scrollRef.current;
     if (viewport && networkZoom < 0.72) {
@@ -810,7 +846,9 @@ export function NetworkGraph({ movements, relationships, eraOrder }: Props) {
           (selectedNodeId &&
             (relationship.from === selectedNodeId ||
               relationship.to === selectedNodeId)) ||
-          (!selectionActive && idleLabelIds.has(relationship.id));
+          (semanticLevel === 'detail' &&
+            !selectionActive &&
+            idleLabelIds.has(relationship.id));
         if (!showLabel) return null;
 
         const touchesSelection =
@@ -915,6 +953,7 @@ export function NetworkGraph({ movements, relationships, eraOrder }: Props) {
     selectedNodeId,
     selectionActive,
     visibleEdges,
+    semanticLevel,
   ]);
 
   const getCameraBounds = (nodeIds?: Set<string>): NetworkVisualBounds => {
@@ -1208,6 +1247,10 @@ export function NetworkGraph({ movements, relationships, eraOrder }: Props) {
       scrollRafRef.current = null;
       const viewport = scrollRef.current;
       if (!viewport) return;
+      if (eraJumpLockRef.current) {
+        setActiveEra(eraJumpLockRef.current);
+        return;
+      }
       const contentCenter =
         viewport.scrollLeft +
         layout.axisW +
@@ -1232,6 +1275,9 @@ export function NetworkGraph({ movements, relationships, eraOrder }: Props) {
     () => () => {
       if (scrollRafRef.current !== null) {
         window.cancelAnimationFrame(scrollRafRef.current);
+      }
+      if (eraJumpTimerRef.current !== null) {
+        window.clearTimeout(eraJumpTimerRef.current);
       }
     },
     [],
@@ -1354,6 +1400,9 @@ export function NetworkGraph({ movements, relationships, eraOrder }: Props) {
     overviewFitAppliedRef.current = true;
     setSelectedNodeId(null);
     setSelectedEdgeId(null);
+    setFocusedEdgeId(null);
+    setExpandedGroupIds(new Set());
+    setLod('core');
     if (relationScope === 'focus') setRelationScope('important');
     window.requestAnimationFrame(() => requestCameraFit('overview', true));
   };
@@ -1588,13 +1637,13 @@ export function NetworkGraph({ movements, relationships, eraOrder }: Props) {
 
       <div className="network-map-tools" aria-label="ネットワークの表示階層">
         <span>
-          SEMANTIC ZOOM
+          SEMANTIC LOD
           <small>
             {semanticLevel === 'overview'
-              ? 'ムーブメント'
+              ? '主要系譜'
               : semanticLevel === 'study'
-                ? 'ムーブメント＋作家'
-                : '作家・作品・文脈'}
+                ? 'ムーブメント'
+                : '関係・作品・文脈'}
           </small>
         </span>
         <div className="network-zoom-control" role="group" aria-label="ネットワーク倍率">
@@ -1618,8 +1667,8 @@ export function NetworkGraph({ movements, relationships, eraOrder }: Props) {
           <button
             type="button"
             onClick={showNetworkOverview}
-            aria-label="表示中のネットワーク全体へ戻る"
-            className="network-zoom-control__fit"
+            aria-label="主要系譜の全体表示へ戻す"
+            className="network-overview-control"
           >
             全体
           </button>
@@ -1692,9 +1741,12 @@ export function NetworkGraph({ movements, relationships, eraOrder }: Props) {
               <div
                 className="network-region-lane__label sticky left-0"
                 style={{ width: layout.axisW, height: lane.height }}
+                aria-label={REGION_LABELS[lane.region]}
               >
                 <span aria-hidden="true" />
-                {REGION_LABELS[lane.region]}
+                {isMobile
+                  ? MOBILE_REGION_LABELS[lane.region] ?? REGION_LABELS[lane.region]
+                  : REGION_LABELS[lane.region]}
               </div>
             </div>
           ))}
@@ -1834,6 +1886,7 @@ export function NetworkGraph({ movements, relationships, eraOrder }: Props) {
                   aria-label={`${movement.nameJa}を選択`}
                   className="network-node relative h-full w-full text-left"
                   data-network-node
+                  data-network-node-id={movement.id}
                   data-node-prominence={prominence}
                   data-overview-landmark={overviewLandmarkIds.has(movement.id)}
                   data-node-state={
@@ -1890,7 +1943,7 @@ export function NetworkGraph({ movements, relationships, eraOrder }: Props) {
             );
           })}
 
-          {selectedMovement && semanticLevel !== 'overview' && (() => {
+          {selectedMovement && semanticLevel === 'detail' && (() => {
             const selectedPosition = layout.positions.get(selectedMovement.id);
             if (!selectedPosition) return null;
             const showDetail = semanticLevel === 'detail';
