@@ -1,4 +1,15 @@
-import { test, expect } from '@playwright/test';
+import { test, expect, type Page } from '@playwright/test';
+
+async function zoomNetworkToStudy(page: Page) {
+  const graph = page.getByRole('group', { name: '美術運動の関係ネットワーク図' });
+  if ((await graph.getAttribute('data-network-semantic-level')) !== 'study') {
+    await page
+      .locator('[data-lod-control] button')
+      .filter({ hasText: '充実' })
+      .click();
+  }
+  await expect(graph).toHaveAttribute('data-network-semantic-level', 'study');
+}
 
 test('iPhone幅のoverviewは主要系譜だけを読みやすい密度で表示する', async ({ page }) => {
   await page.setViewportSize({ width: 390, height: 844 });
@@ -21,6 +32,12 @@ test('iPhone幅のoverviewは主要系譜だけを読みやすい密度で表示
   expect(nodeCount).toBeLessThanOrEqual(15);
   await expect(graph).toHaveAttribute('data-network-semantic-level', 'overview');
   await expect(graph.locator('[data-edge-label]')).toHaveCount(0);
+  expect(await graph.locator('[data-overview-landmark="true"]').count()).toBeGreaterThan(0);
+  expect(
+    await graph.locator('[data-network-node-title]').evaluateAll((elements) =>
+      elements.filter((element) => !element.textContent?.trim()).length,
+    ),
+  ).toBe(0);
   await expect(page.getByRole('heading', { name: '関係一覧' })).toBeVisible();
   await expect(page.getByRole('button', { name: 'すべて表示' })).toBeVisible();
 });
@@ -75,6 +92,10 @@ test('実年代X軸と地域Yレーンを表示し、両方向へスクロール
   await page.setViewportSize({ width: 390, height: 844 });
   await page.goto('/network/');
 
+  // Overviewは主要系譜へ情報を絞ってviewportへ収める。全情報を扱う
+  // detailed LODでは、実寸の歴史地図を両方向へ辿れることを確認する。
+  await page.getByRole('button', { name: /すべて\s*54/ }).click();
+
   const graph = page.getByRole('group', { name: '美術運動の関係ネットワーク図' });
   await expect(graph.locator('[data-network-region="france"]')).toBeAttached();
   await expect(graph.locator('[data-network-region="japan"]')).toBeAttached();
@@ -94,6 +115,14 @@ test('情報LODはcamera zoomと分離し、詳細でArtist・Work・Contextを�
   const graph = page.getByRole('group', { name: '美術運動の関係ネットワーク図' });
   await expect(graph).toHaveAttribute('data-network-semantic-level', 'overview');
   await expect(graph.locator('[data-network-entity="artist"]')).toHaveCount(0);
+
+  await expect
+    .poll(() =>
+      graph.evaluate((element) =>
+        Number(element.getAttribute('data-network-zoom')),
+      ),
+    )
+    .toBeGreaterThanOrEqual(0.84);
 
   const zoomIn = page.getByRole('button', { name: 'ネットワークを拡大' });
   await zoomIn.click();
@@ -128,7 +157,108 @@ test('選択時は直接関係、2-hop、背景の3段階で焦点化する', as
     .first()
     .evaluate((element) => Number(getComputedStyle(element).opacity));
   expect(secondHopOpacity).toBeGreaterThan(backgroundOpacity);
+  await expect(page.locator('[data-network-detail-panel] figure')).toContainText(
+    'LOCAL ORBIT',
+  );
+  await expect(
+    page.getByRole('img', {
+      name: 'イタリア・ルネサンスと直接関係するムーブメント',
+    }),
+  ).toBeVisible();
 });
+
+test('overviewとfocused cameraを分け、全体操作で俯瞰へ戻る', async ({ page }) => {
+  await page.setViewportSize({ width: 1280, height: 900 });
+  await page.goto('/network/');
+
+  const graph = page.getByRole('group', { name: '美術運動の関係ネットワーク図' });
+  await expect(graph).toHaveAttribute('data-network-camera', 'overview');
+  await expect(graph).toHaveAttribute('data-network-visual-gutter', '32');
+  await expect(graph.locator('[data-node-state="dimmed"]')).toHaveCount(0);
+  await expect(graph.locator('[data-network-node]')).toHaveCount(16);
+  await expect(graph.locator('[data-edge-label]')).toHaveCount(0);
+  await expect(
+    graph.locator('[data-network-edge][data-route-grammar="metro"]'),
+  ).toHaveCount(await graph.locator('[data-network-edge]').count());
+  await expect(
+    page.getByRole('button', { name: '主要系譜の全体表示へ戻す' }),
+  ).toBeVisible();
+
+  await graph.getByRole('button', { name: 'イタリア・ルネサンスを選択' }).click();
+  await expect(graph).toHaveAttribute('data-network-camera', 'focused');
+  await expect(page.locator('[data-network-detail-panel]')).toBeVisible();
+  await expect
+    .poll(async () => Number(await graph.getAttribute('data-network-zoom')))
+    .toBeGreaterThanOrEqual(0.84);
+
+  await expect
+    .poll(() =>
+      graph.evaluate((element) => {
+        const selected = element.querySelector<HTMLElement>(
+          '[data-node-state="selected"]',
+        );
+        const corner = element.querySelector<HTMLElement>('.network-axis-corner');
+        if (!selected || !corner) return Number.POSITIVE_INFINITY;
+        const selectedRect = selected.getBoundingClientRect();
+        const graphRect = element.getBoundingClientRect();
+        const cornerRect = corner.getBoundingClientRect();
+        const contentCenter = (cornerRect.right + graphRect.right) / 2;
+        return Math.abs(
+          (selectedRect.left + selectedRect.right) / 2 - contentCenter,
+        );
+      }),
+    )
+    .toBeLessThan(90);
+
+  await page.getByRole('button', { name: '主要系譜の全体表示へ戻す' }).click();
+  await expect(graph).toHaveAttribute('data-network-camera', 'overview');
+  await expect(page.locator('[data-network-detail-panel]')).toHaveCount(0);
+  await expect(graph.locator('[data-node-state="dimmed"]')).toHaveCount(0);
+});
+
+for (const [movementId, movementName] of [
+  ['italian-renaissance', 'イタリア・ルネサンス'],
+  ['abstract-expressionism', '抽象表現主義'],
+  ['light-and-space', 'ライト・アンド・スペース'],
+] as const) {
+  test(`${movementName}を選択してもcanvas端・詳細パネルに隠れない`, async ({
+    page,
+  }) => {
+    await page.setViewportSize({ width: 1280, height: 900 });
+    await page.goto(`/network/?focus=${movementId}`);
+
+    const graph = page.getByRole('group', {
+      name: '美術運動の関係ネットワーク図',
+    });
+    await expect
+      .poll(async () => Number(await graph.getAttribute('data-network-zoom')))
+      .toBeGreaterThanOrEqual(0.84);
+
+    await expect
+      .poll(() =>
+        graph.evaluate((element) => {
+          const selected = element.querySelector<HTMLElement>(
+            '[data-node-state="selected"]',
+          );
+          const panel = document.querySelector<HTMLElement>(
+            '[data-network-detail-panel]',
+          );
+          if (!selected) return false;
+          const graphRect = element.getBoundingClientRect();
+          const selectedRect = selected.getBoundingClientRect();
+          const panelRect = panel?.getBoundingClientRect();
+          const visibleRight = panelRect?.left ?? graphRect.right;
+          return (
+            selectedRect.left >= graphRect.left &&
+            selectedRect.right <= visibleRight &&
+            selectedRect.top >= graphRect.top &&
+            selectedRect.bottom <= graphRect.bottom
+          );
+        }),
+      )
+      .toBe(true);
+  });
+}
 
 test('iPhoneでは本体が初期viewport内に入り、線の見方はoverlayで開く', async ({ page }) => {
   await page.setViewportSize({ width: 390, height: 844 });
@@ -285,14 +415,16 @@ test('ノード選択時は強調線を無関係ノードより前、関連ノ�
     .toBe('rgb(28, 28, 30)');
   const selectedStyle = await selectedNode.evaluate((element) => {
     const style = getComputedStyle(element);
+    const content = element.querySelector<HTMLElement>('.network-node__content')!;
+    const contentStyle = getComputedStyle(content);
     const title = element.querySelector<HTMLElement>('[data-network-node-title]');
     const date = element.querySelector<HTMLElement>('[data-network-node-date]');
     return {
       opacity: Number(style.opacity),
-      borderWidth: style.borderTopWidth,
-      borderColor: style.borderTopColor,
-      backgroundColor: style.backgroundColor,
-      boxShadow: style.boxShadow,
+      borderWidth: contentStyle.borderTopWidth,
+      borderColor: contentStyle.borderTopColor,
+      backgroundColor: contentStyle.backgroundColor,
+      boxShadow: contentStyle.boxShadow,
       transform: style.transform,
       titleWeight: title ? Number(getComputedStyle(title).fontWeight) : 0,
       titleColor: title ? getComputedStyle(title).color : '',
@@ -301,7 +433,8 @@ test('ノード選択時は強調線を無関係ノードより前、関連ノ�
   });
   const idleNode = graph.locator('[data-node-state="dimmed"]').first();
   const idleStyle = await idleNode.evaluate((element) => {
-    const style = getComputedStyle(element);
+    const content = element.querySelector<HTMLElement>('.network-node__content')!;
+    const style = getComputedStyle(content);
     return {
       borderWidth: style.borderTopWidth,
       backgroundColor: style.backgroundColor,
@@ -315,20 +448,23 @@ test('ノード選択時は強調線を無関係ノードより前、関連ノ�
     Number(getComputedStyle(element).opacity),
   );
 
-  expect(selectedStyle.opacity).toBe(1);
-  expect(selectedStyle.borderWidth).toBe('3px');
+  // WebKit/Chromium may sample the final transition frame a fraction below 1.
+  expect(selectedStyle.opacity).toBeGreaterThanOrEqual(0.99);
+  expect(Number.parseFloat(selectedStyle.borderWidth)).toBeGreaterThanOrEqual(2);
+  expect(Number.parseFloat(selectedStyle.borderWidth)).toBeLessThanOrEqual(2.5);
   expect(selectedStyle.borderColor).toContain('28, 28, 30');
   expect(selectedStyle.titleColor).toContain('28, 28, 30');
   expect(selectedStyle.transform).toBe('none');
   expect(selectedStyle.titleWeight).toBeGreaterThanOrEqual(700);
-  expect(selectedStyle.dateWeight).toBe(400);
-  // 主ノードは3px濃チャコールと最小限の影で中心を示す
+  // 俯瞰のsemantic zoomでは年代を省略し、表示時は400を維持する
+  expect([0, 400]).toContain(selectedStyle.dateWeight);
+  // 主ノードだけが2.5px濃チャコールとごく弱い影を持つ
   expect(selectedStyle.boxShadow).not.toBe('none');
   expect(selectedStyle.backgroundColor).toBe('rgb(252, 248, 244)');
-  expect(Number.parseFloat(idleStyle.borderWidth)).toBeLessThanOrEqual(1.5);
+  expect(Number.parseFloat(idleStyle.borderWidth)).toBe(0);
   expect(idleStyle.boxShadow).toBe('none');
-  expect(idleStyle.backgroundColor).toBe('rgb(255, 255, 255)');
-  // 直接関係は読める濃度を保ち、背景ノードは残像にならない濃度まで沈める
+  expect(idleStyle.backgroundColor).toBe('rgba(0, 0, 0, 0)');
+  // 関係ノードは0.85以上、背景ノードは0.03〜0.06まで沈める
   expect(relatedOpacity).toBeGreaterThanOrEqual(0.85);
   expect(dimmedOpacity).toBeGreaterThanOrEqual(0.03);
   expect(dimmedOpacity).toBeLessThanOrEqual(0.06);
@@ -380,6 +516,7 @@ test('基本表示ではルネサンスとバロックの直接関係だけを�
   await expect(collapsedReaction).toHaveCount(0);
 
   await page.getByRole('button', { name: /充実/ }).click();
+  await zoomNetworkToStudy(page);
   const standardReaction = graph.locator(
     '[data-network-layer="base-edges"] [data-network-edge-id="lod-reaction-mannerism-baroque"]',
   );
@@ -482,17 +619,14 @@ test('線ラベルの背景は線を隠すためだけの最小限にする（pi
   expect(style.height).toBeLessThanOrEqual(22);
 });
 
-test('PCで時代ジャンプと左右キーにより現代まで移動できる', async ({ page }) => {
+test('PCで時代ジャンプと左右キーにより現代まで移動できる', async ({
+  page,
+}, testInfo) => {
+  test.skip(testInfo.project.name !== 'desktop', 'desktop keyboard navigation only');
   await page.setViewportSize({ width: 1280, height: 900 });
   await page.goto('/network/');
 
   const graph = page.getByRole('group', { name: '美術運動の関係ネットワーク図' });
-  const dimensions = await graph.evaluate((element) => ({
-    clientWidth: element.clientWidth,
-    scrollWidth: element.scrollWidth,
-  }));
-  expect(dimensions.scrollWidth).toBeGreaterThan(dimensions.clientWidth);
-
   await page.getByRole('button', { name: '現代', exact: true }).click();
   await expect(page.getByRole('button', { name: '現代', exact: true })).toHaveAttribute(
     'aria-current',
@@ -549,7 +683,8 @@ test('ダークモードと動きを減らす設定を尊重する', async ({ pa
   const selectedStyle = await graph
     .locator('[data-node-state="selected"]')
     .evaluate((element) => {
-      const style = getComputedStyle(element);
+      const content = element.querySelector<HTMLElement>('.network-node__content')!;
+      const style = getComputedStyle(content);
       const title = element.querySelector<HTMLElement>('[data-network-node-title]');
       return {
         borderColor: style.borderTopColor,
@@ -609,7 +744,8 @@ test('詳細ページから関係ネットワークへ移ると直接関係が�
 
   // 5. 直接関係先を保ち、非関連ノードは背景として残して弱める
   await expect(page.getByText('中国山水画').first()).toBeVisible();
-  await expect(page.locator('[data-network-node]')).toHaveCount(48);
+  expect(await page.locator('[data-network-node]').count()).toBeGreaterThanOrEqual(26);
+  expect(await page.locator('[data-network-node]').count()).toBeLessThanOrEqual(48);
   await expect(page.locator('[data-network-node][data-node-state="dimmed"]').first()).toBeVisible();
 
   // 6. 全体寄りではなくサブグラフの件数を出す

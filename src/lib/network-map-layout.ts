@@ -1,13 +1,28 @@
 import type {
   Movement,
   RegionId,
-  Relationship,
   VisibilityLevel,
 } from '@/lib/schema';
 import { timelineModeById, yearToTimelineX } from '@/lib/timeline-presentation';
 
 export type NetworkSemanticLevel = 'overview' | 'study' | 'detail';
-export type NetworkNodeProminence = 'hub' | 'major';
+export type NetworkNodeProminence = 'hub' | 'major' | 'normal' | 'peripheral';
+
+export type NetworkVisualBounds = {
+  minX: number;
+  minY: number;
+  maxX: number;
+  maxY: number;
+  width: number;
+  height: number;
+};
+
+export type NetworkVisualRect = {
+  x: number;
+  y: number;
+  width: number;
+  height: number;
+};
 
 export type NetworkRegionLane = {
   region: RegionId;
@@ -28,6 +43,8 @@ export type ChronologicalNetworkLayout = {
   headerH: number;
   pad: number;
   safePad: number;
+  visualGutter: number;
+  visualBounds: NetworkVisualBounds;
   zoom: number;
 };
 
@@ -35,6 +52,8 @@ export type ChronologicalNetworkLayout = {
 // the camera can travel much farther out without turning text into microcopy.
 export const NETWORK_ZOOM_MIN = 0.18;
 export const NETWORK_ZOOM_MAX = 1.6;
+export const NETWORK_VISUAL_GUTTER = 32;
+export const NETWORK_OVERVIEW_NODE_LIMIT = 26;
 
 export function clampNetworkZoom(value: number) {
   return Math.min(NETWORK_ZOOM_MAX, Math.max(NETWORK_ZOOM_MIN, value));
@@ -58,107 +77,143 @@ export function networkSemanticLevelForLod(
   return 'detail';
 }
 
-function movementDegree(
-  movementId: string,
-  relationships: Pick<Relationship, 'from' | 'to'>[],
-) {
-  return relationships.reduce(
-    (count, relationship) =>
-      count +
-      Number(
-        relationship.from === movementId || relationship.to === movementId,
-      ),
-    0,
-  );
-}
-
-export function networkMovementImportance(
+export function networkNodeImportanceScore(
   movement: Movement,
-  relationships: Pick<Relationship, 'from' | 'to'>[],
-) {
+  relationshipDegree: number,
+): number {
   const visibilityScore =
     movement.visibilityLevel === 'core'
-      ? 58
+      ? 5
       : movement.visibilityLevel === 'standard'
-        ? 24
-        : 4;
-  const representativeScore = movement.isRepresentative ? 34 : 0;
-  const degreeScore = Math.min(8, movementDegree(movement.id, relationships)) * 6;
-  const editorialOrderScore = Math.max(
-    0,
-    12 - Math.floor((movement.displayOrder ?? 120) / 10),
-  );
-  return visibilityScore + representativeScore + degreeScore + editorialOrderScore;
-}
-
-/**
- * Overview is an editorial map, not the entire graph made smaller. The greedy
- * pass balances historical importance with era and region coverage so a
- * degree-heavy cluster cannot consume the whole overview.
- */
-export function selectNetworkOverviewMovements(
-  movements: Movement[],
-  relationships: Pick<Relationship, 'from' | 'to'>[],
-  limit: number,
-) {
-  const remaining = new Map(movements.map((movement) => [movement.id, movement]));
-  const selected: Movement[] = [];
-  const coveredEras = new Set<string>();
-  const coveredRegions = new Set<string>();
-
-  while (remaining.size > 0 && selected.length < limit) {
-    const next = [...remaining.values()].sort((a, b) => {
-      const adjusted = (movement: Movement) =>
-        networkMovementImportance(movement, relationships) +
-        (coveredEras.has(movement.era) ? 0 : 20) +
-        (coveredRegions.has(movement.regionIds[0] ?? 'other') ? 0 : 14);
-      return adjusted(b) - adjusted(a) || a.id.localeCompare(b.id);
-    })[0];
-    if (!next) break;
-    selected.push(next);
-    remaining.delete(next.id);
-    coveredEras.add(next.era);
-    coveredRegions.add(next.regionIds[0] ?? 'other');
-  }
-
-  return selected.sort(
-    (a, b) => a.dates.start - b.dates.start || a.id.localeCompare(b.id),
-  );
+        ? 2
+        : 0;
+  return relationshipDegree * 2 + visibilityScore + (movement.isRepresentative ? 5 : 0);
 }
 
 export function networkNodeProminence(
   movement: Movement,
-  relationships: Pick<Relationship, 'from' | 'to'>[],
+  relationshipDegree: number,
 ): NetworkNodeProminence {
-  const degree = movementDegree(movement.id, relationships);
-  return movement.isRepresentative && degree >= 3 || degree >= 6
-    ? 'hub'
-    : 'major';
+  const score = networkNodeImportanceScore(movement, relationshipDegree);
+  if (score >= 23) return 'hub';
+  if (score >= 17) return 'major';
+  if (score >= 9) return 'normal';
+  return 'peripheral';
 }
 
-export function getNetworkMovementBounds(
-  movementIds: Iterable<string>,
-  layout: ChronologicalNetworkLayout,
-  gutter = 32,
-) {
-  const positions = [...movementIds]
-    .map((id) => layout.positions.get(id))
-    .filter((position): position is { x: number; y: number } => Boolean(position));
-  if (positions.length === 0) return null;
-  const minX = Math.min(...positions.map((position) => position.x)) - gutter;
-  const minY = Math.min(...positions.map((position) => position.y)) - gutter;
-  const maxX =
-    Math.max(...positions.map((position) => position.x + layout.nodeW)) + gutter;
-  const maxY =
-    Math.max(...positions.map((position) => position.y + layout.nodeH)) + gutter;
+/**
+ * Overview is an editorial map rather than a smaller rendering of Detail.
+ * Keep one strong landmark per active region, then fill the remaining places
+ * by historical connectivity and editorial importance.
+ */
+export function selectNetworkOverviewMovements(
+  movements: Movement[],
+  relationshipDegreeById: ReadonlyMap<string, number>,
+  limit = NETWORK_OVERVIEW_NODE_LIMIT,
+): Movement[] {
+  if (movements.length <= limit) return [...movements];
+
+  const ranked = [...movements].sort((a, b) => {
+    const scoreDifference =
+      networkNodeImportanceScore(b, relationshipDegreeById.get(b.id) ?? 0) -
+      networkNodeImportanceScore(a, relationshipDegreeById.get(a.id) ?? 0);
+    return scoreDifference || a.dates.start - b.dates.start || a.id.localeCompare(b.id);
+  });
+  const remaining = new Map(ranked.map((movement) => [movement.id, movement]));
+  const selected = new Map<string, Movement>();
+  const seenRegions = new Set<RegionId>();
+  const seenEras = new Set<Movement['era']>();
+
+  // Give every active region one readable landmark before adding a second
+  // movement from a well-connected Western cluster.
+  for (const movement of ranked) {
+    const region = primaryRegion(movement);
+    if (seenRegions.has(region)) continue;
+    selected.set(movement.id, movement);
+    remaining.delete(movement.id);
+    seenRegions.add(region);
+    seenEras.add(movement.era);
+    if (selected.size >= limit) break;
+  }
+
+  while (remaining.size > 0 && selected.size < limit) {
+    const next = [...remaining.values()].sort((a, b) => {
+      const adjustedScore = (movement: Movement) =>
+        networkNodeImportanceScore(
+          movement,
+          relationshipDegreeById.get(movement.id) ?? 0,
+        ) +
+        (seenRegions.has(primaryRegion(movement)) ? 0 : 8) +
+        (seenEras.has(movement.era) ? 0 : 10);
+      return adjustedScore(b) - adjustedScore(a) || a.id.localeCompare(b.id);
+    })[0];
+    if (!next) break;
+    selected.set(next.id, next);
+    remaining.delete(next.id);
+    seenRegions.add(primaryRegion(next));
+    seenEras.add(next.era);
+  }
+
+  return [...selected.values()].sort(
+    (a, b) => a.dates.start - b.dates.start || a.id.localeCompare(b.id),
+  );
+}
+
+export function getNetworkVisualBounds(
+  rects: NetworkVisualRect[],
+  gutter = 0,
+): NetworkVisualBounds {
+  if (rects.length === 0) {
+    return {
+      minX: 0,
+      minY: 0,
+      maxX: gutter * 2,
+      maxY: gutter * 2,
+      width: gutter * 2,
+      height: gutter * 2,
+    };
+  }
+
+  const minX = Math.min(...rects.map((rect) => rect.x)) - gutter;
+  const minY = Math.min(...rects.map((rect) => rect.y)) - gutter;
+  const maxX = Math.max(...rects.map((rect) => rect.x + rect.width)) + gutter;
+  const maxY = Math.max(...rects.map((rect) => rect.y + rect.height)) + gutter;
   return {
-    x: Math.max(0, minX),
-    y: Math.max(0, minY),
+    minX,
+    minY,
+    maxX,
+    maxY,
     width: maxX - minX,
     height: maxY - minY,
-    centerX: (minX + maxX) / 2,
-    centerY: (minY + maxY) / 2,
   };
+}
+
+export function getNetworkFitZoom({
+  currentZoom,
+  bounds,
+  viewportWidth,
+  viewportHeight,
+  axisW,
+  headerH,
+  padding = NETWORK_VISUAL_GUTTER,
+  maxZoom = NETWORK_ZOOM_MAX,
+}: {
+  currentZoom: number;
+  bounds: NetworkVisualBounds;
+  viewportWidth: number;
+  viewportHeight: number;
+  axisW: number;
+  headerH: number;
+  padding?: number;
+  maxZoom?: number;
+}) {
+  const availableWidth = Math.max(1, viewportWidth - axisW - padding * 2);
+  const availableHeight = Math.max(1, viewportHeight - headerH - padding * 2);
+  const ratio = Math.min(
+    availableWidth / Math.max(1, bounds.width),
+    availableHeight / Math.max(1, bounds.height),
+  );
+  return Math.min(maxZoom, clampNetworkZoom(currentZoom * ratio));
 }
 
 const primaryRegion = (movement: Movement): RegionId =>
@@ -175,27 +230,47 @@ export function buildChronologicalNetworkLayout({
   zoom,
   compact,
   safePad = 16,
+  visualGutter = NETWORK_VISUAL_GUTTER,
 }: {
   movements: Movement[];
   regionOrder: RegionId[];
   zoom: number;
   compact: boolean;
   safePad?: number;
+  visualGutter?: number;
 }): ChronologicalNetworkLayout {
   const resolvedZoom = clampNetworkZoom(zoom);
   const mode = timelineModeById('survey');
   const axisW = compact ? 88 : 142;
   const headerH = compact ? 48 : 52;
-  const pad = compact ? 24 : 36;
-  const nodeW = compact ? 150 : 174;
-  const nodeH = compact ? 58 : 62;
-  const trackStep = compact ? 72 : 76;
-  const lanePadding = compact ? 22 : 26;
-  const minimumLaneHeight = compact ? 108 : 116;
-  const timelineW = Math.round((compact ? 1540 : 2240) * resolvedZoom);
+  const basePad = compact ? 24 : 36;
+  const baseNodeW = compact ? 150 : 174;
+  const baseNodeH = compact ? 58 : 62;
+  const baseTrackStep = compact ? 72 : 76;
+  const baseLanePadding = compact ? 22 : 26;
+  const baseMinimumLaneHeight = compact ? 108 : 116;
+  const baseRegionGap = compact ? 12 : 18;
+  const baseTimelineW = compact ? 1540 : 2240;
+  const pad = Math.round(basePad * resolvedZoom);
+  const nodeW = Math.round(baseNodeW * resolvedZoom);
+  const nodeH = Math.max(compact ? 12 : 14, Math.round(baseNodeH * resolvedZoom));
+  const trackStep = Math.max(
+    compact ? 16 : 18,
+    Math.round(baseTrackStep * resolvedZoom),
+  );
+  const lanePadding = Math.max(
+    compact ? 3 : 4,
+    Math.round(baseLanePadding * resolvedZoom),
+  );
+  const minimumLaneHeight = Math.max(
+    compact ? 21 : 25,
+    Math.round(baseMinimumLaneHeight * resolvedZoom),
+  );
+  const regionGap = Math.max(6, Math.round(baseRegionGap * resolvedZoom));
+  const timelineW = Math.round(baseTimelineW * resolvedZoom);
   // The final historical years must be centerable even on a wide viewport.
   // This is display-safe space only; it never changes the time coordinate.
-  const rightGutter = compact ? 560 : 720;
+  const rightGutter = Math.round((compact ? 560 : 720) * resolvedZoom);
   const positions = new Map<string, { x: number; y: number }>();
 
   const activeRegions = regionOrder.filter((region) =>
@@ -210,6 +285,21 @@ export function buildChronologicalNetworkLayout({
       .sort((a, b) => a.dates.start - b.dates.start || a.id.localeCompare(b.id));
     const trackEnds: number[] = [];
     const placements = inRegion.map((movement) => {
+      // Collision tracks are resolved in the unscaled historical world. This
+      // keeps overview zoom from creating extra tracks merely because X was
+      // compressed, so the same map can be fitted without changing topology.
+      const baseOriginX =
+        safePad +
+        axisW +
+        basePad +
+        yearToTimelineX(movement.dates.start, mode, baseTimelineW);
+      const baseX = Math.max(
+        safePad + axisW + 8,
+        Math.min(
+          baseOriginX - baseNodeW / 2,
+          safePad + axisW + basePad + baseTimelineW - baseNodeW / 2,
+        ),
+      );
       const originX =
         safePad + axisW + pad + yearToTimelineX(movement.dates.start, mode, timelineW);
       const x = Math.max(
@@ -217,12 +307,12 @@ export function buildChronologicalNetworkLayout({
         Math.min(originX - nodeW / 2, safePad + axisW + pad + timelineW - nodeW / 2),
       );
       const minimumGap = compact ? 12 : 16;
-      let track = trackEnds.findIndex((end) => x >= end + minimumGap);
+      let track = trackEnds.findIndex((end) => baseX >= end + minimumGap);
       if (track < 0) {
         track = trackEnds.length;
-        trackEnds.push(x + nodeW);
+        trackEnds.push(baseX + baseNodeW);
       } else {
-        trackEnds[track] = x + nodeW;
+        trackEnds[track] = baseX + baseNodeW;
       }
       return { movement, x, track };
     });
@@ -239,14 +329,34 @@ export function buildChronologicalNetworkLayout({
         y: laneTop + lanePadding + placement.track * trackStep,
       });
     }
-    laneTop += height;
+    laneTop += height + regionGap;
   }
+
+  const nodeRects = [...positions.values()].map((position) => ({
+    x: position.x,
+    y: position.y,
+    width: nodeW,
+    height: nodeH,
+  }));
+  // The camera uses a visual box, not only node centers. The 4px expansion
+  // accounts for selected/focus outlines before the shared safe gutter.
+  const visualBounds = getNetworkVisualBounds(
+    nodeRects.map((rect) => ({
+      x: rect.x - 4,
+      y: rect.y - 4,
+      width: rect.width + 8,
+      height: rect.height + 8,
+    })),
+    visualGutter,
+  );
+  const nominalCanvasW = safePad * 2 + axisW + pad * 2 + timelineW + rightGutter;
+  const nominalCanvasH = laneTop + pad + safePad;
 
   return {
     positions,
     lanes,
-    canvasW: safePad * 2 + axisW + pad * 2 + timelineW + rightGutter,
-    canvasH: laneTop + pad + safePad,
+    canvasW: Math.ceil(Math.max(nominalCanvasW, visualBounds.maxX + visualGutter)),
+    canvasH: Math.ceil(Math.max(nominalCanvasH, visualBounds.maxY + visualGutter)),
     timelineW,
     nodeW,
     nodeH,
@@ -254,6 +364,8 @@ export function buildChronologicalNetworkLayout({
     headerH,
     pad,
     safePad,
+    visualGutter,
+    visualBounds,
     zoom: resolvedZoom,
   };
 }

@@ -2976,11 +2976,16 @@ html.dark .timeline-era-option[aria-current='true'] {
 }
 
 .network-region-lane {
-  border-bottom: 1px solid rgb(var(--c-line) / 0.42);
-  background: transparent;
+  border-bottom: 0;
+  background: linear-gradient(
+    90deg,
+    rgb(var(--network-region-rgb) / 0.035),
+    transparent 24rem
+  );
 }
 
 .network-region-lane__label {
+  z-index: 40;
   display: flex;
   align-items: flex-start;
   gap: 0.5rem;
@@ -2991,6 +2996,40 @@ html.dark .timeline-era-option[aria-current='true'] {
   font-size: 0.6875rem;
   font-weight: 550;
   line-height: 1.35;
+}
+
+.network-detail-orbit {
+  margin-top: 0.9rem;
+  padding-top: 0.75rem;
+  border-top: 1px solid rgb(var(--c-line));
+}
+
+.network-detail-orbit figcaption {
+  color: rgb(var(--c-faint));
+  font-size: 0.5625rem;
+  font-weight: 700;
+  letter-spacing: 0.12em;
+}
+
+.network-detail-orbit svg {
+  display: block;
+  width: 100%;
+  max-height: 10.25rem;
+  margin-top: 0.35rem;
+  overflow: visible;
+}
+
+.network-detail-orbit__label,
+.network-detail-orbit__center-label {
+  fill: rgb(var(--c-muted));
+  font-family: var(--font-sans);
+  font-size: 8px;
+  font-weight: 500;
+}
+
+.network-detail-orbit__center-label {
+  fill: rgb(var(--c-ink));
+  font-weight: 700;
 }
 
 .network-region-lane__label > span {
@@ -3155,44 +3194,201 @@ html.dark .timeline-era-option[aria-current='true'] {
 }
 
 .network-node {
-  border: 1.5px solid rgb(var(--c-ink) / 0.62);
-  background: rgb(var(--c-network-node));
+  --station-dot: 4px;
+  --station-line: 1.25px;
+  --station-title-size: 0.75rem;
+  border: 0;
+  background: transparent;
+  color: rgb(var(--c-ink));
   transform-origin: center;
   transition:
     opacity 160ms ease,
-    border-color 160ms ease,
-    background-color 160ms ease,
-    box-shadow 160ms ease;
+    color 160ms ease;
 }
 
-.network-node:hover {
-  border-color: rgb(var(--c-ink) / 0.82);
+.network-node[data-node-prominence='hub'] {
+  --station-dot: 8px;
+  --station-line: 2.5px;
+  --station-title-size: 0.9375rem;
+}
+
+.network-node[data-node-prominence='major'] {
+  --station-dot: 6px;
+  --station-line: 2px;
+  --station-title-size: 0.8125rem;
+}
+
+.network-node[data-node-prominence='peripheral'] {
+  --station-dot: 3px;
+  --station-line: 1px;
+  --station-title-size: 0.6875rem;
+}
+
+.network-node__station {
+  position: absolute;
+  top: 50%;
+  left: 0;
+  width: 3.1rem;
+  height: 1rem;
+  color: currentColor;
+  pointer-events: none;
+  transform: translateY(-50%);
+}
+
+.network-node__station::before {
+  position: absolute;
+  top: 50%;
+  left: 0.25rem;
+  width: 2.55rem;
+  border-top: var(--station-line) solid currentColor;
+  content: '';
+  opacity: 0.58;
+  transform: translateY(-50%);
+}
+
+.network-node__station > span {
+  position: absolute;
+  top: 50%;
+  left: calc(0.875rem - var(--station-dot) / 2);
+  width: var(--station-dot);
+  height: var(--station-dot);
+  border: 1px solid currentColor;
+  border-radius: 50%;
+  background: rgb(var(--c-paper));
+  transform: translateY(-50%);
+}
+
+.network-node__content {
+  position: absolute;
+  top: 50%;
+  left: 1.2rem;
+  display: grid;
+  max-width: calc(100% - 1.2rem);
+  min-height: 1.75rem;
+  align-content: center;
+  padding: 0.2rem 0.35rem;
+  background: transparent;
+  pointer-events: none;
+  transform: translateY(-50%);
+}
+
+.network-node:hover .network-node__content {
+  background: rgb(var(--c-raised) / 0.72);
 }
 
 .network-node:focus-visible {
+  outline: 0;
+}
+
+.network-node:focus-visible .network-node__content {
   outline: 2px solid rgb(var(--c-ink));
   outline-offset: 2px;
 }
 
 .network-node[data-node-role='source']:not([data-node-state='selected']) {
-  border-width: 2px;
-  border-style: dashed;
+  color: rgb(var(--c-ink));
 }
 
 .network-node[data-node-role='target']:not([data-node-state='selected']) {
-  border-width: 3px;
-  border-style: double;
+  color: rgb(var(--c-ink));
 }
 
 .network-node[data-node-state='selected'] {
-  border: 3px solid rgb(var(--c-ink));
   opacity: 1;
+}
+
+.network-node[data-node-state='selected'] .network-node__content {
+  min-width: min(10rem, calc(100% - 1.2rem));
+  padding: 0.4rem 0.5rem;
+  border: 2.5px solid rgb(var(--c-ink));
   background: rgb(var(--c-network-selected));
   box-shadow: 0 2px 8px rgb(var(--c-ink) / 0.06);
 }
 
+.network-node[data-node-state='selected'] .network-node__station::before {
+  opacity: 0.86;
+}
+
 .network-node__title {
+  overflow: hidden;
+  color: inherit;
+  font-family: var(--font-sans);
+  font-size: var(--station-title-size);
   font-weight: 600;
+  line-height: 1.12;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.network-node[data-node-prominence='hub'] .network-node__title {
+  font-weight: 650;
+}
+
+.network-node[data-node-prominence='major'] .network-node__title {
+  font-weight: 600;
+}
+
+.network-node[data-node-prominence='peripheral'] .network-node__title {
+  font-weight: 450;
+}
+
+.network-node__date,
+.network-node__relation-count,
+.network-node__role {
+  overflow: hidden;
+  color: rgb(var(--c-faint));
+  font-size: 0.5625rem;
+  font-variant-numeric: tabular-nums;
+  font-weight: 400;
+  line-height: 1.25;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.network-node__role {
+  color: rgb(var(--c-muted));
+  font-size: 0.5rem;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+}
+
+.network-node__relation-count {
+  font-weight: 600;
+}
+
+[data-network-compact-overview='true'] .network-node {
+  --station-title-size: 0.625rem;
+}
+
+[data-network-compact-overview='true']
+  .network-node[data-node-prominence='hub']
+  .network-node__content,
+[data-network-compact-overview='true']
+  .network-node[data-node-prominence='major']
+  .network-node__content {
+  width: max-content;
+  max-width: 7.75rem;
+}
+
+[data-network-compact-overview='true']
+  .network-node[data-node-prominence='hub']
+  .network-node__title {
+  font-size: 0.8125rem;
+}
+
+[data-network-compact-overview='true']
+  .network-node[data-node-prominence='major']
+  .network-node__title {
+  font-size: 0.71875rem;
+}
+
+[data-network-compact-overview='true']
+  .network-node[data-node-prominence='normal']:not([data-node-state='selected'])
+  .network-node__content,
+[data-network-compact-overview='true']
+  .network-node[data-node-prominence='peripheral']:not([data-node-state='selected'])
+  .network-node__content {
+  display: none;
 }
 
 .network-node[data-node-state='selected'] .network-node__title {
@@ -3209,9 +3405,17 @@ html.dark .timeline-era-option[aria-current='true'] {
   border: 1.25px solid rgb(var(--c-ink) / 0.58);
 }
 
+.network-node[data-node-state='related'] .network-node__title {
+  font-weight: 600;
+}
+
 .network-node[data-node-state='secondary'] {
   opacity: 0.26;
   border-color: rgb(var(--c-ink) / 0.22);
+}
+
+.network-node[data-node-state='secondary'] .network-node__title {
+  font-weight: 500;
 }
 
 .network-node[data-node-state='dimmed'] {
@@ -3225,7 +3429,23 @@ html.dark .timeline-era-option[aria-current='true'] {
 }
 
 .network-node[data-node-state='dimmed'] .network-node__date {
-  display: none;
+  color: rgb(var(--c-faint));
+}
+
+.network-node[data-node-state='idle'][data-node-prominence='hub'] {
+  opacity: 1;
+}
+
+.network-node[data-node-state='idle'][data-node-prominence='major'] {
+  opacity: 0.92;
+}
+
+.network-node[data-node-state='idle'][data-node-prominence='normal'] {
+  opacity: 0.78;
+}
+
+.network-node[data-node-state='idle'][data-node-prominence='peripheral'] {
+  opacity: 0.62;
 }
 
 .network-scroll[data-network-semantic-level='overview']
@@ -3278,6 +3498,29 @@ html.dark .timeline-era-option[aria-current='true'] {
 @media (prefers-reduced-motion: reduce) {
   .network-node {
     transition: none;
+  }
+}
+
+@media (max-width: 639px) {
+  [data-network-compact-overview='true']
+    .network-node:not([data-overview-landmark='true']):not([data-node-state='selected'])
+    .network-node__content {
+    display: none;
+  }
+
+  [data-network-compact-overview='true']
+    .network-node[data-overview-landmark='true']
+    .network-node__content {
+    display: grid;
+    width: max-content;
+    max-width: 7.75rem;
+  }
+
+  [data-network-compact-overview='true']
+    .network-node[data-overview-landmark='true']:not([data-node-state='selected'])
+    .network-node__title {
+    font-size: 0.71875rem;
+    font-weight: 600;
   }
 }
 

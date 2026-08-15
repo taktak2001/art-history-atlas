@@ -3,7 +3,9 @@ import { movements, regionOrder, relationships } from '@/lib/dataset';
 import {
   buildChronologicalNetworkLayout,
   clampNetworkZoom,
-  getNetworkMovementBounds,
+  getNetworkFitZoom,
+  getNetworkVisualBounds,
+  NETWORK_OVERVIEW_NODE_LIMIT,
   networkNodeProminence,
   networkSemanticLevel,
   networkSemanticLevelForLod,
@@ -86,50 +88,108 @@ describe('network semantic zoom', () => {
     expect(networkSemanticLevelForLod('detailed')).toBe('detail');
   });
 
-  it('reduces mobile overview to a balanced editorial set', () => {
-    const overview = selectNetworkOverviewMovements(
+  it('limits overview to an editorial set while preserving regional landmarks', () => {
+    const degreeById = new Map<string, number>();
+    for (const relationship of relationships) {
+      degreeById.set(
+        relationship.from,
+        (degreeById.get(relationship.from) ?? 0) + 1,
+      );
+      degreeById.set(
+        relationship.to,
+        (degreeById.get(relationship.to) ?? 0) + 1,
+      );
+    }
+    const overview = selectNetworkOverviewMovements(movements, degreeById);
+
+    expect(overview).toHaveLength(NETWORK_OVERVIEW_NODE_LIMIT);
+    expect(new Set(overview.map((movement) => movement.regionIds[0])).size).toBe(
+      new Set(movements.map((movement) => movement.regionIds[0])).size,
+    );
+    expect(overview.map((movement) => movement.id)).toContain('italian-renaissance');
+
+    const mobileOverview = selectNetworkOverviewMovements(
       movements,
-      relationships,
+      degreeById,
       12,
     );
-    expect(overview).toHaveLength(12);
-    expect(new Set(overview.map((movement) => movement.era)).size).toBeGreaterThanOrEqual(6);
-    expect(new Set(overview.map((movement) => movement.regionIds[0])).size).toBeGreaterThanOrEqual(6);
-    expect(overview.every((movement) => movement.visibilityLevel !== 'detailed')).toBe(true);
+    expect(mobileOverview).toHaveLength(12);
+    expect(
+      new Set(mobileOverview.map((movement) => movement.era)).size,
+    ).toBeGreaterThanOrEqual(6);
+    expect(
+      new Set(mobileOverview.map((movement) => movement.regionIds[0])).size,
+    ).toBeGreaterThanOrEqual(6);
   });
 
-  it('derives hub prominence from editorial priority and relation degree', () => {
+  it('assigns stronger station hierarchy to connected representative movements', () => {
     const renaissance = movements.find(
       (movement) => movement.id === 'italian-renaissance',
     )!;
-    expect(networkNodeProminence(renaissance, relationships)).toBe('hub');
+    const peripheral = movements.find((movement) => movement.id === 'land-art')!;
+
+    expect(networkNodeProminence(renaissance, 7)).toBe('hub');
+    expect(networkNodeProminence(peripheral, 0)).toBe('peripheral');
+  });
+});
+
+describe('network visual bounds and camera fit', () => {
+  it('includes the complete visual rectangles and a 32px gutter', () => {
+    expect(
+      getNetworkVisualBounds(
+        [
+          { x: 100, y: 80, width: 160, height: 60 },
+          { x: 310, y: 160, width: 42, height: 18 },
+        ],
+        32,
+      ),
+    ).toEqual({
+      minX: 68,
+      minY: 48,
+      maxX: 384,
+      maxY: 210,
+      width: 316,
+      height: 162,
+    });
   });
 
-  it('includes the full visual node box and safe gutter in focus bounds', () => {
+  it('derives overview zoom from the actual network viewport', () => {
+    const bounds = getNetworkVisualBounds(
+      [{ x: 0, y: 0, width: 1200, height: 620 }],
+      32,
+    );
+    const zoom = getNetworkFitZoom({
+      currentZoom: 1,
+      bounds,
+      viewportWidth: 1000,
+      viewportHeight: 700,
+      axisW: 142,
+      headerH: 52,
+      padding: 0,
+    });
+
+    expect(zoom).toBeCloseTo(0.678, 2);
+  });
+
+  it('keeps every node visual box inside the expanded canvas', () => {
     const selected = movements.filter((movement) =>
-      ['italian-renaissance', 'baroque'].includes(movement.id),
+      ['italian-renaissance', 'abstract-expressionism', 'light-and-space'].includes(
+        movement.id,
+      ),
     );
     const layout = buildChronologicalNetworkLayout({
       movements: selected,
       regionOrder,
-      zoom: 1,
-      compact: true,
+      zoom: 0.84,
+      compact: false,
+      visualGutter: 32,
     });
-    const bounds = getNetworkMovementBounds(
-      selected.map((movement) => movement.id),
-      layout,
-      32,
-    )!;
-    const left = Math.min(
-      ...selected.map((movement) => layout.positions.get(movement.id)!.x),
-    );
-    const right = Math.max(
-      ...selected.map(
-        (movement) => layout.positions.get(movement.id)!.x + layout.nodeW,
-      ),
-    );
-    expect(bounds.x).toBeLessThanOrEqual(left - 32);
-    expect(bounds.x + bounds.width).toBeGreaterThanOrEqual(right + 32);
+
+    expect(layout.visualGutter).toBe(32);
+    expect(layout.visualBounds.minX).toBeGreaterThanOrEqual(0);
+    expect(layout.visualBounds.minY).toBeGreaterThanOrEqual(0);
+    expect(layout.canvasW - layout.visualBounds.maxX).toBeGreaterThanOrEqual(32);
+    expect(layout.canvasH - layout.visualBounds.maxY).toBeGreaterThanOrEqual(32);
   });
 });
 
