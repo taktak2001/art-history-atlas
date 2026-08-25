@@ -1,5 +1,6 @@
 import type { Metadata } from 'next';
 import { MovementsExplorer } from '@/components/MovementsExplorer';
+import { EditorialPageHeader } from '@/components/EditorialPageHeader';
 import { movements } from '@/lib/dataset';
 
 export const metadata: Metadata = {
@@ -10,21 +11,21 @@ export const metadata: Metadata = {
 export default function MovementsPage() {
   return (
     <div className="movements-directory-main">
-      <header className="movements-directory-header">
-        <div>
-          <div className="movements-directory-heading">
-            <h1>MOVEMENTS</h1>
-            <p>ムーブメント一覧</p>
-          </div>
-          <p className="movements-directory-introduction">
+      <EditorialPageHeader
+        englishTitle="MOVEMENTS"
+        japaneseTitle="ムーブメント一覧"
+        description={
+          <p>
             名称・作家・作品・地域・思想・技法・素材・キーワードから探し、時代や分類で絞り込めます。
           </p>
-        </div>
-        <p className="movements-directory-total" aria-label={`${movements.length}件のムーブメント`}>
-          <strong>{movements.length}</strong>
-          <span>movements</span>
-        </p>
-      </header>
+        }
+        aside={
+          <p className="movements-directory-total" aria-label={`${movements.length}件のムーブメント`}>
+            <strong>{movements.length}</strong>
+            <span>movements</span>
+          </p>
+        }
+      />
       <MovementsExplorer />
     </div>
   );

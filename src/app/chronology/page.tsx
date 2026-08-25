@@ -1,6 +1,7 @@
 import type { Metadata } from 'next';
 import { movementsChronological } from '@/lib/dataset';
 import { ChronologyView } from '@/components/ChronologyView';
+import { EditorialPageHeader } from '@/components/EditorialPageHeader';
 
 export const metadata: Metadata = {
   title: '縦型年表',
@@ -12,15 +13,12 @@ export default function ChronologyPage() {
 
   return (
     <div className="chronology-page">
-      <header className="chronology-page__header">
-        <p className="text-xs uppercase tracking-[0.3em] text-faint">Chronology</p>
-        <h1 className="mt-1.5 font-serif text-3xl tracking-tight sm:text-4xl">
-          縦型年表
-        </h1>
-        <p className="mt-1 text-sm leading-6 text-muted">
-          展示室を選んで、美術史を読む
-        </p>
-      </header>
+      <EditorialPageHeader
+        className="chronology-page__header"
+        englishTitle="CHRONOLOGY"
+        japaneseTitle="縦型年表"
+        description={<p>展示室を選んで、美術史を読む</p>}
+      />
 
       <div className="chronology-page__body">
         <ChronologyView movements={ordered} />
