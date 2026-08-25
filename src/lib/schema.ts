@@ -537,6 +537,33 @@ export const Relationship = z.object({
 });
 export type Relationship = z.infer<typeof Relationship>;
 
+/** ムーブメント名称の成立過程。後世の分類と当事者による命名を区別して記録する。 */
+export const NameOriginCertainty = z.enum([
+  'established',
+  'probable',
+  'disputed',
+]);
+export type NameOriginCertainty = z.infer<typeof NameOriginCertainty>;
+
+export const MovementNameOrigin = z.object({
+  /** 読者向けの簡潔な説明 */
+  summary: z.string().min(20),
+  /** 同時代または原語で用いられた名称 */
+  originalTerm: z.string().min(1).optional(),
+  /** 原語の直訳・語義 */
+  literalMeaning: z.string().min(1).optional(),
+  /** 命名者が特定できる場合のみ記録 */
+  coinedBy: z.string().min(1).optional(),
+  /** 名称が公に用いられた年。範囲しか分からない場合は context に記す */
+  coinedYear: z.number().int().optional(),
+  /** 批評、宣言、展覧会、後世の分類など、名称が成立した文脈 */
+  context: z.string().min(1).optional(),
+  certainty: NameOriginCertainty,
+  /** 名称由来を裏づける既存Source ID */
+  sourceIds: z.array(slug).min(1),
+});
+export type MovementNameOrigin = z.infer<typeof MovementNameOrigin>;
+
 /** ムーブメント本体 */
 export const Movement = z.object({
   id: slug,
@@ -560,6 +587,9 @@ export const Movement = z.object({
   dates: DateRange,
   regionIds: z.array(RegionId).min(1),
   cities: z.array(z.string()).default([]),
+
+  /** 名称の語義・命名者・成立文脈。段階的なデータ移行のため定義上は任意。 */
+  nameOrigin: MovementNameOrigin.optional(),
 
   /**
    * 研究上の留保。年代の範囲説明にとどまる `dates.note` とは役割が異なり、

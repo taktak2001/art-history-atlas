@@ -135,6 +135,29 @@ describe('収録規模（MVP要件）', () => {
   it('各ムーブメントに鑑賞ポイントがある', () => {
     for (const m of movements) expect(m.viewingPoints.length, m.id).toBeGreaterThan(0);
   });
+  it('全54件に出典付きの名称由来がある', () => {
+    expect(movements).toHaveLength(54);
+    const sourceIds = new Set(sources.map((source) => source.id));
+    for (const movement of movements) {
+      expect(movement.nameOrigin, movement.id).toBeDefined();
+      expect(movement.nameOrigin?.sourceIds.length, movement.id).toBeGreaterThan(0);
+      for (const sourceId of movement.nameOrigin?.sourceIds ?? []) {
+        expect(sourceIds.has(sourceId), `${movement.id}->${sourceId}`).toBe(true);
+        expect(movement.sourceIds, movement.id).toContain(sourceId);
+      }
+    }
+  });
+
+  it('名称成立が不確かな項目を断定扱いにしない', () => {
+    expect(movements.find((movement) => movement.id === 'impressionism')?.nameOrigin)
+      .toMatchObject({ coinedBy: 'ルイ・ルロワ', coinedYear: 1874, certainty: 'established' });
+    expect(movements.find((movement) => movement.id === 'dada')?.nameOrigin?.certainty)
+      .toBe('disputed');
+    expect(movements.find((movement) => movement.id === 'baroque')?.nameOrigin?.certainty)
+      .toBe('disputed');
+    expect(movements.find((movement) => movement.id === 'mono-ha')?.nameOrigin)
+      .toMatchObject({ originalTerm: 'もの派 / Mono-ha', certainty: 'established' });
+  });
 });
 
 describe('Movement詳細の情報分類', () => {
