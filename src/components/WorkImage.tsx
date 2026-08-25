@@ -37,8 +37,8 @@ export function WorkImage({
   /** 表示コンテキスト。quotation画像はこのサーフェスが許可された場所でのみ表示される。 */
   surface?: ImageSurface;
   /**
-   * 画像未収録時のプレースホルダーに「提供元で作品を見る」外部リンクを出すか。
-   * 作品詳細でのみ true。一覧カード・Timeline・Network・Chronology では表示しない。
+   * 画像未収録時のプレースホルダーに、引用元の原典ページへの外部リンクを出すか。
+   * 作品詳細およびホームの特集カードで使用し、Timeline・Network・Chronology では表示しない。
    * 画像の転載ではなく、提供元ページへの遷移導線のみを提供する。
    */
   showReferenceLink?: boolean;
@@ -144,25 +144,27 @@ export function WorkImage({
     </svg>
   );
 
-  // imageReference があり、外部導線を出す面（作品詳細 / ムーブメント代表作品 / 比較）では、
-  // プレースホルダー全面を1つの外部リンク（<a>）にする。内部に別のリンク/ボタンは入れない。
-  if (showReferenceLink && work.imageReference?.sourcePageUrl) {
-    const provider = shortProviderName(work.imageReference.provider);
+  // 外部導線を出す面では、未収録画像は imageReference、読込失敗画像は
+  // ImageMeta の原典へ直接戻れるようプレースホルダー全面を外部リンクにする。
+  const referenceUrl = work.imageReference?.sourcePageUrl ?? img?.sourceUrl;
+  const referenceProvider = work.imageReference?.provider ?? img?.provider;
+  if (showReferenceLink && referenceUrl && referenceProvider) {
+    const provider = shortProviderName(referenceProvider);
     return (
       <div className={className}>
         <a
-          href={work.imageReference.sourcePageUrl}
+          href={referenceUrl}
           target="_blank"
           rel="noopener noreferrer"
-          aria-label={`${work.titleJa}を${provider}の提供元ページで見る（外部サイト）`}
+          aria-label={`${work.titleJa}の画像を${provider}の引用元で確認する（外部サイト）`}
           className="group flex aspect-[4/3] w-full flex-col items-center justify-center gap-2 border hairline bg-surface p-4 text-center no-underline transition-colors hover:border-ink/40 hover:bg-raised focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent"
         >
           {placeholderIcon}
           <span className="font-serif text-sm leading-snug text-muted transition-colors group-hover:text-ink">
-            画像は提供元で確認
+            画像は引用元で確認
           </span>
           <span className="text-[11px] leading-snug text-faint transition-colors group-hover:text-muted">
-            {provider}で作品を見る <span aria-hidden="true">↗</span>
+            {provider}の原典を見る <span aria-hidden="true">↗</span>
           </span>
         </a>
       </div>

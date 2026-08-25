@@ -326,13 +326,13 @@ test('縦型年表：画像未収録作品はプレースホルダー全面が�
   await expect(page.locator('[data-chronology-movement]').first()).toBeVisible();
 
   const sourceLink = page
-    .getByRole('link', { name: /提供元ページで見る（外部サイト）/ })
+    .getByRole('link', { name: /引用元で確認する（外部サイト）/ })
     .first();
   await expect(sourceLink).toBeVisible();
   await expect(sourceLink).toHaveAttribute('target', '_blank');
   await expect(sourceLink).toHaveAttribute('rel', /noopener/);
   await expect(sourceLink).toHaveAttribute('href', /^https:\/\//);
-  await expect(sourceLink).toContainText('画像は提供元で確認');
+  await expect(sourceLink).toContainText('画像は引用元で確認');
 
   // 未承認画像のサムネイルは出さない（プレースホルダー内に img を描画しない）
   await expect(sourceLink.locator('img')).toHaveCount(0);

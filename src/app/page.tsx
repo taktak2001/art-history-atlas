@@ -130,7 +130,13 @@ export default function HomePage() {
         <div className="home-card-grid mt-5 grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
           {turningPoints.map((id) => {
             const m = getMovement(id);
-            return m ? <MovementCard key={id} movement={m} /> : null;
+            return m ? (
+              <MovementCard
+                key={id}
+                movement={m}
+                linkUnavailableImageToSource
+              />
+            ) : null;
           })}
         </div>
       </section>
@@ -199,7 +205,11 @@ export default function HomePage() {
         />
         <div className="home-card-grid mt-5 grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
           {recent.map((m) => (
-            <MovementCard key={m.id} movement={m} />
+            <MovementCard
+              key={m.id}
+              movement={m}
+              linkUnavailableImageToSource
+            />
           ))}
         </div>
       </section>

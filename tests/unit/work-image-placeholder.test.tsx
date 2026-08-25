@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { render, screen } from '@testing-library/react';
+import { fireEvent, render, screen } from '@testing-library/react';
 import { WorkImage } from '@/components/WorkImage';
 import { shortProviderName } from '@/lib/provider-display';
 import type { ImageReference, Work } from '@/lib/schema';
@@ -67,17 +67,46 @@ describe('WorkImage プレースホルダー', () => {
     const work: Work = { ...baseWork, imageReference: ref };
     render(<WorkImage work={work} showReferenceLink />);
     const link = screen.getByRole('link', {
-      name: /テスト作品をMoMAの提供元ページで見る（外部サイト）/,
+      name: /テスト作品の画像をMoMAの引用元で確認する（外部サイト）/,
     });
     expect(link).toHaveAttribute('href', ref.sourcePageUrl);
     expect(link).toHaveAttribute('target', '_blank');
     expect(link).toHaveAttribute('rel', expect.stringContaining('noopener'));
-    expect(screen.getByText('画像は提供元で確認')).toBeInTheDocument();
-    expect(screen.getByText(/MoMAで作品を見る/)).toBeInTheDocument();
+    expect(screen.getByText('画像は引用元で確認')).toBeInTheDocument();
+    expect(screen.getByText(/MoMAの原典を見る/)).toBeInTheDocument();
     // サムネイル（実画像）は出さない
     expect(document.querySelector('img')).toBeNull();
     // candidateFileUrl を画像として使わない
     expect(document.body.innerHTML).not.toContain('iiif');
+  });
+
+  it('画像読込に失敗した場合も引用元へのリンクへ切り替える', () => {
+    const sourceUrl = 'https://commons.wikimedia.org/wiki/File:Test.jpg';
+    const work: Work = {
+      ...baseWork,
+      image: {
+        title: 'テスト作品',
+        creator: '作者',
+        date: '2000年',
+        provider: 'Wikimedia Commons',
+        sourceUrl,
+        fileUrl: 'https://commons.wikimedia.org/wiki/Special:FilePath/Test.jpg',
+        license: 'public-domain',
+        credit: 'テスト credit',
+        isPublicDomain: true,
+        alt: 'テスト代替テキスト',
+        verifiedOn: '2026-08-06',
+      },
+    };
+
+    render(<WorkImage work={work} showReferenceLink />);
+    fireEvent.error(screen.getByRole('img'));
+
+    expect(
+      screen.getByRole('link', {
+        name: /テスト作品の画像をWikimedia Commonsの引用元で確認する/,
+      }),
+    ).toHaveAttribute('href', sourceUrl);
   });
 
   it('showReferenceLink=false のときはリンクにしない（一覧・Timeline 等）', () => {

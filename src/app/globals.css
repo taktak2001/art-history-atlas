@@ -280,16 +280,16 @@ h1, h2, h3, h4 {
 }
 
 .home-compact-card,
-.home-card-grid > a {
+.home-card-grid > .movement-directory-card {
   padding: 0.875rem;
 }
 
-.home-card-grid > a {
+.home-card-grid > .movement-directory-card {
   gap: 0.4375rem;
   border: 0;
 }
 
-.home-card-grid > a:hover {
+.home-card-grid > .movement-directory-card:hover {
   background: rgb(var(--c-surface));
 }
 
@@ -378,7 +378,7 @@ html.dark .relation-badge {
   }
 
   .home-compact-card,
-  .home-card-grid > a {
+  .home-card-grid > .movement-directory-card {
     padding: 0.8125rem;
   }
 }
@@ -4517,10 +4517,14 @@ html.dark .chronology-era--digital {
   --era-accent: 133 166 199;
 }
 
-/* ムーブメント一覧：美術館アーカイブの目録を意識したデスクトップ専用シェル。 */
-.movements-directory-shell {
+/* 全ページ共通：美術館アーカイブの目録を意識したデスクトップシェル。 */
+.app-shell {
   min-height: 100dvh;
   background: rgb(var(--c-paper));
+}
+
+.app-shell__content {
+  min-width: 0;
 }
 
 .movement-directory-sidebar {
@@ -4805,12 +4809,14 @@ html.dark .chronology-era--digital {
 
 .movement-directory-card__media figure,
 .movement-directory-card__media figure > div,
-.movement-directory-card__media > div {
+.movement-directory-card__media > div,
+.movement-directory-card__media > div > a {
   height: 100%;
 }
 
 .movement-directory-card__media figure > div,
-.movement-directory-card__media > div > div {
+.movement-directory-card__media > div > div,
+.movement-directory-card__media > div > a {
   aspect-ratio: auto;
   border: 0;
 }
@@ -4833,6 +4839,11 @@ html.dark .chronology-era--digital {
   min-width: 0;
   flex-direction: column;
   padding: 0.9rem 0.95rem;
+}
+
+.movement-directory-card__body--link {
+  color: inherit;
+  text-decoration: none;
 }
 
 .movement-directory-card__heading {
@@ -4915,33 +4926,43 @@ html.dark .chronology-era--digital {
   margin-left: 0.5rem;
 }
 
-.movements-directory-pagination {
+.movements-directory-infinite {
   display: flex;
   justify-content: center;
-  margin-top: 1.25rem;
+  min-height: 4.5rem;
+  align-items: center;
+  margin-top: 1rem;
 }
 
-.movements-directory-pagination button {
-  min-width: 2.75rem;
+.movements-directory-load-more {
+  display: inline-flex;
+  min-width: 10rem;
   min-height: 2.75rem;
+  align-items: center;
+  justify-content: center;
+  gap: 0.65rem;
+  padding-inline: 1rem;
   border: 1px solid rgb(var(--c-line));
-  border-right: 0;
+  border-radius: 3px;
+  background: rgb(var(--c-raised));
   color: rgb(var(--c-muted));
-  font-family: var(--font-serif);
-  font-size: 0.8rem;
+  font-size: 0.75rem;
+  transition: border-color 150ms ease, color 150ms ease;
 }
 
-.movements-directory-pagination button:last-child {
-  border-right: 1px solid rgb(var(--c-line));
+.movements-directory-load-more:hover {
+  border-color: rgb(var(--c-muted));
+  color: rgb(var(--c-ink));
 }
 
-.movements-directory-pagination button[aria-current='page'] {
-  background: rgb(var(--c-ink));
-  color: rgb(var(--c-paper));
+.movements-directory-load-more span,
+.movements-directory-end {
+  color: rgb(var(--c-faint));
+  font-size: 0.6875rem;
 }
 
-.movements-directory-pagination button:disabled {
-  color: rgb(var(--c-line));
+.movements-directory-end {
+  margin: 0;
 }
 
 .movements-directory-note {
@@ -4971,18 +4992,18 @@ html.dark .chronology-era--digital {
 }
 
 @media (min-width: 1024px) {
-  body:has(.movements-directory-shell) > header,
-  body:has(.movements-directory-shell) > footer {
-    display: none;
-  }
-
-  body:has(.movements-directory-shell) {
+  body {
     padding-bottom: 0;
   }
 
-  .movements-directory-shell {
+  .app-shell {
     display: grid;
     grid-template-columns: 15.5rem minmax(0, 1fr);
+  }
+
+  .app-shell__content > header,
+  .app-shell__content > footer {
+    display: none;
   }
 
   .movement-directory-sidebar {
@@ -5043,15 +5064,19 @@ html.dark .chronology-era--digital {
     border-radius: 0;
   }
 
-  .movement-directory-sidebar__home-mark {
-    width: 1rem;
+  .movement-directory-sidebar__icon {
+    width: 1.2rem;
+    flex: 0 0 1.2rem;
     color: rgb(var(--c-faint));
-    font-size: 1rem;
-    text-align: center;
+    transition: color 150ms ease;
+  }
+
+  .movement-directory-sidebar__copy {
+    min-width: 0;
   }
 
   .movement-directory-sidebar__home strong,
-  .movement-directory-sidebar__link > span {
+  .movement-directory-sidebar__link strong {
     display: block;
     color: rgb(var(--c-ink));
     font-family: var(--font-serif);
@@ -5074,11 +5099,20 @@ html.dark .chronology-era--digital {
     background: rgb(var(--c-raised));
   }
 
-  .movement-directory-sidebar__link[aria-current='page'] {
+  .movement-directory-sidebar__link:hover .movement-directory-sidebar__icon,
+  .movement-directory-sidebar__home:hover .movement-directory-sidebar__icon,
+  .movement-directory-sidebar__link[aria-current='page'] .movement-directory-sidebar__icon,
+  .movement-directory-sidebar__home[aria-current='page'] .movement-directory-sidebar__icon {
+    color: rgb(var(--c-accent));
+  }
+
+  .movement-directory-sidebar__link[aria-current='page'],
+  .movement-directory-sidebar__home[aria-current='page'] {
     background: rgb(var(--c-raised));
   }
 
-  .movement-directory-sidebar__link[aria-current='page'] > span {
+  .movement-directory-sidebar__link[aria-current='page'] strong,
+  .movement-directory-sidebar__home[aria-current='page'] strong {
     color: rgb(var(--c-accent));
   }
 

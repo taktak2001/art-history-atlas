@@ -1,22 +1,80 @@
+'use client';
+
 import Link from 'next/link';
+import { usePathname } from 'next/navigation';
+import {
+  Books,
+  ChartLine,
+  Columns,
+  House,
+  ListNumbers,
+  PencilLine,
+  ShareNetwork,
+  SquaresFour,
+  type Icon,
+} from '@phosphor-icons/react';
 import { ThemeToggle } from './ThemeToggle';
 
 const primaryNavigation = [
-  { href: '/movements/', label: 'ムーブメント', english: 'Movements', current: true },
-  { href: '/chronology/', label: '縦型', english: 'Chronology', current: false },
-  { href: '/timeline/', label: '横型', english: 'Timeline', current: false },
-  { href: '/compare/', label: '比較', english: 'Compare', current: false },
-  { href: '/network/', label: '関係', english: 'Relationship', current: false },
+  { href: '/movements/', label: 'ムーブメント', english: 'Movements', icon: SquaresFour },
+  { href: '/chronology/', label: '縦型', english: 'Chronology', icon: ListNumbers },
+  { href: '/timeline/', label: '横型', english: 'Timeline', icon: ChartLine },
+  { href: '/compare/', label: '比較', english: 'Compare', icon: Columns },
+  { href: '/network/', label: '関係', english: 'Relationship', icon: ShareNetwork },
 ] as const;
 
 const referenceNavigation = [
-  { href: '/sources/', label: '出典', english: 'Sources' },
-  { href: '/about/', label: '編集方針', english: 'Methodology' },
+  { href: '/sources/', label: '出典', english: 'Sources', icon: Books },
+  { href: '/about/', label: '編集方針', english: 'Methodology', icon: PencilLine },
 ] as const;
 
-export function MovementDirectorySidebar() {
+function SidebarLink({
+  href,
+  label,
+  english,
+  icon: IconComponent,
+  current,
+}: {
+  href: string;
+  label: string;
+  english: string;
+  icon: Icon;
+  current: boolean;
+}) {
   return (
-    <aside className="movement-directory-sidebar" aria-label="ムーブメント一覧のナビゲーション">
+    <Link
+      href={href}
+      className="movement-directory-sidebar__link"
+      aria-current={current ? 'page' : undefined}
+    >
+      <IconComponent
+        className="movement-directory-sidebar__icon"
+        size={19}
+        weight="regular"
+        aria-hidden="true"
+      />
+      <span className="movement-directory-sidebar__copy">
+        <strong>{label}</strong>
+        <small>{english}</small>
+      </span>
+    </Link>
+  );
+}
+
+export function MovementDirectorySidebar() {
+  const pathname = usePathname();
+  const isCurrent = (href: string) => {
+    if (href === '/') return pathname === '/';
+    if (href === '/movements/') {
+      return ['/movements/', '/artists/', '/works/'].some((prefix) =>
+        pathname.startsWith(prefix),
+      );
+    }
+    return pathname.startsWith(href);
+  };
+
+  return (
+    <aside className="movement-directory-sidebar" aria-label="サイトナビゲーション">
       <div>
         <Link
           href="/"
@@ -30,9 +88,18 @@ export function MovementDirectorySidebar() {
 
         <nav className="movement-directory-sidebar__navigation" aria-label="主要画面">
           <p className="movement-directory-sidebar__eyebrow">Explore</p>
-          <Link href="/" className="movement-directory-sidebar__home">
-            <span className="movement-directory-sidebar__home-mark" aria-hidden="true">⌂</span>
-            <span>
+          <Link
+            href="/"
+            className="movement-directory-sidebar__home"
+            aria-current={isCurrent('/') ? 'page' : undefined}
+          >
+            <House
+              className="movement-directory-sidebar__icon"
+              size={19}
+              weight="regular"
+              aria-hidden="true"
+            />
+            <span className="movement-directory-sidebar__copy">
               <strong>ホーム</strong>
               <small>Home</small>
             </span>
@@ -40,14 +107,7 @@ export function MovementDirectorySidebar() {
           <ul className="movement-directory-sidebar__list">
             {primaryNavigation.map((item) => (
               <li key={item.href}>
-                <Link
-                  href={item.href}
-                  className="movement-directory-sidebar__link"
-                  aria-current={item.current ? 'page' : undefined}
-                >
-                  <span>{item.label}</span>
-                  <small>{item.english}</small>
-                </Link>
+                <SidebarLink {...item} current={isCurrent(item.href)} />
               </li>
             ))}
           </ul>
@@ -58,10 +118,7 @@ export function MovementDirectorySidebar() {
           <ul className="movement-directory-sidebar__list">
             {referenceNavigation.map((item) => (
               <li key={item.href}>
-                <Link href={item.href} className="movement-directory-sidebar__link">
-                  <span>{item.label}</span>
-                  <small>{item.english}</small>
-                </Link>
+                <SidebarLink {...item} current={isCurrent(item.href)} />
               </li>
             ))}
           </ul>

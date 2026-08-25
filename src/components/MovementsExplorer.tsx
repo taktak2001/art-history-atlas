@@ -1,7 +1,8 @@
 'use client';
 
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import Link from 'next/link';
+import { MagnifyingGlass } from '@phosphor-icons/react';
 import {
   movements,
   searchDocs,
@@ -57,7 +58,8 @@ export function MovementsExplorer() {
   const [hierarchyScope, setHierarchyScope] = useState<HierarchyScope>('all');
   const [sortMode, setSortMode] = useState<SortMode>('chronology');
   const [advancedOpen, setAdvancedOpen] = useState(false);
-  const [page, setPage] = useState(1);
+  const [visibleCount, setVisibleCount] = useState(PAGE_SIZE);
+  const loadMoreRef = useRef<HTMLDivElement>(null);
   const regions = activeRegions();
 
   const matchedIds = useMemo(() => {
@@ -104,15 +106,26 @@ export function MovementsExplorer() {
   }, [matchedIds, era, region, cls, ver, hierarchyScope, sortMode]);
 
   useEffect(() => {
-    setPage(1);
+    setVisibleCount(PAGE_SIZE);
   }, [query, era, region, cls, ver, hierarchyScope, sortMode]);
 
-  const totalPages = Math.max(1, Math.ceil(filtered.length / PAGE_SIZE));
-  const currentPage = Math.min(page, totalPages);
-  const visibleMovements = filtered.slice(
-    (currentPage - 1) * PAGE_SIZE,
-    currentPage * PAGE_SIZE,
-  );
+  const visibleMovements = filtered.slice(0, visibleCount);
+  const hasMore = visibleMovements.length < filtered.length;
+
+  useEffect(() => {
+    const target = loadMoreRef.current;
+    if (!target || !hasMore || typeof IntersectionObserver === 'undefined') return;
+
+    const observer = new IntersectionObserver(
+      (entries) => {
+        if (!entries.some((entry) => entry.isIntersecting)) return;
+        setVisibleCount((count) => Math.min(filtered.length, count + PAGE_SIZE));
+      },
+      { rootMargin: '240px 0px' },
+    );
+    observer.observe(target);
+    return () => observer.disconnect();
+  }, [filtered.length, hasMore]);
 
   const reset = () => {
     setQuery('');
@@ -121,7 +134,7 @@ export function MovementsExplorer() {
     setCls('all');
     setVer('all');
     setHierarchyScope('all');
-    setPage(1);
+    setVisibleCount(PAGE_SIZE);
   };
 
   const selectClass = 'movement-directory-select';
@@ -169,10 +182,7 @@ export function MovementsExplorer() {
         <div className="movements-search">
           <label htmlFor="q" className="sr-only">ムーブメントを検索</label>
           <span className="movements-search__icon" aria-hidden="true">
-            <svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.4">
-              <circle cx="10.5" cy="10.5" r="6.5" />
-              <path d="m15.5 15.5 5 5" />
-            </svg>
+            <MagnifyingGlass size={19} weight="regular" />
           </span>
           <input
             id="q"
@@ -301,17 +311,29 @@ export function MovementsExplorer() {
         </ul>
       )}
 
-      {totalPages > 1 && (
-        <nav className="movements-directory-pagination" aria-label="ムーブメント一覧のページ">
-          <button type="button" onClick={() => setPage((value) => Math.max(1, value - 1))} disabled={currentPage === 1} aria-label="前のページ">‹</button>
-          {Array.from({ length: totalPages }, (_, index) => index + 1).map((pageNumber) => (
-            <button key={pageNumber} type="button" onClick={() => setPage(pageNumber)} aria-current={pageNumber === currentPage ? 'page' : undefined}>
-              {pageNumber}
-            </button>
-          ))}
-          <button type="button" onClick={() => setPage((value) => Math.min(totalPages, value + 1))} disabled={currentPage === totalPages} aria-label="次のページ">›</button>
-        </nav>
-      )}
+      <div
+        ref={loadMoreRef}
+        className="movements-directory-infinite"
+        data-infinite-scroll-sentinel
+        aria-live="polite"
+      >
+        {hasMore ? (
+          <button
+            type="button"
+            onClick={() =>
+              setVisibleCount((count) => Math.min(filtered.length, count + PAGE_SIZE))
+            }
+            className="movements-directory-load-more"
+          >
+            さらに表示
+            <span>{visibleMovements.length} / {filtered.length}</span>
+          </button>
+        ) : (
+          filtered.length > PAGE_SIZE && (
+            <p className="movements-directory-end">全{filtered.length}件を表示しました</p>
+          )
+        )}
+      </div>
 
       <p className="movements-directory-note">
         検索は表示中のページに限らず、収録済みの全{movements.length}件を対象とします。

@@ -108,9 +108,9 @@ test('もの派の画像未登録作品も図録レイアウトと権利案内�
 
   await expect(page.getByText('作品 01')).toBeVisible();
   // もの派の代表作（関根/李）は image:null かつ imageReference あり → 全面が外部リンクのプレースホルダー。
-  await expect(page.getByText('画像は提供元で確認').first()).toBeVisible();
+  await expect(page.getByText('画像は引用元で確認').first()).toBeVisible();
   const sourceLink = page
-    .getByRole('link', { name: /提供元ページで見る（外部サイト）/ })
+    .getByRole('link', { name: /引用元で確認する（外部サイト）/ })
     .first();
   await expect(sourceLink).toBeVisible();
   await expect(sourceLink).toHaveAttribute('target', '_blank');

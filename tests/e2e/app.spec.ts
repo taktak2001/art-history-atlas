@@ -1,11 +1,16 @@
 import { test, expect } from '@playwright/test';
 
-test('ムーブメント一覧はデスクトップ用アーカイブナビを持つ', async ({ page }, testInfo) => {
+test('全ページ共通のデスクトップ用アーカイブナビを持つ', async ({ page }, testInfo) => {
   test.skip(testInfo.project.name !== 'desktop');
+  for (const path of ['/', '/movements/', '/chronology/', '/timeline/', '/compare/', '/network/', '/sources/', '/about/']) {
+    await page.goto(path);
+    await expect(page.getByRole('complementary', { name: 'サイトナビゲーション' })).toBeVisible();
+  }
+
   await page.goto('/movements/');
 
   const sidebar = page.getByRole('complementary', {
-    name: 'ムーブメント一覧のナビゲーション',
+    name: 'サイトナビゲーション',
   });
   await expect(sidebar).toBeVisible();
   const primary = sidebar.getByRole('navigation', { name: '主要画面' });
@@ -19,7 +24,9 @@ test('ムーブメント一覧はデスクトップ用アーカイブナビを�
   await expect(sidebar.getByText('検索', { exact: true })).toHaveCount(0);
   await expect(sidebar.getByText('ブックマーク', { exact: true })).toHaveCount(0);
   await expect(sidebar.getByText('設定', { exact: true })).toHaveCount(0);
-  await expect(page.locator('[data-movement-result]')).toHaveCount(10);
+  await expect.poll(async () => page.locator('[data-movement-result]').count()).toBeGreaterThanOrEqual(10);
+  await page.locator('[data-infinite-scroll-sentinel]').scrollIntoViewIfNeeded();
+  await expect.poll(async () => page.locator('[data-movement-result]').count()).toBeGreaterThan(10);
 });
 
 test('ホームからムーブメント詳細へ移動できる', async ({ page }) => {

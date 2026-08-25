@@ -145,7 +145,7 @@ test('ホームのセクション見出しは英語と短い日本語説明で�
 test('ホームのコンテンツカードは外枠を使わない', async ({ page }) => {
   await page.goto('/');
 
-  const turningCard = page.locator('.home-card-grid > a').first();
+  const turningCard = page.locator('.home-card-grid > .movement-directory-card').first();
   const reactionCard = page
     .getByRole('heading', { level: 2, name: 'Reactions & Breaks' })
     .locator('xpath=../..')
@@ -167,17 +167,35 @@ test('ホームのコンテンツカードは外枠を使わない', async ({ pa
   }
 });
 
-test('ヘッダーは英字3行ロゴと均衡した操作領域を持つ', async ({ page }) => {
+test('画像を表示できない特集カードは引用元へ直接移動できる', async ({ page }) => {
   await page.goto('/');
 
-  const wordmark = page
-    .getByRole('banner')
-    .getByRole('link', { name: 'Art History Atlas', exact: true });
+  for (const headingName of ['Turning Points', 'Latest Additions']) {
+    const section = page
+      .getByRole('heading', { level: 2, name: headingName })
+      .locator('xpath=ancestor::section[1]');
+    const sourceLinks = section.getByRole('link', { name: /引用元で確認する（外部サイト）/ });
+    expect(await sourceLinks.count()).toBeGreaterThan(0);
+    await expect(sourceLinks.first()).toHaveAttribute('href', /^https:\/\//);
+    await expect(sourceLinks.first()).toHaveAttribute('target', '_blank');
+    await expect(sourceLinks.first()).toHaveAttribute('rel', /noopener/);
+  }
+});
+
+test('ヘッダーは英字3行ロゴと均衡した操作領域を持つ', async ({ page }, testInfo) => {
+  await page.goto('/');
+
+  const wordmark = page.getByRole('link', {
+    name: /Art History Atlas(?: ホーム)?/,
+  }).first();
   await expect(wordmark).toBeVisible();
-  await expect(wordmark.locator('.site-wordmark__line')).toHaveCount(3);
-  await expect(wordmark.locator('.site-wordmark__line').nth(0)).toHaveText('ART');
-  await expect(wordmark.locator('.site-wordmark__line').nth(1)).toHaveText('HISTORY');
-  await expect(wordmark.locator('.site-wordmark__line').nth(2)).toHaveText('ATLAS');
+  const lines = testInfo.project.name === 'desktop'
+    ? wordmark.locator(':scope > span[aria-hidden="true"]')
+    : wordmark.locator('.site-wordmark__line');
+  await expect(lines).toHaveCount(3);
+  await expect(lines.nth(0)).toHaveText('ART');
+  await expect(lines.nth(1)).toHaveText('HISTORY');
+  await expect(lines.nth(2)).toHaveText('ATLAS');
 
   const controls = [
     page.getByRole('button', { name: /テーマ|モード/ }),
@@ -222,9 +240,16 @@ test('正式名称をmetadata・読み上げ・構造化データで統一する
   expect(structuredData.name).toBe('Art History Atlas');
   expect(structuredData.alternateName).toBe('ART HISTORY ATLAS');
 
-  await expect(
-    page.locator('footer').getByRole('link', { name: 'Art History Atlas', exact: true }),
-  ).toContainText('ART HISTORY ATLAS');
+  if (await page.getByRole('complementary', { name: 'サイトナビゲーション' }).isVisible()) {
+    await expect(
+      page.getByRole('complementary', { name: 'サイトナビゲーション' })
+        .getByRole('link', { name: 'Art History Atlas ホーム' }),
+    ).toContainText(/ART\s*HISTORY\s*ATLAS/);
+  } else {
+    await expect(
+      page.locator('footer').getByRole('link', { name: 'Art History Atlas', exact: true }),
+    ).toContainText('ART HISTORY ATLAS');
+  }
   const retiredJapaneseName = ['美術史', 'アトラス'].join('');
   await expect(page.locator('body')).not.toContainText(retiredJapaneseName);
 
