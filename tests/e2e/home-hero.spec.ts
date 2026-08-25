@@ -142,7 +142,7 @@ test('ホームのセクション見出しは英語と短い日本語説明で�
   await expect(page.getByRole('heading', { level: 2, name: 'Across Regions' })).toHaveCount(0);
 });
 
-test('ホームのコンテンツカードは外枠を使わない', async ({ page }) => {
+test('ホームのコンテンツカードは外枠を使わず、白い紙面で統一する', async ({ page }) => {
   await page.goto('/');
 
   const turningCard = page.locator('.home-card-grid > .movement-directory-card').first();
@@ -156,8 +156,13 @@ test('ホームのコンテンツカードは外枠を使わない', async ({ pa
     .locator('xpath=../..')
     .locator('a')
     .first();
+  const latestCard = page
+    .getByRole('heading', { level: 2, name: 'Latest Additions' })
+    .locator('xpath=ancestor::section[1]')
+    .locator('.movement-directory-card')
+    .first();
 
-  for (const card of [turningCard, reactionCard, comparisonCard]) {
+  for (const card of [turningCard, reactionCard, comparisonCard, latestCard]) {
     await expect(card).toBeVisible();
     const borderWidths = await card.evaluate((element) => {
       const styles = getComputedStyle(element);
@@ -165,6 +170,14 @@ test('ホームのコンテンツカードは外枠を使わない', async ({ pa
     });
     expect(borderWidths).toEqual(['0px', '0px', '0px', '0px']);
   }
+
+  const backgrounds = await Promise.all(
+    [turningCard, reactionCard, latestCard].map((card) =>
+      card.evaluate((element) => getComputedStyle(element).backgroundColor),
+    ),
+  );
+  expect(new Set(backgrounds).size).toBe(1);
+  expect(backgrounds[0]).not.toBe('rgba(0, 0, 0, 0)');
 });
 
 test('画像を表示できない特集カードは引用元へ直接移動できる', async ({ page }) => {

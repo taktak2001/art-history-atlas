@@ -2,6 +2,7 @@ import type { Metadata } from 'next';
 import Link from 'next/link';
 import { sources, movements } from '@/lib/dataset';
 import { SourceList } from '@/components/SourceList';
+import { EditorialPageHeader } from '@/components/EditorialPageHeader';
 
 export const metadata: Metadata = {
   title: '出典一覧',
@@ -17,13 +18,17 @@ export default function SourcesPage() {
 
   return (
     <div className="mx-auto max-w-3xl px-4 py-10">
-      <p className="text-xs uppercase tracking-[0.3em] text-faint">Sources</p>
-      <h1 className="mt-3 font-serif text-3xl">出典一覧</h1>
-      <p className="mt-3 text-sm leading-relaxed text-muted">
-        本サイトの記述は、以下の美術館・大学・研究機関等の公開資料に基づきます（全{sources.length}件、うち信頼性「高」{highCount}件）。
-        一般ブログ・まとめサイトのみを根拠にはしていません。各URLは参照日時点で到達可能性を確認しています。
-        リンク先の内容は各機関に帰属します。
-      </p>
+      <EditorialPageHeader
+        englishTitle="SOURCES"
+        japaneseTitle="出典一覧"
+        description={
+          <p>
+            本サイトの記述は、以下の美術館・大学・研究機関等の公開資料に基づきます（全{sources.length}件、うち信頼性「高」{highCount}件）。
+            一般ブログ・まとめサイトのみを根拠にはしていません。各URLは参照日時点で到達可能性を確認しています。
+            リンク先の内容は各機関に帰属します。
+          </p>
+        }
+      />
 
       <div className="mt-8 space-y-6">
         {sources.map((s) => {

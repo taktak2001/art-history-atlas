@@ -2,6 +2,7 @@ import type { Metadata } from 'next';
 import Link from 'next/link';
 import { ClassificationAccordion } from '@/components/ClassificationAccordion';
 import { RelationshipStandards } from '@/components/RelationshipStandards';
+import { EditorialPageHeader } from '@/components/EditorialPageHeader';
 import {
   VERIFICATION_LABELS,
   VISIBILITY_LEVEL_DESCRIPTIONS,
@@ -52,8 +53,10 @@ const visibilityLevels: VisibilityLevel[] = ['core', 'standard', 'detailed'];
 export default function AboutPage() {
   return (
     <div className="mx-auto max-w-prose px-4 py-10">
-      <p className="text-xs uppercase tracking-[0.3em] text-faint">About</p>
-      <h1 className="mt-3 font-serif text-3xl">編集方針・分類基準・注意事項</h1>
+      <EditorialPageHeader
+        englishTitle="METHODOLOGY"
+        japaneseTitle="編集方針・分類基準・注意事項"
+      />
 
       <section className="mt-8">
         <h2 className="font-serif text-2xl">このサイトの目的</h2>
