@@ -1077,7 +1077,7 @@ html.dark .relation-badge {
 
 .semantic-lod-fab--viewer {
   z-index: 24;
-  --semantic-lod-bottom-offset: 4.75rem;
+  bottom: max(0.5rem, calc(env(safe-area-inset-bottom) + 0.375rem));
 }
 
 .semantic-lod-fab__trigger {
@@ -1298,10 +1298,6 @@ html.dark .relation-badge {
   .semantic-lod-fab {
     right: calc(0.875rem + env(safe-area-inset-right));
     --semantic-lod-bottom-offset: 1rem;
-  }
-
-  .semantic-lod-fab--viewer {
-    --semantic-lod-bottom-offset: 4.65rem;
   }
 
   .semantic-lod-fab__segment {
