@@ -18,7 +18,34 @@ import {
 import { MatrixView } from '@/components/MatrixView';
 import { MovementsExplorer } from '@/components/MovementsExplorer';
 import { MovementSubheading } from '@/components/MovementSubheading';
+import { MovementDirectorySidebar } from '@/components/MovementDirectorySidebar';
 import { movements, activeRegions } from '@/lib/dataset';
+
+describe('MovementDirectorySidebar', () => {
+  it('ホームの下に主要5画面を指定順で置き、補助ボタンを増やさない', () => {
+    render(<MovementDirectorySidebar />);
+
+    const sidebar = screen.getByRole('complementary', {
+      name: 'ムーブメント一覧のナビゲーション',
+    });
+    const primary = within(sidebar).getByRole('navigation', { name: '主要画面' });
+    const labels = within(primary)
+      .getAllByRole('link')
+      .map((link) => link.textContent?.replace(/\s+/g, ' ').trim());
+
+    expect(labels).toEqual([
+      '⌂ホームHome',
+      'ムーブメントMovements',
+      '縦型Chronology',
+      '横型Timeline',
+      '比較Compare',
+      '関係Relationship',
+    ]);
+    expect(within(sidebar).queryByText('検索')).not.toBeInTheDocument();
+    expect(within(sidebar).queryByText('ブックマーク')).not.toBeInTheDocument();
+    expect(within(sidebar).queryByText('設定')).not.toBeInTheDocument();
+  });
+});
 
 describe('MovementSubheading', () => {
   it('詳細本文用のセリフ見出し規則を一元化する', () => {

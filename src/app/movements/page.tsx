@@ -1,5 +1,6 @@
 import type { Metadata } from 'next';
 import { MovementsExplorer } from '@/components/MovementsExplorer';
+import { MovementDirectorySidebar } from '@/components/MovementDirectorySidebar';
 import { movements } from '@/lib/dataset';
 
 export const metadata: Metadata = {
@@ -9,13 +10,24 @@ export const metadata: Metadata = {
 
 export default function MovementsPage() {
   return (
-    <div className="mx-auto max-w-layout px-4 py-10">
-      <p className="text-xs uppercase tracking-[0.3em] text-faint">Movements</p>
-      <h1 className="mt-3 font-serif text-3xl">ムーブメント一覧・検索</h1>
-      <p className="mt-3 max-w-prose text-sm text-muted">
-        全{movements.length}件。名称・作家・作品・地域・思想・技法・素材・キーワードで検索し、時代・地域・分類・情報確認状態で絞り込めます。
-      </p>
-      <div className="mt-8">
+    <div className="movements-directory-shell">
+      <MovementDirectorySidebar />
+      <div className="movements-directory-main">
+        <header className="movements-directory-header">
+          <div>
+            <div className="movements-directory-heading">
+              <h1>MOVEMENTS</h1>
+              <p>ムーブメント一覧</p>
+            </div>
+            <p className="movements-directory-introduction">
+              名称・作家・作品・地域・思想・技法・素材・キーワードから探し、時代や分類で絞り込めます。
+            </p>
+          </div>
+          <p className="movements-directory-total" aria-label={`${movements.length}件のムーブメント`}>
+            <strong>{movements.length}</strong>
+            <span>movements</span>
+          </p>
+        </header>
         <MovementsExplorer />
       </div>
     </div>
