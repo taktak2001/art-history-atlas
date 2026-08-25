@@ -2,7 +2,12 @@
 
 import { useEffect, useMemo, useRef, useState } from 'react';
 import Link from 'next/link';
-import { MagnifyingGlass } from '@phosphor-icons/react';
+import {
+  ArrowsDownUp,
+  CaretDown,
+  Funnel,
+  MagnifyingGlass,
+} from '@phosphor-icons/react';
 import {
   movements,
   searchDocs,
@@ -198,32 +203,52 @@ export function MovementsExplorer() {
           </p>
         </div>
 
-        <button
-          type="button"
-          onClick={() => setAdvancedOpen((open) => !open)}
-          aria-expanded={advancedOpen}
-          aria-controls="advanced-filters"
-          aria-label={`詳細条件・フィルター。${advancedSummary}`}
-          className="movements-directory-toolbar__filter"
-        >
-          <span>フィルター</span>
-          <span className="movements-advanced__summary">{advancedSummary}</span>
-          {activeFilters.length > 0 && <span className="movements-directory-toolbar__badge">{activeFilters.length}</span>}
-          <AccordionChevron open={advancedOpen} className="movements-directory-toolbar__chevron" />
-        </button>
-
-        <label className="movements-directory-sort">
-          <span className="sr-only">並び順</span>
-          <select
-            value={sortMode}
-            onChange={(event) => setSortMode(event.target.value as SortMode)}
-            aria-label="並び順"
+        <div className="movements-directory-toolbar__utilities">
+          <button
+            type="button"
+            onClick={() => setAdvancedOpen((open) => !open)}
+            aria-expanded={advancedOpen}
+            aria-controls="advanced-filters"
+            aria-label={`詳細条件・フィルター。${advancedSummary}`}
+            className="movements-directory-toolbar__filter"
           >
-            <option value="chronology">並び順：年代</option>
-            <option value="name-ja">並び順：名称</option>
-            <option value="name-en">並び順：英語名</option>
-          </select>
-        </label>
+            <Funnel
+              className="movements-directory-toolbar__utility-icon"
+              size={18}
+              weight="regular"
+              aria-hidden="true"
+            />
+            <span>フィルター</span>
+            <span className="movements-advanced__summary sr-only">{advancedSummary}</span>
+            {activeFilters.length > 0 && <span className="movements-directory-toolbar__badge">{activeFilters.length}</span>}
+            <AccordionChevron open={advancedOpen} className="movements-directory-toolbar__chevron" />
+          </button>
+
+          <label className="movements-directory-sort">
+            <span className="sr-only">並び順</span>
+            <ArrowsDownUp
+              className="movements-directory-toolbar__utility-icon movements-directory-sort__icon"
+              size={18}
+              weight="regular"
+              aria-hidden="true"
+            />
+            <select
+              value={sortMode}
+              onChange={(event) => setSortMode(event.target.value as SortMode)}
+              aria-label="並び順"
+            >
+              <option value="chronology">並び順：年代</option>
+              <option value="name-ja">並び順：名称</option>
+              <option value="name-en">並び順：英語名</option>
+            </select>
+            <CaretDown
+              className="movements-directory-sort__chevron"
+              size={14}
+              weight="regular"
+              aria-hidden="true"
+            />
+          </label>
+        </div>
       </div>
 
       <div id="advanced-filters" hidden={!advancedOpen} className="movements-advanced__panel">

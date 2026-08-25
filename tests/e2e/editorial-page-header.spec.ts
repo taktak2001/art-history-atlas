@@ -41,7 +41,12 @@ test('ムーブメント検索ツールバーはガラス面としてスクロ�
   await page.goto('/movements/');
 
   const toolbar = page.locator('.movements-directory-toolbar');
+  const search = page.locator('.movements-search');
+  const utilities = page.locator('.movements-directory-toolbar__utilities');
   await expect(toolbar).toBeVisible();
+  await expect(search).toBeVisible();
+  await expect(utilities).toBeVisible();
+  await expect(utilities.locator('svg')).toHaveCount(4);
 
   const initial = await toolbar.evaluate((element) => {
     const styles = getComputedStyle(element);
@@ -49,11 +54,23 @@ test('ムーブメント検索ツールバーはガラス面としてスクロ�
       position: styles.position,
       top: Number.parseFloat(styles.top),
       y: element.getBoundingClientRect().top,
-      backdrop: styles.backdropFilter || styles.webkitBackdropFilter,
     };
   });
+  const searchBackdrop = await search.evaluate((element) => {
+    const styles = getComputedStyle(element);
+    return styles.backdropFilter || styles.webkitBackdropFilter;
+  });
   expect(initial.position).toBe('sticky');
-  expect(initial.backdrop).toContain('blur');
+  expect(searchBackdrop).toContain('blur');
+
+  const layout = await toolbar.evaluate((element) => {
+    const searchBox = element.querySelector<HTMLElement>('.movements-search')!.getBoundingClientRect();
+    const utilityBox = element
+      .querySelector<HTMLElement>('.movements-directory-toolbar__utilities')!
+      .getBoundingClientRect();
+    return { searchBottom: searchBox.bottom, utilitiesTop: utilityBox.top };
+  });
+  expect(layout.utilitiesTop).toBeGreaterThan(layout.searchBottom);
 
   await page.evaluate(() => window.scrollTo({ top: 1200, behavior: 'instant' }));
   await page.waitForTimeout(100);
