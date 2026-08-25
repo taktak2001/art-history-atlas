@@ -3,7 +3,7 @@
 import { useMemo, useState } from 'react';
 import type { CSSProperties } from 'react';
 import Link from 'next/link';
-import { LodControl } from '@/components/LodControl';
+import { SemanticLodFab } from '@/components/SemanticLodFab';
 import { ERA_LABELS, ERA_ORDER, REGION_LABELS } from '@/lib/dataset';
 import { filterMovementsByLod } from '@/lib/movement-hierarchy';
 import { regionRgb } from '@/lib/timeline-region-presentation';
@@ -43,14 +43,13 @@ export function MatrixView({
 
   return (
     <>
-      <LodControl
+      <SemanticLodFab
         value={lod}
         onChange={(next) => {
           setExpandedCells(new Set());
           setLod(next);
         }}
         counts={counts}
-        catalogue
       />
 
       <div

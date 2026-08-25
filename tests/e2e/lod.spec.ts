@@ -1,21 +1,23 @@
 import { test, expect } from '@playwright/test';
+import { openLodFab, selectLod } from './lod-helpers';
 
-test('主要4画面で図録型LODと基本・充実・すべてを共通表示する', async ({
+test('主要4画面でLOD操作を右下の銀杏形FABへ一本化する', async ({
   page,
 }) => {
   // ムーブメント一覧はLODを持たない（常に全件が対象）
   for (const route of ['/timeline/', '/chronology/', '/network/', '/matrix/']) {
     await page.goto(route);
-    const control = page.locator('[data-lod-control]');
-    await expect(control).toHaveClass(/lod-control--catalogue/);
-    await expect(
-      control.getByText('LEVEL OF DETAIL', { exact: true }),
-    ).toBeVisible();
-    await expect(control.getByRole('button', { name: /基本\s*32/ })).toBeVisible();
-    await expect(control.getByRole('button', { name: /充実\s*48/ })).toBeVisible();
-    await expect(
-      control.getByRole('button', { name: /すべて\s*54/ }),
-    ).toBeVisible();
+    const fab = page.locator('[data-semantic-lod-fab]');
+    const trigger = page.getByRole('button', { name: '表示密度を変更' });
+    await expect(fab).toHaveCount(1);
+    await expect(trigger).toBeVisible();
+    await expect(trigger).toHaveAttribute('aria-expanded', 'false');
+    await expect(page.getByRole('menuitemradio')).toHaveCount(0);
+
+    await openLodFab(page);
+    await expect(page.getByRole('menuitemradio')).toHaveCount(3);
+    await trigger.click();
+    await expect(trigger).toHaveAttribute('aria-expanded', 'false');
   }
 });
 
@@ -34,22 +36,22 @@ test('Aboutの凡例も基本・充実・すべてへ統一する', async ({ pag
 
 test('基本・充実・すべてをURLへ反映し、リロード後も維持する', async ({ page }) => {
   await page.goto('/matrix/');
-  await expect(page.getByRole('button', { name: /基本\s*32/ })).toHaveAttribute(
-    'aria-pressed',
-    'true',
-  );
-  await expect(page.getByText('美術史の骨格となる主要項目を表示')).toHaveClass(
-    /sr-only/,
+  await expect(page.getByRole('button', { name: '表示密度を変更' })).toHaveAttribute(
+    'title',
+    '表示密度: 基本',
   );
 
-  await page.getByRole('button', { name: /すべて\s*54/ }).click();
+  await selectLod(page, 'detailed');
   await expect(page).toHaveURL(/lod=detailed/);
   await page.reload();
-  await expect(page.getByRole('button', { name: /すべて\s*54/ })).toHaveAttribute(
-    'aria-pressed',
-    'true',
+  await expect(page.getByRole('button', { name: '表示密度を変更' })).toHaveAttribute(
+    'title',
+    '表示密度: すべて',
   );
-  await expect(page.getByText('収録済みの全項目を表示')).toHaveClass(/sr-only/);
+  await openLodFab(page);
+  await expect(
+    page.getByRole('menuitemradio', { name: /すべてに切り替え/ }),
+  ).toHaveAttribute('aria-checked', 'true');
   await expect(page.locator('[data-matrix-lod]')).toHaveAttribute(
     'data-matrix-lod',
     'detailed',
@@ -131,7 +133,7 @@ test('ネットワークはLOD外ノードをDOMへ描画しない', async ({ pa
   await expect(graph).toHaveAttribute('data-network-lod', 'core');
   await expect(graph.getByRole('button', { name: '未来派を選択' })).toHaveCount(0);
 
-  await page.getByRole('button', { name: /充実\s*48/ }).click();
+  await selectLod(page, 'standard');
   if (testInfo.project.name === 'mobile') {
     await page.getByRole('button', { name: 'すべて表示' }).click();
   }

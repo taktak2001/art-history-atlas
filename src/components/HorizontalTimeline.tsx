@@ -11,7 +11,7 @@ import {
 } from 'react';
 import type { Movement, RegionId } from '@/lib/schema';
 import { CLASSIFICATION_LABELS, REGION_LABELS } from '@/lib/schema';
-import { LodControl } from '@/components/LodControl';
+import { SemanticLodFab } from '@/components/SemanticLodFab';
 import {
   TimelineViewerFrame,
   type TimelineViewerNode,
@@ -648,14 +648,6 @@ export function HorizontalTimeline({
   return (
     <div style={{ paddingBottom: 'calc(env(safe-area-inset-bottom) + 16px)' }}>
       <div className="timeline-controls">
-        <LodControl
-          value={lod}
-          onChange={(next) => {
-            setLod(next);
-          }}
-          counts={lodCounts}
-          catalogue
-        />
         <div className="timeline-era-control">
           <p className="timeline-control-caption">Era</p>
           <div
@@ -678,6 +670,10 @@ export function HorizontalTimeline({
         </div>
 
       </div>
+
+      {!isViewerMode && (
+        <SemanticLodFab value={lod} onChange={setLod} counts={lodCounts} />
+      )}
 
       <section
         className="timeline-status sticky top-[69px] z-30 mt-3 bg-paper/95 backdrop-blur sm:static sm:mt-4 sm:bg-transparent"

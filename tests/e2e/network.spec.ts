@@ -1,12 +1,10 @@
 import { test, expect, type Page } from '@playwright/test';
+import { selectLod } from './lod-helpers';
 
 async function zoomNetworkToStudy(page: Page) {
   const graph = page.getByRole('group', { name: '美術運動の関係ネットワーク図' });
   if ((await graph.getAttribute('data-network-semantic-level')) !== 'study') {
-    await page
-      .locator('[data-lod-control] button')
-      .filter({ hasText: '充実' })
-      .click();
+    await selectLod(page, 'standard');
   }
   await expect(graph).toHaveAttribute('data-network-semantic-level', 'study');
 }
@@ -94,7 +92,7 @@ test('実年代X軸と地域Yレーンを表示し、両方向へスクロール
 
   // Overviewは主要系譜へ情報を絞ってviewportへ収める。全情報を扱う
   // detailed LODでは、実寸の歴史地図を両方向へ辿れることを確認する。
-  await page.getByRole('button', { name: /すべて\s*54/ }).click();
+  await selectLod(page, 'detailed');
 
   const graph = page.getByRole('group', { name: '美術運動の関係ネットワーク図' });
   await expect(graph.locator('[data-network-region="france"]')).toBeAttached();
@@ -127,12 +125,12 @@ test('情報LODはcamera zoomと分離し、詳細でArtist・Work・Contextを�
   const zoomIn = page.getByRole('button', { name: 'ネットワークを拡大' });
   await zoomIn.click();
   await expect(graph).toHaveAttribute('data-network-semantic-level', 'overview');
-  await page.getByRole('button', { name: /充実\s*48/ }).click();
+  await selectLod(page, 'standard');
   await expect(graph).toHaveAttribute('data-network-semantic-level', 'study');
   await expect(graph.locator('[data-network-entity="artist"]')).toHaveCount(0);
   await expect(graph.locator('[data-network-entity="work"]')).toHaveCount(0);
 
-  await page.getByRole('button', { name: /すべて\s*54/ }).click();
+  await selectLod(page, 'detailed');
   await expect(graph).toHaveAttribute('data-network-semantic-level', 'detail');
   expect(await graph.locator('[data-network-entity="work"]').count()).toBeGreaterThan(0);
   expect(await graph.locator('[data-network-entity="context"]').count()).toBeGreaterThan(0);
@@ -515,7 +513,7 @@ test('基本表示ではルネサンスとバロックの直接関係だけを�
   await expect(collapsedSuccession).toHaveAttribute('data-route-offset', '0');
   await expect(collapsedReaction).toHaveCount(0);
 
-  await page.getByRole('button', { name: /充実/ }).click();
+  await selectLod(page, 'standard');
   await zoomNetworkToStudy(page);
   const standardReaction = graph.locator(
     '[data-network-layer="base-edges"] [data-network-edge-id="lod-reaction-mannerism-baroque"]',
@@ -733,8 +731,8 @@ test('詳細ページから関係ネットワークへ移ると直接関係が�
 
   // 3. 直接関係を出すために必要な最小LOD（充実）へ自動変更される
   await expect(
-    page.locator('[data-lod-control] button[aria-pressed="true"]'),
-  ).toContainText('充実');
+    page.getByRole('button', { name: '表示密度を変更' }),
+  ).toHaveAttribute('title', '表示密度: 充実');
   await expect(page).toHaveURL(/lod=standard/);
 
   // 4. 表示関係が「このムーブメント」になる
@@ -760,10 +758,7 @@ test('focus中は手動変更を尊重し、選択解除で全体表示へ戻る
   await expect(page).toHaveURL(/scope=focus/);
 
   // 手動でLODを基本へ戻しても、自動設定へ巻き戻さない
-  await page
-    .locator('[data-lod-control] button')
-    .filter({ hasText: '基本' })
-    .click();
+  await selectLod(page, 'core');
   await expect(page).toHaveURL(/lod=core/);
   await expect(page).toHaveURL(/focus=japanese-ink-painting/);
   // focusノードと直接関係はLODに関わらず表示し続け、overviewの主要背景も残す
@@ -797,8 +792,8 @@ test('focus付きURLは再読込で同じ状態を復元し、無効なfocusは�
     page.locator('.network-scope-option[aria-pressed="true"]'),
   ).toHaveText('このムーブメント');
   await expect(
-    page.locator('[data-lod-control] button[aria-pressed="true"]'),
-  ).toContainText('充実');
+    page.getByRole('button', { name: '表示密度を変更' }),
+  ).toHaveAttribute('title', '表示密度: 充実');
   await expect(page.locator('[data-network-node][aria-pressed="true"]')).toHaveCount(1);
 
   // 無効な focus はエラーにせず通常表示
@@ -880,7 +875,7 @@ test('関係ラベルは密集しても互いに重ならず、全件表示さ�
 
 test('全体表示でラベルが密集してもラベル同士が重ならない', async ({ page }) => {
   await page.goto('/network/?scope=all');
-  await page.getByRole('button', { name: /すべて\s*54/ }).click();
+  await selectLod(page, 'detailed');
 
   await expect(page.locator('[data-edge-label]').first()).toBeVisible();
 

@@ -1,4 +1,5 @@
 import { test, expect } from '@playwright/test';
+import { selectLod } from './lod-helpers';
 
 test('比較ページはネイティブselectを使わず、検索ピッカーで追加する', async ({ page }) => {
   await page.goto('/compare/?ids=surrealism,baroque');
@@ -118,7 +119,7 @@ test('ネットワークで検索後に手動変更しても自動設定へ戻�
   await expect(page).toHaveURL(/lod=standard/);
 
   // 手動でLODを基本へ戻す
-  await page.locator('[data-lod-control] button').filter({ hasText: '基本' }).click();
+  await selectLod(page, 'core');
   await expect(page).toHaveURL(/lod=core/);
   // focus と scope は保持され、自動調整で上書きされない
   await expect(page).toHaveURL(/focus=cubism/);

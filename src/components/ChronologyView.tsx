@@ -2,7 +2,7 @@
 
 import { useState } from 'react';
 import Link from 'next/link';
-import { LodControl } from '@/components/LodControl';
+import { SemanticLodFab } from '@/components/SemanticLodFab';
 import { WorkImage } from '@/components/WorkImage';
 import { relationships, works } from '@/lib/dataset';
 import { filterMovementsByLod, getMovementParent } from '@/lib/movement-hierarchy';
@@ -320,14 +320,7 @@ export function ChronologyView({ movements }: { movements: Movement[] }) {
 
   return (
     <>
-      <div className="chronology-controls">
-        <LodControl
-          value={lod}
-          onChange={setLod}
-          counts={counts}
-          catalogue
-        />
-      </div>
+      <SemanticLodFab value={lod} onChange={setLod} counts={counts} />
 
       <div
         className="chronology-gallery"
