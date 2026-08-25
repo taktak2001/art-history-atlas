@@ -11,7 +11,10 @@ import {
 import { RelationshipStandards } from '@/components/RelationshipStandards';
 import { getMovement, getSources } from '@/lib/dataset';
 import type { Work } from '@/lib/schema';
-import { SemanticLodFab } from '@/components/SemanticLodFab';
+import {
+  getLodLevelFromFanPointer,
+  SemanticLodFab,
+} from '@/components/SemanticLodFab';
 import { MatrixView } from '@/components/MatrixView';
 import { MovementsExplorer } from '@/components/MovementsExplorer';
 import { MovementSubheading } from '@/components/MovementSubheading';
@@ -215,6 +218,15 @@ describe('RelationshipStandards', () => {
 });
 
 describe('LOD UI', () => {
+  it('90度fanをdead zoneの外で基本・充実・すべてへ分割する', () => {
+    expect(getLodLevelFromFanPointer(36, 4)).toBeNull();
+    expect(getLodLevelFromFanPointer(110, 20)).toBe('core');
+    expect(getLodLevelFromFanPointer(78, 78)).toBe('standard');
+    expect(getLodLevelFromFanPointer(20, 110)).toBe('detailed');
+    expect(getLodLevelFromFanPointer(-20, 110)).toBeNull();
+    expect(getLodLevelFromFanPointer(180, 20)).toBeNull();
+  });
+
   it('通常時は親FABだけを表示し、展開後に銀杏形の3項目を選択する', async () => {
     const onChange = vi.fn();
     const { rerender } = render(

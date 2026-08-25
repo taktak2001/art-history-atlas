@@ -2,7 +2,7 @@ import { expect, test } from '@playwright/test';
 import AxeBuilder from '@axe-core/playwright';
 import { openLodFab } from './lod-helpers';
 
-test('mobileのLOD FABは閉じた親1個から銀杏形3分割へ開き、bottom sheetを避ける', async ({
+test('mobileのLOD FABは90度の3sectorへ開き、tapとdragでLODを選べる', async ({
   page,
 }, testInfo) => {
   test.skip(testInfo.project.name !== 'mobile', 'mobile project only');
@@ -32,33 +32,66 @@ test('mobileのLOD FABは閉じた親1個から銀杏形3分割へ開き、botto
   await expect(menu.getByRole('menuitemradio')).toHaveCount(3);
   const leafShape = await menu.evaluate((element) => {
     const style = getComputedStyle(element);
+    const outline = element.querySelector(
+      '.semantic-lod-fab__fan-outline',
+    );
     return {
-      clipPath: style.clipPath,
       display: style.display,
       transformOrigin: style.transformOrigin,
+      angle: element.getAttribute('data-fan-angle'),
+      radius: element.getAttribute('data-fan-radius'),
+      width: element.clientWidth,
+      height: element.clientHeight,
+      outline: outline?.getAttribute('d'),
     };
   });
-  expect(leafShape.clipPath).toContain('polygon');
-  expect(leafShape.display).toBe('grid');
-  expect(leafShape.transformOrigin).not.toBe('50% 50%');
+  expect(leafShape.display).toBe('block');
+  expect(leafShape.transformOrigin).toBe('172px 172px');
+  expect(leafShape.angle).toBe('90');
+  expect(leafShape.radius).toBe('168');
+  expect(leafShape.width).toBeCloseTo(172, 0);
+  expect(leafShape.height).toBeCloseTo(172, 0);
+  expect(leafShape.outline).toContain('A 168 168');
   await page.screenshot({
     path: 'docs/screenshots/lod-fab-network-mobile-expanded.png',
   });
 
   await page.locator('body').click({ position: { x: 12, y: 320 } });
   await expect(menu).toBeHidden();
-  await openLodFab(page);
-  await page.keyboard.press('ArrowRight');
+
+  const triggerBox = await trigger.boundingBox();
+  expect(triggerBox).not.toBeNull();
+  if (!triggerBox) return;
+  const hingeX = triggerBox.x + triggerBox.width / 2;
+  const hingeY = triggerBox.y + triggerBox.height / 2;
+  await page.mouse.move(hingeX, hingeY);
+  await page.mouse.down();
+  await expect(menu).toBeVisible();
+  await page.mouse.move(hingeX - 78, hingeY - 78, { steps: 5 });
   const standard = menu.getByRole('menuitemradio', { name: /充実に切り替え/ });
-  await expect(standard).toBeFocused();
-  await page.keyboard.press('Enter');
+  await expect(standard).toHaveAttribute('data-drag-highlight', 'true');
+  await page.screenshot({
+    path: 'docs/screenshots/lod-fab-network-mobile-drag-middle.png',
+  });
+  await page.mouse.up();
   await expect(menu).toBeHidden();
   await expect(page).toHaveURL(/lod=standard/);
   await expect(trigger).toHaveAttribute('title', '表示密度: 充実');
-  await expect(trigger).toBeFocused();
   await page.screenshot({
     path: 'docs/screenshots/lod-fab-network-mobile-middle-selected.png',
   });
+
+  await openLodFab(page);
+  await menu.getByRole('menuitemradio', { name: /すべてに切り替え/ }).click();
+  await expect(menu).toBeHidden();
+  await expect(page).toHaveURL(/lod=detailed/);
+
+  await page.mouse.move(hingeX, hingeY);
+  await page.mouse.down();
+  await page.mouse.move(hingeX + 24, hingeY + 8, { steps: 3 });
+  await page.mouse.up();
+  await expect(menu).toBeHidden();
+  await expect(page).toHaveURL(/lod=detailed/);
 
   const graph = page.getByRole('group', { name: '美術運動の関係ネットワーク図' });
   await graph.getByRole('button', { name: 'イタリア・ルネサンスを選択' }).click();
