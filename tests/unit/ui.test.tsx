@@ -21,12 +21,16 @@ import { MovementSubheading } from '@/components/MovementSubheading';
 import { MovementDirectorySidebar } from '@/components/MovementDirectorySidebar';
 import { movements, activeRegions } from '@/lib/dataset';
 
+vi.mock('next/navigation', () => ({
+  usePathname: () => '/movements/',
+}));
+
 describe('MovementDirectorySidebar', () => {
   it('ホームの下に主要5画面を指定順で置き、補助ボタンを増やさない', () => {
     render(<MovementDirectorySidebar />);
 
     const sidebar = screen.getByRole('complementary', {
-      name: 'ムーブメント一覧のナビゲーション',
+      name: 'サイトナビゲーション',
     });
     const primary = within(sidebar).getByRole('navigation', { name: '主要画面' });
     const labels = within(primary)
@@ -34,13 +38,20 @@ describe('MovementDirectorySidebar', () => {
       .map((link) => link.textContent?.replace(/\s+/g, ' ').trim());
 
     expect(labels).toEqual([
-      '⌂ホームHome',
+      'ホームHome',
       'ムーブメントMovements',
       '縦型Chronology',
       '横型Timeline',
       '比較Compare',
       '関係Relationship',
     ]);
+    within(primary).getAllByRole('link').forEach((link) => {
+      expect(link.querySelector('svg')).not.toBeNull();
+    });
+    expect(within(sidebar).getByRole('link', { name: /ムーブメント/ })).toHaveAttribute(
+      'aria-current',
+      'page',
+    );
     expect(within(sidebar).queryByText('検索')).not.toBeInTheDocument();
     expect(within(sidebar).queryByText('ブックマーク')).not.toBeInTheDocument();
     expect(within(sidebar).queryByText('設定')).not.toBeInTheDocument();

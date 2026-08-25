@@ -11,7 +11,7 @@ export default function ChronologyPage() {
   const ordered = movementsChronological();
 
   return (
-    <main className="chronology-page">
+    <div className="chronology-page">
       <header className="chronology-page__header">
         <p className="text-xs uppercase tracking-[0.3em] text-faint">Chronology</p>
         <h1 className="mt-1.5 font-serif text-3xl tracking-tight sm:text-4xl">
@@ -25,6 +25,6 @@ export default function ChronologyPage() {
       <div className="chronology-page__body">
         <ChronologyView movements={ordered} />
       </div>
-    </main>
+    </div>
   );
 }
