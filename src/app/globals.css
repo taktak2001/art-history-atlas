@@ -1093,6 +1093,9 @@ html.dark .relation-badge {
   color: rgb(var(--c-ink));
   box-shadow: 0 3px 12px rgb(var(--c-ink) / 0.07);
   pointer-events: auto;
+  touch-action: none;
+  user-select: none;
+  -webkit-user-select: none;
   transition:
     border-color 150ms ease-out,
     background-color 150ms ease-out,
@@ -1111,7 +1114,7 @@ html.dark .relation-badge {
 }
 
 .semantic-lod-fab__trigger:focus-visible,
-.semantic-lod-fab__segment:focus-visible {
+.semantic-lod-fab__segment:focus-visible .semantic-lod-fab__segment-content {
   outline: 2px solid rgb(var(--c-accent));
   outline-offset: 3px;
 }
@@ -1149,35 +1152,17 @@ html.dark .relation-badge {
 
 .semantic-lod-fab__leaf {
   position: absolute;
-  right: -0.15rem;
-  bottom: 2.55rem;
-  display: grid;
-  width: min(13.75rem, calc(100vw - 2rem));
-  height: 7.25rem;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
-  gap: 1px;
-  padding: 1px;
-  overflow: hidden;
-  background: rgb(var(--c-ink) / 0.42);
-  clip-path: polygon(
-    91% 100%,
-    10% 59%,
-    2% 48%,
-    0 34%,
-    5% 20%,
-    17% 9%,
-    35% 2%,
-    56% 0,
-    76% 4%,
-    91% 13%,
-    99% 27%,
-    100% 42%,
-    97% 57%
-  );
+  right: 1.5625rem;
+  bottom: 1.5625rem;
+  display: block;
+  width: 10.75rem;
+  height: 10.75rem;
+  overflow: visible;
+  color: rgb(var(--c-ink) / 0.46);
   opacity: 0;
   pointer-events: none;
-  transform: scale(0.82) rotate(-3deg);
-  transform-origin: 91% 100%;
+  transform: scale(0.84) rotate(1.5deg);
+  transform-origin: 100% 100%;
   transition:
     opacity 180ms ease-out,
     transform 190ms cubic-bezier(0.16, 1, 0.3, 1);
@@ -1190,16 +1175,15 @@ html.dark .relation-badge {
 }
 
 .semantic-lod-fab__segment {
-  position: relative;
+  position: absolute;
+  z-index: 2;
   display: grid;
-  min-width: 0;
-  min-height: 4.5rem;
-  align-content: start;
-  justify-items: center;
-  gap: 0.28rem;
-  padding: 1.35rem 0.35rem 0.8rem;
+  width: 3.5rem;
+  height: 3rem;
+  place-items: center;
+  padding: 0;
   border: 0;
-  background: rgb(var(--c-paper) / 0.985);
+  background: transparent;
   color: rgb(var(--c-muted));
   font-family: var(--font-sans);
   font-size: 0.72rem;
@@ -1207,25 +1191,50 @@ html.dark .relation-badge {
   letter-spacing: 0.02em;
   line-height: 1.2;
   text-align: center;
+  cursor: pointer;
   transition:
-    background-color 140ms ease-out,
     color 140ms ease-out;
 }
 
+.semantic-lod-fab__segment:nth-of-type(1) {
+  left: 2.05rem;
+  top: 7.45rem;
+}
+
+.semantic-lod-fab__segment:nth-of-type(2) {
+  left: 4.2rem;
+  top: 4.45rem;
+}
+
+.semantic-lod-fab__segment:nth-of-type(3) {
+  left: 7.15rem;
+  top: 1.45rem;
+}
+
 .semantic-lod-fab__segment:hover,
-.semantic-lod-fab__segment:focus-visible {
-  background: rgb(var(--c-raised));
+.semantic-lod-fab__segment:focus-visible,
+.semantic-lod-fab__segment[data-drag-highlight='true'] {
   color: rgb(var(--c-ink));
 }
 
+.semantic-lod-fab__segment[data-drag-highlight='true'] {
+  font-weight: 600;
+}
+
 .semantic-lod-fab__segment[data-selected='true'] {
-  background: rgb(var(--c-surface));
   color: rgb(var(--c-ink));
   font-weight: 600;
 }
 
 .semantic-lod-fab__segment-label {
   max-width: 100%;
+}
+
+.semantic-lod-fab__segment-content {
+  display: grid;
+  width: 3.25rem;
+  justify-items: center;
+  gap: 0.18rem;
 }
 
 .semantic-lod-fab__segment-count {
@@ -1243,9 +1252,46 @@ html.dark .relation-badge {
   background: transparent;
 }
 
+.semantic-lod-fab__segment[data-drag-highlight='true']
+  .semantic-lod-fab__selection-mark {
+  background: rgb(var(--c-accent) / 0.58);
+}
+
 .semantic-lod-fab__segment[data-selected='true']
   .semantic-lod-fab__selection-mark {
   background: rgb(var(--c-accent) / 0.82);
+}
+
+.semantic-lod-fab__fan-lines {
+  position: absolute;
+  inset: 0;
+  z-index: 0;
+  display: block;
+  width: 100%;
+  height: 100%;
+  overflow: visible;
+  pointer-events: none;
+}
+
+.semantic-lod-fab__fan-sector-shape {
+  fill: rgb(var(--c-paper) / 0.985);
+  transition: fill 140ms ease-out;
+}
+
+.semantic-lod-fab__fan-sector-shape[data-selected='true'] {
+  fill: rgb(var(--c-surface));
+}
+
+.semantic-lod-fab__fan-sector-shape[data-highlight='true'] {
+  fill: rgb(var(--c-raised));
+}
+
+.semantic-lod-fab__fan-outline,
+.semantic-lod-fab__fan-separator {
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 1;
+  vector-effect: non-scaling-stroke;
 }
 
 @media (max-width: 639px) {
@@ -1258,14 +1304,7 @@ html.dark .relation-badge {
     --semantic-lod-bottom-offset: 4.65rem;
   }
 
-  .semantic-lod-fab__leaf {
-    right: -0.1rem;
-    width: min(13.25rem, calc(100vw - 1.5rem));
-    height: 7rem;
-  }
-
   .semantic-lod-fab__segment {
-    padding-top: 1.25rem;
     font-size: 0.6875rem;
   }
 }
@@ -1286,13 +1325,12 @@ html.dark .relation-badge {
 }
 
 @media (prefers-contrast: more) {
-  .semantic-lod-fab__trigger,
-  .semantic-lod-fab__leaf {
+  .semantic-lod-fab__trigger {
     border-color: rgb(var(--c-ink));
   }
 
   .semantic-lod-fab__leaf {
-    background: rgb(var(--c-ink));
+    color: rgb(var(--c-ink));
   }
 }
 
