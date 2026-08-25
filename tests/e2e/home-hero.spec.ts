@@ -1,6 +1,6 @@
 import { test, expect } from '@playwright/test';
 
-test('ホームのファーストビューに4つの探索導線を表示する', async ({ page }) => {
+test('ホームのファーストビューに3つの探索導線を表示する', async ({ page }) => {
   await page.goto('/');
 
   const hero = page.locator('[data-home-hero]');
@@ -32,10 +32,8 @@ test('ホームのファーストビューに4つの探索導線を表示する'
     'href',
     '/chronology/',
   );
-  await expect(navigation.getByRole('link', { name: /Relationship Network.*継承・反発・影響を辿る/ })).toHaveAttribute(
-    'href',
-    '/network/',
-  );
+  await expect(navigation.getByRole('link')).toHaveCount(3);
+  await expect(navigation.getByRole('link', { name: /Relationship Network/ })).toHaveCount(0);
   await expect(page.getByText('美術史とは、様式名を暗記するものではない。')).toHaveCount(0);
 
   const geometry = await hero.evaluate((element) => {
@@ -130,7 +128,6 @@ test('ホームのセクション見出しは英語と短い日本語説明で�
     ['Explore by Era', '時代ごとの価値基準から読む'],
     ['Turning Points', '視点・空間・制度の前提が変わった局面'],
     ['Reactions & Breaks', '前時代への応答と反発を辿る'],
-    ['Across Regions', '同時代の地域差を比較する'],
     ['Comparisons', '2つのムーブメントを並べて読む'],
     ['Latest Additions', '最近追加したムーブメント'],
     ['Sources & Methodology', '出典・編集方針・分類基準'],
@@ -140,6 +137,33 @@ test('ホームのセクション見出しは英語と短い日本語説明で�
     await expect(page.getByRole('heading', { level: 2, name: heading })).toBeVisible();
     await expect(page.getByText(description, { exact: true })).toBeVisible();
     expect(description.length).toBeLessThanOrEqual(40);
+  }
+
+  await expect(page.getByRole('heading', { level: 2, name: 'Across Regions' })).toHaveCount(0);
+});
+
+test('ホームのコンテンツカードは外枠を使わない', async ({ page }) => {
+  await page.goto('/');
+
+  const turningCard = page.locator('.home-card-grid > a').first();
+  const reactionCard = page
+    .getByRole('heading', { level: 2, name: 'Reactions & Breaks' })
+    .locator('xpath=../..')
+    .locator('li')
+    .first();
+  const comparisonCard = page
+    .getByRole('heading', { level: 2, name: 'Comparisons' })
+    .locator('xpath=../..')
+    .locator('a')
+    .first();
+
+  for (const card of [turningCard, reactionCard, comparisonCard]) {
+    await expect(card).toBeVisible();
+    const borderWidths = await card.evaluate((element) => {
+      const styles = getComputedStyle(element);
+      return [styles.borderTopWidth, styles.borderRightWidth, styles.borderBottomWidth, styles.borderLeftWidth];
+    });
+    expect(borderWidths).toEqual(['0px', '0px', '0px', '0px']);
   }
 });
 

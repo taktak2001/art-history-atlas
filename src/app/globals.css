@@ -198,7 +198,7 @@ h1, h2, h3, h4 {
 
 .home-hero__actions {
   display: grid;
-  grid-template-columns: repeat(4, minmax(0, 1fr));
+  grid-template-columns: repeat(3, minmax(0, 1fr));
   /* キャッチコピー削除後、大見出しから区切り線までの余白をここで作る */
   margin-top: clamp(2rem, 2.75vw, 2.5rem);
   border-block: 1px solid rgb(var(--c-line));
@@ -286,6 +286,11 @@ h1, h2, h3, h4 {
 
 .home-card-grid > a {
   gap: 0.4375rem;
+  border: 0;
+}
+
+.home-card-grid > a:hover {
+  background: rgb(var(--c-surface));
 }
 
 .home-body-copy {

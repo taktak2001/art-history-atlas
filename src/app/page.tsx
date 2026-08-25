@@ -48,11 +48,6 @@ const primaryExplorationLinks = [
     title: 'Chronology',
     description: '時代の流れを展示形式で読む',
   },
-  {
-    href: '/network/',
-    title: 'Relationship Network',
-    description: '継承・反発・影響を辿る',
-  },
 ];
 
 function HomeSectionHeading({
@@ -153,7 +148,7 @@ export default function HomePage() {
             const to = getMovement(r.to);
             if (!from || !to) return null;
             return (
-              <li key={r.id} className="home-compact-card border hairline bg-raised">
+              <li key={r.id} className="home-compact-card bg-raised">
                 <div className="flex flex-wrap items-center gap-2 text-sm">
                   <Link href={`/movements/${to.id}/`} className="font-serif text-ink hover:text-accent">
                     {to.nameJa}
@@ -174,19 +169,7 @@ export default function HomePage() {
         </Link>
       </section>
 
-      {/* 6. 地域別表示への導線 */}
-      <section className="home-section border-t hairline" aria-labelledby="region-heading">
-        <HomeSectionHeading
-          id="region-heading"
-          title="Across Regions"
-          description="同時代の地域差を比較する"
-        />
-        <Link href="/matrix/" className="mt-3 inline-block rounded-sm border hairline px-5 py-2.5 text-sm hover:border-ink/40">
-          時代×地域マトリクスを開く →
-        </Link>
-      </section>
-
-      {/* 7. 注目比較 */}
+      {/* 6. 注目比較 */}
       <section className="home-section border-t hairline" aria-labelledby="compare-heading">
         <HomeSectionHeading
           id="compare-heading"
@@ -198,7 +181,7 @@ export default function HomePage() {
             <Link
               key={c.label}
               href={`/compare/?ids=${c.ids.join(',')}`}
-              className="home-compact-card border hairline bg-raised text-sm hover:border-ink/30"
+              className="home-compact-card bg-raised text-sm hover:bg-surface"
             >
               <span className="font-serif text-base text-ink">{c.label}</span>
               <span className="mt-1 block text-xs text-faint">比較して読む →</span>
@@ -207,7 +190,7 @@ export default function HomePage() {
         </div>
       </section>
 
-      {/* 8. 最近追加されたムーブメント */}
+      {/* 7. 最近追加されたムーブメント */}
       <section className="home-section border-t hairline" aria-labelledby="recent-heading">
         <HomeSectionHeading
           id="recent-heading"
@@ -221,7 +204,7 @@ export default function HomePage() {
         </div>
       </section>
 
-      {/* 9. 情報の出典・編集方針 */}
+      {/* 8. 情報の出典・編集方針 */}
       <section className="home-section border-t hairline" aria-labelledby="policy-heading">
         <HomeSectionHeading
           id="policy-heading"
