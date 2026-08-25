@@ -54,6 +54,33 @@ test('iPhone幅でもゴシック美術の概要が文の途中で切れない',
   await expect(summary).not.toContainText('…');
 });
 
+test('詳細ページは概要と思想の間に出典付きの名称由来を表示する', async ({ page }) => {
+  await page.goto('/movements/futurism/');
+
+  const origin = page.locator('[data-name-origin]');
+  await expect(origin.getByRole('heading', { name: '名称の由来' })).toBeVisible();
+  await expect(origin).toContainText('Futurismo');
+  await expect(origin).toContainText('フィリッポ・トンマーゾ・マリネッティ');
+  await expect(origin).toContainText('1909年');
+  await expect(origin.getByText('根拠資料')).toBeVisible();
+  await expect(origin.getByRole('link').first()).toHaveAttribute('target', '_blank');
+
+  const originTop = await origin.evaluate((element) => element.getBoundingClientRect().top);
+  const contextTop = await page
+    .getByRole('heading', { name: '思想と歴史的背景' })
+    .evaluate((element) => element.getBoundingClientRect().top);
+  expect(originTop).toBeLessThan(contextTop);
+});
+
+test('名称の成立に諸説がある場合は断定しない', async ({ page }) => {
+  await page.goto('/movements/dada/');
+
+  const origin = page.locator('[data-name-origin]');
+  await expect(origin).toContainText('諸説');
+  await expect(origin).toContainText('単一の説明として断定していません');
+  await expect(origin.getByText('命名', { exact: true })).toHaveCount(0);
+});
+
 for (const movement of [
   // 注意書きの見出しは内容ごとに具体化している（一律の「学説上の注意」にしない）
   { slug: 'prehistoric-ritual', title: '先史美術', note: '年代の精度について' },

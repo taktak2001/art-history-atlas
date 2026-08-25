@@ -159,6 +159,7 @@ function Passage({
 function MiniContents() {
   const items = [
     ['summary', '概要'],
+    ['name-origin', '名称'],
     ['context', '思想'],
     ['visual', '技法'],
     ['system', '制度'],
@@ -198,6 +199,7 @@ export default async function MovementDetailPage({
   if (!movement) notFound();
 
   const sources = getSources(movement.sourceIds);
+  const nameOriginSources = getSources(movement.nameOrigin?.sourceIds ?? []);
   const artists = artistsOf(movement);
   const works = worksOf(movement);
   const outgoing = outgoingRelationships(movement.id);
@@ -317,6 +319,99 @@ export default async function MovementDetailPage({
       </header>
 
       <MiniContents />
+
+      {movement.nameOrigin && (
+        <section
+          id="name-origin"
+          aria-labelledby="name-origin-title"
+          className="scroll-mt-32 border-t hairline bg-surface"
+          data-name-origin
+        >
+          <div className="mx-auto grid max-w-layout gap-8 px-4 py-12 sm:py-14 md:grid-cols-[minmax(0,1fr)_280px] md:gap-14">
+            <div className="max-w-[42em]">
+              <h2
+                id="name-origin-title"
+                className="font-serif text-[26px] font-medium leading-tight text-ink sm:text-[30px]"
+              >
+                名称の由来
+              </h2>
+              <p className="detail-body mt-5 text-[15px] leading-[1.95] text-ink sm:text-base">
+                {toDisplayText(movement.nameOrigin.summary)}
+              </p>
+              {movement.nameOrigin.certainty !== 'established' && (
+                <p className="mt-4 text-sm leading-relaxed text-muted">
+                  {movement.nameOrigin.certainty === 'disputed'
+                    ? '名称の成立には諸説があるため、単一の説明として断定していません。'
+                    : '命名の細部には幅があるため、確認できる一般的な説明を示しています。'}
+                </p>
+              )}
+            </div>
+
+            <div className="border-t hairline pt-4">
+              <dl className="space-y-4 text-sm">
+                {movement.nameOrigin.originalTerm && (
+                  <div>
+                    <dt className="text-xs font-medium tracking-[0.06em] text-faint">原語</dt>
+                    <dd className="mt-1 font-medium text-ink">
+                      {toDisplayText(movement.nameOrigin.originalTerm)}
+                    </dd>
+                  </div>
+                )}
+                {movement.nameOrigin.literalMeaning && (
+                  <div>
+                    <dt className="text-xs font-medium tracking-[0.06em] text-faint">語義</dt>
+                    <dd className="mt-1 leading-relaxed text-muted">
+                      {toDisplayText(movement.nameOrigin.literalMeaning)}
+                    </dd>
+                  </div>
+                )}
+                {(movement.nameOrigin.coinedBy || movement.nameOrigin.coinedYear) && (
+                  <div>
+                    <dt className="text-xs font-medium tracking-[0.06em] text-faint">
+                      {movement.nameOrigin.coinedBy ? '命名' : '成立時期'}
+                    </dt>
+                    <dd className="mt-1 leading-relaxed text-muted">
+                      {movement.nameOrigin.coinedBy
+                        ? toDisplayText(movement.nameOrigin.coinedBy)
+                        : ''}
+                      {movement.nameOrigin.coinedYear
+                        ? `${movement.nameOrigin.coinedBy ? '、' : ''}${movement.nameOrigin.coinedYear}年`
+                        : ''}
+                    </dd>
+                  </div>
+                )}
+                {movement.nameOrigin.context && (
+                  <div>
+                    <dt className="text-xs font-medium tracking-[0.06em] text-faint">文脈</dt>
+                    <dd className="mt-1 leading-relaxed text-muted">
+                      {toDisplayText(movement.nameOrigin.context)}
+                    </dd>
+                  </div>
+                )}
+              </dl>
+              {nameOriginSources.length > 0 && (
+                <div className="mt-5 border-t hairline pt-4 text-xs leading-relaxed text-faint">
+                  <span className="mr-2">根拠資料</span>
+                  {nameOriginSources.map((source, index) => (
+                    <span key={source.id}>
+                      {index > 0 && <span aria-hidden="true">・</span>}
+                      <a
+                        href={source.url}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="prose-link"
+                      >
+                        {toDisplayText(source.publisher)}
+                        <span className="sr-only">（外部サイト）</span>
+                      </a>
+                    </span>
+                  ))}
+                </div>
+              )}
+            </div>
+          </div>
+        </section>
+      )}
 
       <Chapter id="context" number="01" title="思想と歴史的背景" tone="paper">
         <div className="space-y-10">

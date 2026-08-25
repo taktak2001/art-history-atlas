@@ -1,6 +1,7 @@
 import type { Movement } from '@/lib/schema';
 import { coreExpansionMovements } from './expansion/core-movements';
 import { finalExpansionMovements } from './expansion/final-movements';
+import { applyNameOrigins } from './expansion/name-origins';
 import { applyScholarlyNotes } from './expansion/scholarly-notes';
 import { standardOneExpansionMovements } from './expansion/standard-one-movements';
 
@@ -1730,5 +1731,7 @@ const movementRecords: Movement[] = [
   ...finalExpansionMovements,
 ];
 
-// 研究上の留保（見出し＋本文）を最後に付与する。既存の記述データは変更しない。
-export const movements: Movement[] = applyScholarlyNotes(movementRecords);
+// 研究上の留保と名称成立データを最後に付与する。既存の記述データは変更しない。
+export const movements: Movement[] = applyNameOrigins(
+  applyScholarlyNotes(movementRecords),
+);

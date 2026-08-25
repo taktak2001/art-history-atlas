@@ -96,6 +96,29 @@ for (const m of movements) {
   for (const s of m.sourceIds) if (!sourceIds.has(s)) fail(`movement ${m.id}: 出典 "${s}" が存在しない`);
 }
 
+console.log('▶ 名称の由来');
+for (const m of movements) {
+  if (!m.nameOrigin) {
+    fail(`movement ${m.id}: 名称の由来が未登録`);
+    continue;
+  }
+  for (const sourceId of m.nameOrigin.sourceIds) {
+    if (!sourceIds.has(sourceId)) {
+      fail(`movement ${m.id}: 名称由来の出典 "${sourceId}" が存在しない`);
+    }
+    if (!m.sourceIds.includes(sourceId)) {
+      fail(`movement ${m.id}: 名称由来の出典 "${sourceId}" がmovement.sourceIdsに含まれない`);
+    }
+  }
+  if (
+    m.nameOrigin.certainty === 'disputed' &&
+    !/(諸説|複数|確定|断定|幅)/.test(m.nameOrigin.summary)
+  ) {
+    fail(`movement ${m.id}: disputedの名称由来に留保表現がない`);
+  }
+}
+console.log(`  ✓ 名称の由来: ${movements.filter((m) => m.nameOrigin).length}/${movements.length}件`);
+
 console.log('▶ Movement LOD・階層');
 const groupIds = new Set(MOVEMENT_GROUPS.map((group) => group.id));
 const displayOrderScopes = new Map<string, Set<number>>();
