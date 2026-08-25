@@ -25,7 +25,7 @@ import {
   RELATIONSHIP_DEFINITIONS,
   RELATION_KINDS,
 } from '@/lib/relationship-definitions';
-import { LodControl } from '@/components/LodControl';
+import { SemanticLodFab } from '@/components/SemanticLodFab';
 import {
   ArrowMarkerDefs,
   RelationLine,
@@ -1571,24 +1571,6 @@ export function NetworkGraph({ movements, relationships, eraOrder }: Props) {
           : '選択なし'}
       </p>
       <section className="network-controls" aria-label="ネットワーク表示設定">
-        <LodControl
-          value={lod}
-          onChange={(next) => {
-            // focus中はLODを手動変更しても選択を保持する
-            // （focusノードと直接関係はLODに関わらず表示し続ける）
-            if (!selectedNodeId) setSelectedNodeId(null);
-            setSelectedEdgeId(null);
-            setExpandedGroupIds(new Set());
-            setLod(next);
-          }}
-          counts={{
-            core: filterMovementsByLod(movements, 'core').length,
-            standard: filterMovementsByLod(movements, 'standard').length,
-            detailed: filterMovementsByLod(movements, 'detailed').length,
-          }}
-          catalogue
-        />
-
         <div className="network-controls__row">
           <div className="network-picker-control">
             <button
@@ -1737,17 +1719,7 @@ export function NetworkGraph({ movements, relationships, eraOrder }: Props) {
         )}
       </div>
 
-      <div className="network-map-tools" aria-label="ネットワークの表示階層">
-        <span>
-          SEMANTIC LOD
-          <small>
-            {semanticLevel === 'overview'
-              ? '主要系譜'
-              : semanticLevel === 'study'
-                ? 'ムーブメント'
-                : '関係・作品・文脈'}
-          </small>
-        </span>
+      <div className="network-map-tools" aria-label="ネットワーク倍率">
         <div className="network-zoom-control" role="group" aria-label="ネットワーク倍率">
           <button
             type="button"
@@ -1776,6 +1748,28 @@ export function NetworkGraph({ movements, relationships, eraOrder }: Props) {
           </button>
         </div>
       </div>
+
+      <SemanticLodFab
+        value={lod}
+        counts={{
+          core: filterMovementsByLod(movements, 'core').length,
+          standard: filterMovementsByLod(movements, 'standard').length,
+          detailed: filterMovementsByLod(movements, 'detailed').length,
+        }}
+        bottomOffset={
+          isMobile && (selectedMovement || selectedEdge)
+            ? 'calc(min(40dvh, 22rem) + 1.25rem)'
+            : undefined
+        }
+        onChange={(next) => {
+          // focus中はLODを手動変更しても選択を保持する
+          // （focusノードと直接関係はLODに関わらず表示し続ける）
+          if (!selectedNodeId) setSelectedNodeId(null);
+          setSelectedEdgeId(null);
+          setExpandedGroupIds(new Set());
+          setLod(next);
+        }}
+      />
 
       <nav className="network-era-nav" aria-label="ネットワークの時代移動">
         <div className="scroll-x flex h-full items-stretch">

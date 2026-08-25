@@ -2,7 +2,7 @@
 
 import Link from 'next/link';
 import { NativeTimelineViewerFrame } from '@/components/NativeTimelineViewerFrame';
-import { TimelineViewerLodMenu } from '@/components/TimelineViewerLodMenu';
+import { SemanticLodFab } from '@/components/SemanticLodFab';
 import {
   useCallback,
   useEffect,
@@ -1358,12 +1358,13 @@ function LegacyTimelineViewerFrame({
               >
                 <span aria-hidden="true">＋</span>
               </button>
-              <TimelineViewerLodMenu
-                value={lod}
-                counts={lodCounts}
-                onChange={onLodChange}
-              />
             </div>
+            <SemanticLodFab
+              value={lod}
+              counts={lodCounts}
+              onChange={onLodChange}
+              placement="viewer"
+            />
           </div>
 
           <div

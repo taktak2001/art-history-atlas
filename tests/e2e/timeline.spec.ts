@@ -1,5 +1,6 @@
 import { test, expect, type Page } from '@playwright/test';
 import AxeBuilder from '@axe-core/playwright';
+import { openLodFab, selectLod } from './lod-helpers';
 
 const modeButton = (page: Page, name: string) =>
   page.getByRole('group', { name: '表示モード' }).getByRole('button', { name, exact: true });
@@ -67,7 +68,7 @@ test('通史はコンパクトな俯瞰表示と日本語名・年代の2段ラ�
   ).toHaveCount(0);
   await expect(page.getByRole('navigation', { name: '時代ナビゲーション' })).toHaveCount(0);
   await expect(page.getByText('時代へ移動', { exact: true })).toHaveCount(0);
-  await expect(page.getByText('LEVEL OF DETAIL', { exact: true })).toBeVisible();
+  await expect(page.getByRole('button', { name: '表示密度を変更' })).toBeVisible();
   await expect(page.getByText('Era', { exact: true })).toBeVisible();
   await expect(page.getByText('表示中', { exact: true })).toHaveCount(0);
 
@@ -585,9 +586,7 @@ test('閲覧モードは全画面へ入り、倍率操作・LOD・終了後の�
     viewer.getByRole('button', { name: '全体表示へ戻す' }),
   ).toHaveCount(0);
   await expect(
-    viewer.getByRole('button', {
-      name: /表示する範囲、現在は(?:基本|充実|すべて)/,
-    }),
+    viewer.getByRole('button', { name: '表示密度を変更' }),
   ).toBeVisible();
 
   await stage.press('Escape');
@@ -596,9 +595,9 @@ test('閲覧モードは全画面へ入り、倍率操作・LOD・終了後の�
   await expect(modeButton(page, '近代')).toHaveAttribute('aria-current', 'true');
 });
 
-test('閲覧モード内でLODを切り替え、URLと年代・地域位置を維持する', async ({
+test('閲覧モード内の銀杏形FABでLODを切り替え、URLと年代・地域位置を維持する', async ({
   page,
-}, testInfo) => {
+}) => {
   await page.goto('/timeline/?lod=core');
   await page.getByRole('button', { name: 'タイムラインを全画面で表示' }).click();
 
@@ -618,76 +617,31 @@ test('閲覧モード内でLODを切り替え、URLと年代・地域位置を�
     );
   });
 
-  const trigger = viewer.getByRole('button', {
-    name: '表示する範囲、現在は基本',
-  });
-  await expect(trigger).toHaveAttribute('aria-haspopup', 'dialog');
+  const trigger = viewer.getByRole('button', { name: '表示密度を変更' });
+  await expect(trigger).toHaveAttribute('aria-haspopup', 'menu');
   await expect(trigger).toHaveAttribute('aria-expanded', 'false');
-  const triggerTypography = await trigger.evaluate((element) => {
-    const style = getComputedStyle(element);
-    const svg = element.querySelector('svg');
-    return {
-      appearance: style.appearance,
-      backgroundColor: style.backgroundColor,
-      borderWidth: style.borderWidth,
-      boxShadow: style.boxShadow,
-      fontSize: Number.parseFloat(style.fontSize),
-      fontWeight: style.fontWeight,
-      letterSpacing: Number.parseFloat(style.letterSpacing),
-      lineHeight: Number.parseFloat(style.lineHeight),
-      hasCustomChevron: Boolean(svg),
-      hasNativeSelect: Boolean(element.querySelector('select')),
-    };
-  });
-  expect(triggerTypography.appearance).toBe('none');
-  expect(triggerTypography.backgroundColor).toBe('rgba(0, 0, 0, 0)');
-  expect(triggerTypography.borderWidth).toBe('0px');
-  expect(triggerTypography.boxShadow).toBe('none');
-  expect(triggerTypography.fontSize).toBe(12);
-  expect(triggerTypography.fontWeight).toBe('500');
-  expect(triggerTypography.letterSpacing).toBeGreaterThan(0);
-  expect(triggerTypography.lineHeight).toBeCloseTo(triggerTypography.fontSize, 0);
-  expect(triggerTypography.hasCustomChevron).toBe(true);
-  expect(triggerTypography.hasNativeSelect).toBe(false);
   await trigger.click();
 
-  const panel = page.getByRole('dialog', { name: '表示する範囲' });
-  const options = panel.getByRole('radiogroup', { name: '表示する範囲' });
-  await expect(panel).toBeVisible();
-  await expect(panel.getByText('LEVEL OF DETAIL')).toBeVisible();
-  await expect(options.getByRole('radio', { name: /基本\s*32/ })).toHaveAttribute(
+  const menu = page.getByRole('menu', { name: '表示密度' });
+  await expect(menu).toBeVisible();
+  await expect(menu.getByRole('menuitemradio', { name: /基本に切り替え/ })).toHaveAttribute(
     'aria-checked',
     'true',
   );
-  await expect(options.getByRole('radio', { name: /充実\s*48/ })).toBeVisible();
-  await expect(options.getByRole('radio', { name: /すべて\s*54/ })).toBeVisible();
+  await expect(menu.getByRole('menuitemradio', { name: /充実に切り替え/ })).toBeVisible();
+  await expect(menu.getByRole('menuitemradio', { name: /すべてに切り替え/ })).toBeVisible();
 
-  const panelRect = await panel.boundingBox();
-  const triggerRect = await trigger.boundingBox();
-  expect(panelRect).not.toBeNull();
-  expect(triggerRect).not.toBeNull();
-  if (panelRect && triggerRect) {
-    if (testInfo.project.name === 'mobile') {
-      expect(panelRect.width).toBeGreaterThanOrEqual(360);
-      expect(panelRect.x).toBeLessThanOrEqual(10);
-    } else {
-      expect(panelRect.width).toBeLessThanOrEqual(220);
-      expect(panelRect.y + panelRect.height).toBeLessThan(triggerRect.y);
-    }
-  }
-
-  await page.locator('.timeline-viewer-lod-backdrop').click({ position: { x: 2, y: 2 } });
-  await expect(panel).toHaveCount(0);
+  await page.locator('body').click({ position: { x: 8, y: 8 } });
+  await expect(menu).toBeHidden();
   await trigger.click();
-  await expect(panel).toBeVisible();
+  await expect(menu).toBeVisible();
 
-  await options.getByRole('radio', { name: /充実\s*48/ }).click();
+  await menu.getByRole('menuitemradio', { name: /充実に切り替え/ }).click();
   await expect(viewer).toHaveAttribute('data-viewer-lod', 'standard');
   await expect(page).toHaveURL(/lod=standard/);
-  await expect(page.getByRole('dialog', { name: '表示する範囲' })).toHaveCount(0);
-  const standardTrigger = viewer.getByRole('button', {
-    name: '表示する範囲、現在は充実',
-  });
+  await expect(menu).toBeHidden();
+  const standardTrigger = viewer.getByRole('button', { name: '表示密度を変更' });
+  await expect(standardTrigger).toHaveAttribute('title', '表示密度: 充実');
   await expect(standardTrigger).toBeFocused();
   await expect(viewer).toHaveAttribute('data-last-lod-anchor-region');
   await expect(viewer).toHaveAttribute('data-last-lod-anchor-year');
@@ -697,10 +651,7 @@ test('閲覧モード内でLODを切り替え、URLと年代・地域位置を�
   };
 
   await standardTrigger.click();
-  await page
-    .getByRole('dialog', { name: '表示する範囲' })
-    .getByRole('radio', { name: /すべて\s*54/ })
-    .click();
+  await menu.getByRole('menuitemradio', { name: /すべてに切り替え/ }).click();
   await expect(viewer).toHaveAttribute('data-viewer-lod', 'detailed');
   await expect(page).toHaveURL(/lod=detailed/);
   const secondAnchor = {
@@ -713,22 +664,16 @@ test('閲覧モード内でLODを切り替え、URLと年代・地域位置を�
   await page.goBack();
   await expect(page).toHaveURL(/lod=standard/);
   await expect(viewer).toHaveAttribute('data-viewer-lod', 'standard');
-  await expect(
-    viewer.getByRole('button', { name: '表示する範囲、現在は充実' }),
-  ).toBeVisible();
+  await expect(trigger).toHaveAttribute('title', '表示密度: 充実');
   await page.goForward();
   await expect(page).toHaveURL(/lod=detailed/);
   await expect(viewer).toHaveAttribute('data-viewer-lod', 'detailed');
 
-  await viewer.getByRole('button', {
-    name: '表示する範囲、現在はすべて',
-  }).click();
+  await trigger.click();
   await page.keyboard.press('Escape');
-  await expect(page.getByRole('dialog', { name: '表示する範囲' })).toHaveCount(0);
+  await expect(menu).toBeHidden();
   await expect(viewer).toBeVisible();
-  await expect(
-    viewer.getByRole('button', { name: '表示する範囲、現在はすべて' }),
-  ).toBeFocused();
+  await expect(trigger).toBeFocused();
 
   const accessibilityScanResults = await new AxeBuilder({ page })
     .include('[data-timeline-viewer="active"]')
@@ -736,18 +681,16 @@ test('閲覧モード内でLODを切り替え、URLと年代・地域位置を�
   expect(accessibilityScanResults.violations).toEqual([]);
 
   await viewer.getByRole('button', { name: '閲覧モードを閉じる' }).click();
-  await expect(
-    page
-      .getByRole('group', { name: '表示する範囲' })
-      .getByRole('button', { name: /すべて\s*54/ }),
-  ).toHaveAttribute('aria-pressed', 'true');
+  await expect(page.getByRole('button', { name: '表示密度を変更' })).toHaveAttribute(
+    'title',
+    '表示密度: すべて',
+  );
   await page.reload();
   await expect(page).toHaveURL(/lod=detailed/);
-  await expect(
-    page
-      .getByRole('group', { name: '表示する範囲' })
-      .getByRole('button', { name: /すべて\s*54/ }),
-  ).toHaveAttribute('aria-pressed', 'true');
+  await expect(page.getByRole('button', { name: '表示密度を変更' })).toHaveAttribute(
+    'title',
+    '表示密度: すべて',
+  );
 });
 
 test('閲覧モードの年代軸は縮小・拡大時も短い表記を重ねない', async ({
@@ -854,10 +797,7 @@ test('閲覧モードはnative scroll・ダブルクリック・キーボード�
 }, testInfo) => {
   test.skip(testInfo.project.name !== 'desktop', 'desktop project only');
   await page.goto('/timeline/');
-  await page
-    .getByRole('group', { name: '表示する範囲' })
-    .getByRole('button', { name: /すべて/ })
-    .click();
+  await selectLod(page, 'detailed');
   await page.getByRole('button', { name: 'タイムラインを全画面で表示' }).click();
 
   const viewer = page.locator('[data-timeline-viewer="active"]');
@@ -910,10 +850,7 @@ test('PC閲覧モードはマウスドラッグで上下左右へパンできる
 }, testInfo) => {
   test.skip(testInfo.project.name !== 'desktop', 'desktop project only');
   await page.goto('/timeline/');
-  await page
-    .getByRole('group', { name: '表示する範囲' })
-    .getByRole('button', { name: /すべて/ })
-    .click();
+  await selectLod(page, 'detailed');
   await page.getByRole('button', { name: 'タイムラインを全画面で表示' }).click();
 
   const stage = page.locator('[data-native-scroll-viewport]');
@@ -957,10 +894,7 @@ test('PC閲覧モードはドラッグしていないムーブメントクリッ
 }, testInfo) => {
   test.skip(testInfo.project.name !== 'desktop', 'desktop project only');
   await page.goto('/timeline/');
-  await page
-    .getByRole('group', { name: '表示する範囲' })
-    .getByRole('button', { name: /すべて/ })
-    .click();
+  await selectLod(page, 'detailed');
   await page.getByRole('button', { name: 'タイムラインを全画面で表示' }).click();
 
   const viewer = page.locator('[data-timeline-viewer="active"]');
@@ -981,10 +915,7 @@ test('＋／−ズームは中央の年代と地域レーンを維持する', as
     await page.setViewportSize({ width: 900, height: 800 });
   }
   await page.goto('/timeline/');
-  await page
-    .getByRole('group', { name: '表示する範囲' })
-    .getByRole('button', { name: /すべて/ })
-    .click();
+  await selectLod(page, 'detailed');
   await page.getByRole('button', { name: 'タイムラインを全画面で表示' }).click();
 
   const viewer = page.locator('[data-timeline-viewer="active"]');
@@ -1124,10 +1055,7 @@ test('native scroll中はReact render・DOM差替え・compositor transformを�
 }, testInfo) => {
   test.skip(testInfo.project.name !== 'desktop', 'desktop project only');
   await page.goto('/timeline/');
-  await page
-    .getByRole('group', { name: '表示する範囲' })
-    .getByRole('button', { name: /すべて/ })
-    .click();
+  await selectLod(page, 'detailed');
   await page.getByRole('button', { name: 'タイムラインを全画面で表示' }).click();
 
   const viewer = page.locator('[data-timeline-viewer="active"]');
@@ -1367,10 +1295,7 @@ test('PC 400%・iPhone高倍率でも象徴主義とフォーヴィスムの年�
   page,
 }, testInfo) => {
   await page.goto('/timeline/');
-  await page
-    .getByRole('group', { name: '表示する範囲' })
-    .getByRole('button', { name: /充実/ })
-    .click();
+  await selectLod(page, 'standard');
   await modeButton(page, '近代').click();
   await page.getByRole('button', { name: 'タイムラインを全画面で表示' }).click();
 
@@ -1517,10 +1442,7 @@ test('閲覧モードは実年代の期間線と固定寸法の名称ラベル�
 
 test('同一地域の近接・重複期間線を独立して見せる', async ({ page }) => {
   await page.goto('/timeline/');
-  await page
-    .getByRole('group', { name: '表示する範囲' })
-    .getByRole('button', { name: /充実/ })
-    .click();
+  await selectLod(page, 'standard');
   await page.getByRole('button', { name: 'タイムラインを全画面で表示' }).click();
 
   const viewer = page.locator('[data-timeline-viewer="active"]');

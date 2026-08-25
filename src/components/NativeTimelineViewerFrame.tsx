@@ -1,7 +1,7 @@
 'use client';
 
 import Link from 'next/link';
-import { TimelineViewerLodMenu } from '@/components/TimelineViewerLodMenu';
+import { SemanticLodFab } from '@/components/SemanticLodFab';
 import {
   useCallback,
   useEffect,
@@ -1035,12 +1035,13 @@ export function NativeTimelineViewerFrame({
           >
             <span aria-hidden="true">＋</span>
           </button>
-          <TimelineViewerLodMenu
-            value={lod}
-            counts={lodCounts}
-            onChange={handleLodChange}
-          />
         </div>
+        <SemanticLodFab
+          value={lod}
+          counts={lodCounts}
+          onChange={handleLodChange}
+          placement="viewer"
+        />
       </div>
 
       <div

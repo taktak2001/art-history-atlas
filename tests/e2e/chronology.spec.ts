@@ -1,4 +1,5 @@
 import { test, expect } from '@playwright/test';
+import { openLodFab } from './lod-helpers';
 
 test('初期表示は時代ヒーローだけを示し、選択した展示を展開する', async ({
   page,
@@ -19,9 +20,12 @@ test('初期表示は時代ヒーローだけを示し、選択した展示を�
   await expect(hero).toContainText('1400〜1600年頃');
   await expect(hero).toContainText(/\d+ movements?/);
   await expect(page.getByText('展示室を選んで、美術史を読む')).toBeVisible();
+  await expect(page.getByRole('button', { name: '表示密度を変更' })).toBeVisible();
+  await openLodFab(page);
   await expect(
-    page.getByRole('button', { name: /基本\s*32/ }),
-  ).toBeVisible();
+    page.getByRole('menuitemradio', { name: /基本に切り替え、32件/ }),
+  ).toHaveAttribute('aria-checked', 'true');
+  await page.getByRole('button', { name: '表示密度を変更' }).click();
   await expect(page.locator('.chronology-era__toggle')).toHaveCount(0);
   await expect(page.locator('.chronology-era__chevron')).toHaveCount(8);
   await expect(hero).toHaveAccessibleName(

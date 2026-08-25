@@ -57,7 +57,7 @@ test('マトリクスは地域色と図録型ラベルを共通利用し、ペ�
   expect(regionColor).toBe('64 103 137');
   expect(dotColor).toContain('64, 103, 137');
   expect(linkBorder).toContain('64, 103, 137');
-  await expect(page.getByText('LEVEL OF DETAIL', { exact: true })).toBeVisible();
+  await expect(page.getByRole('button', { name: '表示密度を変更' })).toBeVisible();
   await expect(page.getByText('表示する範囲', { exact: true })).toHaveCount(0);
   const emptyColor = await page
     .locator('.matrix-empty')

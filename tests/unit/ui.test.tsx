@@ -11,8 +11,7 @@ import {
 import { RelationshipStandards } from '@/components/RelationshipStandards';
 import { getMovement, getSources } from '@/lib/dataset';
 import type { Work } from '@/lib/schema';
-import { LodControl } from '@/components/LodControl';
-import { TimelineViewerLodMenu } from '@/components/TimelineViewerLodMenu';
+import { SemanticLodFab } from '@/components/SemanticLodFab';
 import { MatrixView } from '@/components/MatrixView';
 import { MovementsExplorer } from '@/components/MovementsExplorer';
 import { MovementSubheading } from '@/components/MovementSubheading';
@@ -216,10 +215,10 @@ describe('RelationshipStandards', () => {
 });
 
 describe('LOD UI', () => {
-  it('閲覧モード用LODは現在値だけを示し、展開後に件数付きで選択する', async () => {
+  it('通常時は親FABだけを表示し、展開後に銀杏形の3項目を選択する', async () => {
     const onChange = vi.fn();
     const { rerender } = render(
-      <TimelineViewerLodMenu
+      <SemanticLodFab
         value="core"
         counts={{ core: 32, standard: 48, detailed: 54 }}
         onChange={onChange}
@@ -227,45 +226,54 @@ describe('LOD UI', () => {
     );
 
     const trigger = screen.getByRole('button', {
-      name: '表示する範囲、現在は基本',
+      name: '表示密度を変更',
     });
     expect(trigger).toHaveAttribute('aria-expanded', 'false');
-    expect(trigger).toHaveTextContent('基本');
-    expect(trigger).not.toHaveTextContent('32');
-    expect(trigger.querySelector('select')).toBeNull();
-    expect(trigger.querySelector('svg')).not.toBeNull();
-    expect(trigger).not.toHaveTextContent('⌄');
+    expect(screen.queryByRole('menu', { name: '表示密度' })).toBeNull();
+    expect(document.querySelector('[data-semantic-lod-menu]')).toHaveAttribute(
+      'aria-hidden',
+      'true',
+    );
 
     fireEvent.click(trigger);
     expect(trigger).toHaveAttribute('aria-expanded', 'true');
-    expect(screen.getByText('LEVEL OF DETAIL')).toBeVisible();
-    const options = screen.getByRole('radiogroup', { name: '表示する範囲' });
-    expect(within(options).getByRole('radio', { name: /基本\s*32/ })).toHaveAttribute(
+    const options = screen.getByRole('menu', { name: '表示密度' });
+    expect(
+      within(options).getByRole('menuitemradio', { name: /基本に切り替え、32件/ }),
+    ).toHaveAttribute(
       'aria-checked',
       'true',
     );
-    expect(within(options).getByRole('radio', { name: /充実\s*48/ })).toBeVisible();
-    expect(within(options).getByRole('radio', { name: /すべて\s*54/ })).toBeVisible();
+    expect(
+      within(options).getByRole('menuitemradio', { name: /充実に切り替え、48件/ }),
+    ).toBeVisible();
+    expect(
+      within(options).getByRole('menuitemradio', { name: /すべてに切り替え、54件/ }),
+    ).toBeVisible();
 
-    fireEvent.click(within(options).getByRole('radio', { name: /充実\s*48/ }));
+    fireEvent.click(
+      within(options).getByRole('menuitemradio', { name: /充実に切り替え/ }),
+    );
     expect(onChange).toHaveBeenCalledWith('standard');
     await waitFor(() => expect(trigger).toHaveFocus());
+    expect(trigger).toHaveAttribute('aria-expanded', 'false');
 
     rerender(
-      <TimelineViewerLodMenu
+      <SemanticLodFab
         value="standard"
         counts={{ core: 32, standard: 48, detailed: 54 }}
         onChange={onChange}
       />,
     );
-    expect(
-      screen.getByRole('button', { name: '表示する範囲、現在は充実' }),
-    ).toBeVisible();
+    expect(screen.getByRole('button', { name: '表示密度を変更' })).toHaveAttribute(
+      'title',
+      '表示密度: 充実',
+    );
   });
 
-  it('閲覧モード用LODはパネル外のpointerdownで閉じる', () => {
+  it('外側のpointerdownで閉じる', () => {
     render(
-      <TimelineViewerLodMenu
+      <SemanticLodFab
         value="detailed"
         counts={{ core: 32, standard: 48, detailed: 54 }}
         onChange={vi.fn()}
@@ -273,93 +281,43 @@ describe('LOD UI', () => {
     );
 
     const trigger = screen.getByRole('button', {
-      name: '表示する範囲、現在はすべて',
+      name: '表示密度を変更',
     });
     fireEvent.click(trigger);
-    expect(screen.getByRole('dialog', { name: '表示する範囲' })).toBeVisible();
+    expect(screen.getByRole('menu', { name: '表示密度' })).toBeVisible();
 
     fireEvent.pointerDown(document.body);
 
-    expect(screen.queryByRole('dialog', { name: '表示する範囲' })).toBeNull();
+    expect(screen.queryByRole('menu', { name: '表示密度' })).toBeNull();
     expect(trigger).toHaveAttribute('aria-expanded', 'false');
   });
 
-  it('閲覧モード用LODをEscapeで閉じ、トリガーへフォーカスを戻す', async () => {
+  it('矢印キーで項目間を移動し、Escapeで親FABへ戻る', async () => {
     render(
-      <TimelineViewerLodMenu
-        value="detailed"
+      <SemanticLodFab
+        value="standard"
         counts={{ core: 32, standard: 48, detailed: 54 }}
         onChange={vi.fn()}
       />,
     );
     const trigger = screen.getByRole('button', {
-      name: '表示する範囲、現在はすべて',
+      name: '表示密度を変更',
     });
     fireEvent.click(trigger);
-    fireEvent.keyDown(document, { key: 'Escape' });
+    const menu = screen.getByRole('menu', { name: '表示密度' });
+    const standard = within(menu).getByRole('menuitemradio', {
+      name: /充実に切り替え/,
+    });
+    const detailed = within(menu).getByRole('menuitemradio', {
+      name: /すべてに切り替え/,
+    });
+    await waitFor(() => expect(standard).toHaveFocus());
+    fireEvent.keyDown(menu, { key: 'ArrowRight' });
+    expect(detailed).toHaveFocus();
+    fireEvent.keyDown(menu, { key: 'Escape' });
 
     await waitFor(() => expect(trigger).toHaveAttribute('aria-expanded', 'false'));
     await waitFor(() => expect(trigger).toHaveFocus());
-  });
-
-  it('表示する範囲を説明とaria-pressedで切り替える', () => {
-    const onChange = vi.fn();
-    const { rerender } = render(<LodControl value="core" onChange={onChange} />);
-
-    expect(screen.getByRole('group', { name: '表示する範囲' })).toBeVisible();
-    expect(screen.getByRole('button', { name: '基本' })).toHaveAttribute(
-      'aria-pressed',
-      'true',
-    );
-    expect(screen.getByText('美術史の骨格となる主要項目を表示')).toBeVisible();
-
-    fireEvent.click(screen.getByRole('button', { name: '充実' }));
-    expect(onChange).toHaveBeenCalledWith('standard');
-    rerender(<LodControl value="standard" onChange={onChange} />);
-    expect(screen.getByText('重要な細分・派生ムーブメントも表示')).toBeVisible();
-  });
-
-  it('図録型LODを日本語の共通表記で表示する', () => {
-    const onChange = vi.fn();
-    render(
-      <LodControl
-        value="core"
-        onChange={onChange}
-        counts={{ core: 24, standard: 30, detailed: 30 }}
-        catalogue
-      />,
-    );
-
-    expect(screen.getByText('LEVEL OF DETAIL')).toBeVisible();
-    expect(screen.getByRole('button', { name: /基本\s*24/ })).toHaveAttribute(
-      'aria-pressed',
-      'true',
-    );
-    expect(screen.getByRole('button', { name: /充実\s*30/ })).toBeVisible();
-    expect(screen.getByRole('button', { name: /すべて\s*30/ })).toBeVisible();
-    expect(
-      screen.getByText('美術史の骨格となる主要項目を表示'),
-    ).toHaveClass('sr-only');
-  });
-
-  it('横型年表用LODを控えめな図録キャプションで表示する', () => {
-    render(
-      <LodControl
-        value="standard"
-        onChange={vi.fn()}
-        counts={{ core: 24, standard: 30, detailed: 30 }}
-        catalogue
-      />,
-    );
-
-    expect(screen.getByText('LEVEL OF DETAIL')).toBeVisible();
-    expect(screen.getByRole('button', { name: /充実\s*30/ })).toHaveAttribute(
-      'aria-pressed',
-      'true',
-    );
-    expect(
-      screen.getByText('重要な細分・派生ムーブメントも表示'),
-    ).toHaveClass('sr-only');
   });
 
   it('マトリクスのセルを+Nで個別展開する', async () => {
