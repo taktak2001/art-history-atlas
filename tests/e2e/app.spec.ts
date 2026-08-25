@@ -1,5 +1,27 @@
 import { test, expect } from '@playwright/test';
 
+test('ムーブメント一覧はデスクトップ用アーカイブナビを持つ', async ({ page }, testInfo) => {
+  test.skip(testInfo.project.name !== 'desktop');
+  await page.goto('/movements/');
+
+  const sidebar = page.getByRole('complementary', {
+    name: 'ムーブメント一覧のナビゲーション',
+  });
+  await expect(sidebar).toBeVisible();
+  const primary = sidebar.getByRole('navigation', { name: '主要画面' });
+  await expect(primary.getByRole('link')).toHaveCount(6);
+  await expect(primary.getByRole('link').nth(0)).toContainText('ホーム');
+  await expect(primary.getByRole('link').nth(1)).toContainText('ムーブメント');
+  await expect(primary.getByRole('link').nth(2)).toContainText('縦型');
+  await expect(primary.getByRole('link').nth(3)).toContainText('横型');
+  await expect(primary.getByRole('link').nth(4)).toContainText('比較');
+  await expect(primary.getByRole('link').nth(5)).toContainText('関係');
+  await expect(sidebar.getByText('検索', { exact: true })).toHaveCount(0);
+  await expect(sidebar.getByText('ブックマーク', { exact: true })).toHaveCount(0);
+  await expect(sidebar.getByText('設定', { exact: true })).toHaveCount(0);
+  await expect(page.locator('[data-movement-result]')).toHaveCount(10);
+});
+
 test('ホームからムーブメント詳細へ移動できる', async ({ page }) => {
   await page.goto('/');
   const title = page.getByRole('heading', {

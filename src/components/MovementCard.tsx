@@ -1,25 +1,44 @@
 import Link from 'next/link';
 import type { Movement } from '@/lib/schema';
-import { formatDateRange } from '@/lib/dataset';
+import { formatDateRange, worksOf } from '@/lib/dataset';
 import { ClassificationBadge, RegionBadges } from './Badges';
+import { WorkImage } from './WorkImage';
 
 export function MovementCard({ movement: m }: { movement: Movement }) {
+  const representativeWork = worksOf(m)[0];
+
   return (
     <Link
       href={`/movements/${m.id}/`}
-      className="group flex flex-col gap-2 border hairline bg-raised p-4 transition-colors hover:border-ink/30"
+      className="movement-directory-card group"
     >
-      <div className="flex items-baseline justify-between gap-2">
-        <span className="text-xs tabular-nums text-faint">{formatDateRange(m)}</span>
-        <ClassificationBadge kind={m.classification} />
+      <div className="movement-directory-card__media" aria-hidden={!representativeWork}>
+        {representativeWork ? (
+          <WorkImage
+            work={representativeWork}
+            surface="movement-card"
+            sizes="(max-width: 767px) 36vw, (max-width: 1279px) 180px, 160px"
+          />
+        ) : (
+          <div className="movement-directory-card__empty-media" aria-hidden="true">
+            <span>{m.nameJa.slice(0, 1)}</span>
+          </div>
+        )}
       </div>
-      <h3 className="font-serif text-lg leading-snug text-ink group-hover:text-accent">
-        {m.nameJa}
-      </h3>
-      <p className="text-xs uppercase tracking-wider text-faint">{m.nameEn}</p>
-      <p className="mt-1 line-clamp-3 text-sm text-muted">{m.summary}</p>
-      <div className="mt-auto pt-2">
-        <RegionBadges regionIds={m.regionIds} />
+
+      <div className="movement-directory-card__body">
+        <div className="movement-directory-card__heading">
+          <div>
+            <h3>{m.nameJa}</h3>
+            <p>{m.nameEn}</p>
+          </div>
+          <span className="movement-directory-card__arrow" aria-hidden="true">→</span>
+        </div>
+        <p className="movement-directory-card__dates">{formatDateRange(m)}</p>
+        <div className="movement-directory-card__meta">
+          <RegionBadges regionIds={m.regionIds} />
+          <ClassificationBadge kind={m.classification} />
+        </div>
       </div>
     </Link>
   );

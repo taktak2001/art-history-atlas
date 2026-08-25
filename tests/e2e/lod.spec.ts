@@ -111,6 +111,8 @@ test('一覧は表示形式を持たず、親子関係はカード内の上位�
   await expect(page.getByRole('button', { name: 'フラット', exact: true })).toHaveCount(0);
   await expect(page.locator('[data-movement-view="hierarchy"]')).toHaveCount(0);
   await expect(page.locator('[data-movement-view="flat"]')).toBeVisible();
+  // 子項目を検索し、カード内の上位分類表示を確認する。
+  await page.getByRole('searchbox').fill('文人画');
   await expect(page.getByText('上位分類：').first()).toBeVisible();
 });
 

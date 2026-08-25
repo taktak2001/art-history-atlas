@@ -1,6 +1,6 @@
 'use client';
 
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import Link from 'next/link';
 import {
   movements,
@@ -25,25 +25,26 @@ import { AccordionChevron } from './AccordionChevron';
 
 const CLASSIFICATIONS = Object.keys(CLASSIFICATION_LABELS) as ClassificationKind[];
 const VERIFICATIONS = Object.keys(VERIFICATION_LABELS) as VerificationStatus[];
+const PAGE_SIZE = 10;
+
 type HierarchyScope = 'all' | 'parent' | 'child';
+type SortMode = 'chronology' | 'name-ja' | 'name-en';
 
 function ResultCard({ movement }: { movement: Movement }) {
   const parent = getMovementParent(movement.id, movements);
 
   return (
-    <div data-movement-result={movement.id}>
+    <article className="movement-directory-result" data-movement-result={movement.id}>
+      <MovementCard movement={movement} />
       {parent && (
-        <div className="border-x border-t hairline bg-surface px-3 py-2 text-xs text-muted">
-          <span>
-            上位分類：
-            <Link href={`/movements/${parent.id}/`} className="prose-link">
-              {parent.nameJa}
-            </Link>
-          </span>
+        <div className="movement-directory-result__parent">
+          上位分類：
+          <Link href={`/movements/${parent.id}/`} className="prose-link">
+            {parent.nameJa}
+          </Link>
         </div>
       )}
-      <MovementCard movement={movement} />
-    </div>
+    </article>
   );
 }
 
@@ -54,7 +55,9 @@ export function MovementsExplorer() {
   const [cls, setCls] = useState<ClassificationKind | 'all'>('all');
   const [ver, setVer] = useState<VerificationStatus | 'all'>('all');
   const [hierarchyScope, setHierarchyScope] = useState<HierarchyScope>('all');
+  const [sortMode, setSortMode] = useState<SortMode>('chronology');
   const [advancedOpen, setAdvancedOpen] = useState(false);
+  const [page, setPage] = useState(1);
   const regions = activeRegions();
 
   const matchedIds = useMemo(() => {
@@ -76,32 +79,40 @@ export function MovementsExplorer() {
   }, [query]);
 
   const filtered = useMemo(() => {
-    // 一覧は常に全件を対象にする（表示密度LODは持たない）
-    return movements
+    const result = movements
       .filter((movement) => (matchedIds ? matchedIds.has(movement.id) : true))
       .filter((movement) => (era === 'all' ? true : movement.era === era))
-      .filter((movement) =>
-        region === 'all' ? true : movement.regionIds.includes(region),
-      )
-      .filter((movement) =>
-        cls === 'all' ? true : movement.classification === cls,
-      )
-      .filter((movement) =>
-        ver === 'all' ? true : movement.verification === ver,
-      )
+      .filter((movement) => (region === 'all' ? true : movement.regionIds.includes(region)))
+      .filter((movement) => (cls === 'all' ? true : movement.classification === cls))
+      .filter((movement) => (ver === 'all' ? true : movement.verification === ver))
       .filter((movement) => {
         if (hierarchyScope === 'all') return true;
         const isChild =
           Boolean(movement.parentMovementId) ||
           Boolean(movement.groupId && !movement.isRepresentative);
         return hierarchyScope === 'child' ? isChild : !isChild;
-      })
-      .sort(
-        (a, b) =>
-          (a.displayOrder ?? Number.MAX_SAFE_INTEGER) -
-          (b.displayOrder ?? Number.MAX_SAFE_INTEGER),
+      });
+
+    return result.sort((a, b) => {
+      if (sortMode === 'name-ja') return a.nameJa.localeCompare(b.nameJa, 'ja');
+      if (sortMode === 'name-en') return a.nameEn.localeCompare(b.nameEn, 'en');
+      return (
+        (a.displayOrder ?? Number.MAX_SAFE_INTEGER) -
+        (b.displayOrder ?? Number.MAX_SAFE_INTEGER)
       );
-  }, [matchedIds, era, region, cls, ver, hierarchyScope]);
+    });
+  }, [matchedIds, era, region, cls, ver, hierarchyScope, sortMode]);
+
+  useEffect(() => {
+    setPage(1);
+  }, [query, era, region, cls, ver, hierarchyScope, sortMode]);
+
+  const totalPages = Math.max(1, Math.ceil(filtered.length / PAGE_SIZE));
+  const currentPage = Math.min(page, totalPages);
+  const visibleMovements = filtered.slice(
+    (currentPage - 1) * PAGE_SIZE,
+    currentPage * PAGE_SIZE,
+  );
 
   const reset = () => {
     setQuery('');
@@ -110,14 +121,12 @@ export function MovementsExplorer() {
     setCls('all');
     setVer('all');
     setHierarchyScope('all');
+    setPage(1);
   };
 
-  // iOSのフォーカス時オートズームを避けるため、フォーム部品は16px以上にする
-  const selectClass =
-    'min-h-11 w-full rounded-sm border hairline bg-raised px-2 py-2 text-base text-ink';
+  const selectClass = 'movement-directory-select';
   const queryActive = Boolean(query.trim());
 
-  /** 詳細条件のうち現在設定されているもの（閉じていても分かるように要約・チップで示す） */
   const activeFilters: { key: string; label: string; clear: () => void }[] = [
     era !== 'all' && {
       key: 'era',
@@ -152,116 +161,119 @@ export function MovementsExplorer() {
       : `${activeFilters.slice(0, 3).map((filter) => filter.label).join('・')}${
           activeFilters.length > 3 ? `ほか${activeFilters.length - 3}件` : ''
         }`;
-
   const hasAnyCondition = queryActive || activeFilters.length > 0;
 
   return (
-    <div>
-      {/* 名前・キーワード検索は常時表示。詳細条件はアコーディオン内へ畳む */}
-      <div className="movements-search">
-        <label htmlFor="q" className="movements-search__label">
-          ムーブメントを検索
-        </label>
-        <input
-          id="q"
-          type="search"
-          value={query}
-          onChange={(event) => setQuery(event.target.value)}
-          placeholder="ムーブメント名・作家・作品など"
-          aria-describedby="q-help"
-          className="movements-search__input"
-        />
-        <p id="q-help" className="movements-search__help">
-          名称・別名のほか、作家・作品・地域・思想・技法・素材・キーワードを対象に検索します。
-        </p>
-      </div>
+    <div className="movements-directory-explorer">
+      <div className="movements-directory-toolbar">
+        <div className="movements-search">
+          <label htmlFor="q" className="sr-only">ムーブメントを検索</label>
+          <span className="movements-search__icon" aria-hidden="true">
+            <svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.4">
+              <circle cx="10.5" cy="10.5" r="6.5" />
+              <path d="m15.5 15.5 5 5" />
+            </svg>
+          </span>
+          <input
+            id="q"
+            type="search"
+            value={query}
+            onChange={(event) => setQuery(event.target.value)}
+            placeholder="ムーブメント名・作家・作品など"
+            aria-describedby="q-help"
+            className="movements-search__input"
+          />
+          <p id="q-help" className="sr-only">
+            名称・別名のほか、作家・作品・地域・思想・技法・素材・キーワードを対象に検索します。
+          </p>
+        </div>
 
-      <div className="movements-advanced">
         <button
           type="button"
           onClick={() => setAdvancedOpen((open) => !open)}
           aria-expanded={advancedOpen}
           aria-controls="advanced-filters"
-          className="movements-advanced__toggle"
+          aria-label={`詳細条件・フィルター。${advancedSummary}`}
+          className="movements-directory-toolbar__filter"
         >
-          <span className="movements-advanced__title">詳細条件</span>
+          <span>フィルター</span>
           <span className="movements-advanced__summary">{advancedSummary}</span>
-          <AccordionChevron
-            open={advancedOpen}
-            className="movements-advanced__icon"
-          />
+          {activeFilters.length > 0 && <span className="movements-directory-toolbar__badge">{activeFilters.length}</span>}
+          <AccordionChevron open={advancedOpen} className="movements-directory-toolbar__chevron" />
         </button>
 
-        {activeFilters.length > 0 && (
-          <ul className="movements-chips">
-            {activeFilters.slice(0, 3).map((filter) => (
-              <li key={filter.key}>
-                <span className="movements-chip">
-                  {filter.label}
-                  <button
-                    type="button"
-                    onClick={filter.clear}
-                    aria-label={`絞り込み条件「${filter.label}」を解除`}
-                    className="movements-chip__clear"
-                  >
-                    ×
-                  </button>
-                </span>
-              </li>
-            ))}
-            {activeFilters.length > 3 && (
-              <li className="movements-chips__more">ほか{activeFilters.length - 3}件</li>
-            )}
-          </ul>
-        )}
-
-        <div
-          id="advanced-filters"
-          hidden={!advancedOpen}
-          className="movements-advanced__panel"
-        >
-          <div>
-            <label htmlFor="f-era" className="mb-1 block text-xs text-muted">時代区分</label>
-            <select id="f-era" value={era} onChange={(event) => setEra(event.target.value as EraId | 'all')} className={selectClass}>
-              <option value="all">すべての時代</option>
-              {ERA_ORDER.map((item) => <option key={item} value={item}>{ERA_LABELS[item]}</option>)}
-            </select>
-          </div>
-
-          <div>
-            <label htmlFor="f-region" className="mb-1 block text-xs text-muted">地域</label>
-            <select id="f-region" value={region} onChange={(event) => setRegion(event.target.value as RegionId | 'all')} className={selectClass}>
-              <option value="all">すべての地域</option>
-              {regions.map((item) => <option key={item} value={item}>{REGION_LABELS[item]}</option>)}
-            </select>
-          </div>
-
-          <div>
-            <label htmlFor="f-cls" className="mb-1 block text-xs text-muted">分類</label>
-            <select id="f-cls" value={cls} onChange={(event) => setCls(event.target.value as ClassificationKind | 'all')} className={selectClass}>
-              <option value="all">すべての分類</option>
-              {CLASSIFICATIONS.map((item) => <option key={item} value={item}>{CLASSIFICATION_LABELS[item]}</option>)}
-            </select>
-          </div>
-
-          <div>
-            <label htmlFor="f-ver" className="mb-1 block text-xs text-muted">情報確認状態</label>
-            <select id="f-ver" value={ver} onChange={(event) => setVer(event.target.value as VerificationStatus | 'all')} className={selectClass}>
-              <option value="all">すべて</option>
-              {VERIFICATIONS.map((item) => <option key={item} value={item}>{VERIFICATION_LABELS[item]}</option>)}
-            </select>
-          </div>
-
-          <div>
-            <label htmlFor="f-hierarchy" className="mb-1 block text-xs text-muted">階層</label>
-            <select id="f-hierarchy" value={hierarchyScope} onChange={(event) => setHierarchyScope(event.target.value as HierarchyScope)} className={selectClass}>
-              <option value="all">すべて</option>
-              <option value="parent">親・代表のみ</option>
-              <option value="child">子・内訳のみ</option>
-            </select>
-          </div>
-        </div>
+        <label className="movements-directory-sort">
+          <span className="sr-only">並び順</span>
+          <select
+            value={sortMode}
+            onChange={(event) => setSortMode(event.target.value as SortMode)}
+            aria-label="並び順"
+          >
+            <option value="chronology">並び順：年代</option>
+            <option value="name-ja">並び順：名称</option>
+            <option value="name-en">並び順：英語名</option>
+          </select>
+        </label>
       </div>
+
+      <div id="advanced-filters" hidden={!advancedOpen} className="movements-advanced__panel">
+        <label htmlFor="f-era">
+          <span>時代区分</span>
+          <select id="f-era" aria-label="時代区分" value={era} onChange={(event) => setEra(event.target.value as EraId | 'all')} className={selectClass}>
+            <option value="all">すべての時代</option>
+            {ERA_ORDER.map((item) => <option key={item} value={item}>{ERA_LABELS[item]}</option>)}
+          </select>
+        </label>
+        <label htmlFor="f-region">
+          <span>地域</span>
+          <select id="f-region" aria-label="地域" value={region} onChange={(event) => setRegion(event.target.value as RegionId | 'all')} className={selectClass}>
+            <option value="all">すべての地域</option>
+            {regions.map((item) => <option key={item} value={item}>{REGION_LABELS[item]}</option>)}
+          </select>
+        </label>
+        <label htmlFor="f-cls">
+          <span>分類</span>
+          <select id="f-cls" aria-label="分類" value={cls} onChange={(event) => setCls(event.target.value as ClassificationKind | 'all')} className={selectClass}>
+            <option value="all">すべての分類</option>
+            {CLASSIFICATIONS.map((item) => <option key={item} value={item}>{CLASSIFICATION_LABELS[item]}</option>)}
+          </select>
+        </label>
+        <label htmlFor="f-ver">
+          <span>情報確認状態</span>
+          <select id="f-ver" aria-label="情報確認状態" value={ver} onChange={(event) => setVer(event.target.value as VerificationStatus | 'all')} className={selectClass}>
+            <option value="all">すべて</option>
+            {VERIFICATIONS.map((item) => <option key={item} value={item}>{VERIFICATION_LABELS[item]}</option>)}
+          </select>
+        </label>
+        <label htmlFor="f-hierarchy">
+          <span>階層</span>
+          <select id="f-hierarchy" aria-label="階層" value={hierarchyScope} onChange={(event) => setHierarchyScope(event.target.value as HierarchyScope)} className={selectClass}>
+            <option value="all">すべて</option>
+            <option value="parent">親・代表のみ</option>
+            <option value="child">子・内訳のみ</option>
+          </select>
+        </label>
+      </div>
+
+      {activeFilters.length > 0 && (
+        <ul className="movements-chips" aria-label="有効な絞り込み条件">
+          {activeFilters.map((filter) => (
+            <li key={filter.key}>
+              <span className="movements-chip">
+                {filter.label}
+                <button
+                  type="button"
+                  onClick={filter.clear}
+                  aria-label={`絞り込み条件「${filter.label}」を解除`}
+                  className="movements-chip__clear"
+                >
+                  ×
+                </button>
+              </span>
+            </li>
+          ))}
+        </ul>
+      )}
 
       <div className="movements-resultbar">
         <p className="movements-resultbar__count" aria-live="polite">
@@ -275,15 +287,13 @@ export function MovementsExplorer() {
       </div>
 
       {filtered.length === 0 ? (
-        <p className="mt-8 text-center text-sm text-muted">
+        <p className="movements-directory-empty">
           条件に一致するムーブメントがありません。
-          <button type="button" onClick={reset} className="ml-2 prose-link">条件をクリア</button>
+          <button type="button" onClick={reset} className="prose-link">条件をクリア</button>
         </p>
       ) : (
-        // 表示形式の切り替えは廃止し、一覧は1種類に統一する。
-        // 親子関係は ResultCard 内の控えめな親カテゴリ表記で示す。
-        <ul className="mt-6 grid gap-4 sm:grid-cols-2 lg:grid-cols-3" data-movement-view="flat">
-          {filtered.map((movement) => (
+        <ul className="movement-directory-grid" data-movement-view="flat">
+          {visibleMovements.map((movement) => (
             <li key={movement.id}>
               <ResultCard movement={movement} />
             </li>
@@ -291,10 +301,20 @@ export function MovementsExplorer() {
         </ul>
       )}
 
-      <p className="mt-6 text-xs text-faint">
-        検索は表示する範囲に関係なく全{movements.length}件を対象とします。作品・作家の詳細は
-        <Link href="/movements/" className="prose-link">各ムーブメント</Link>
-        から辿れます。
+      {totalPages > 1 && (
+        <nav className="movements-directory-pagination" aria-label="ムーブメント一覧のページ">
+          <button type="button" onClick={() => setPage((value) => Math.max(1, value - 1))} disabled={currentPage === 1} aria-label="前のページ">‹</button>
+          {Array.from({ length: totalPages }, (_, index) => index + 1).map((pageNumber) => (
+            <button key={pageNumber} type="button" onClick={() => setPage(pageNumber)} aria-current={pageNumber === currentPage ? 'page' : undefined}>
+              {pageNumber}
+            </button>
+          ))}
+          <button type="button" onClick={() => setPage((value) => Math.min(totalPages, value + 1))} disabled={currentPage === totalPages} aria-label="次のページ">›</button>
+        </nav>
+      )}
+
+      <p className="movements-directory-note">
+        検索は表示中のページに限らず、収録済みの全{movements.length}件を対象とします。
       </p>
     </div>
   );
