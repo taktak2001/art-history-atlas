@@ -136,6 +136,39 @@ test('mobile Chronologyも旧上部UIなしで共通FABだけを表示する', a
   });
 });
 
+test('mobile全画面TimelineのLOD FABはzoom操作帯と下端を揃える', async ({
+  page,
+}, testInfo) => {
+  test.skip(testInfo.project.name !== 'mobile', 'mobile project only');
+  await page.goto('/timeline/');
+  await page
+    .getByRole('button', { name: 'タイムラインを全画面で表示' })
+    .click();
+
+  const viewer = page.locator('[data-timeline-viewer="active"]');
+  const controls = viewer.locator('[data-viewer-controls]');
+  const trigger = viewer.getByRole('button', { name: '表示密度を変更' });
+  await expect(controls).toBeVisible();
+  await expect(trigger).toBeVisible();
+
+  const [controlsBox, triggerBox] = await Promise.all([
+    controls.boundingBox(),
+    trigger.boundingBox(),
+  ]);
+  expect(controlsBox).not.toBeNull();
+  expect(triggerBox).not.toBeNull();
+  if (!controlsBox || !triggerBox) return;
+  expect(
+    Math.abs(
+      controlsBox.y + controlsBox.height - (triggerBox.y + triggerBox.height),
+    ),
+  ).toBeLessThanOrEqual(1);
+
+  await page.screenshot({
+    path: 'docs/screenshots/timeline-viewer-lod-toolbar-aligned-iphone.png',
+  });
+});
+
 test('desktopの共通FABはhover不要で開き、Escapeで親へフォーカスを戻す', async ({
   page,
 }, testInfo) => {
