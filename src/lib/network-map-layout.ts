@@ -32,11 +32,10 @@ export function clampNetworkZoom(value: number) {
   return Math.min(NETWORK_ZOOM_MAX, Math.max(NETWORK_ZOOM_MIN, value));
 }
 
-export function networkSemanticLevel(zoom: number): NetworkSemanticLevel {
-  if (zoom < 0.94) return 'overview';
-  if (zoom < 1.28) return 'study';
-  return 'detail';
-}
+/**
+ * 表示段階は倍率ではなく閲覧モードが決める（network-mode.ts）。
+ * 倍率はカメラだけを担当するので、ここでは型のみを提供する。
+ */
 
 const primaryRegion = (movement: Movement): RegionId =>
   movement.regionIds[0] ?? 'other';

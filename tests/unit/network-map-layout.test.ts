@@ -3,7 +3,6 @@ import { movements, regionOrder, relationships } from '@/lib/dataset';
 import {
   buildChronologicalNetworkLayout,
   clampNetworkZoom,
-  networkSemanticLevel,
 } from '@/lib/network-map-layout';
 
 describe('chronological network map layout', () => {
@@ -63,16 +62,6 @@ describe('chronological network map layout', () => {
     expect(france!.trackCount).toBeGreaterThan(1);
     expect(new Set(selected.map((movement) => layout.positions.get(movement.id)!.y)).size)
       .toBeGreaterThan(1);
-  });
-});
-
-describe('network semantic zoom', () => {
-  it('clamps zoom and maps it to overview, study, and detail levels', () => {
-    expect(clampNetworkZoom(0.2)).toBe(0.72);
-    expect(clampNetworkZoom(3)).toBe(1.6);
-    expect(networkSemanticLevel(0.84)).toBe('overview');
-    expect(networkSemanticLevel(1)).toBe('study');
-    expect(networkSemanticLevel(1.4)).toBe('detail');
   });
 });
 

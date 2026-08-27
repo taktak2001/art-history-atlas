@@ -117,12 +117,13 @@ test('ネットワークで検索後に手動変更しても自動設定へ戻�
   await page.locator('[data-movement-option="cubism"]').click();
   await expect(page).toHaveURL(/lod=standard/);
 
-  // 手動でLODを基本へ戻す
-  await page.locator('[data-lod-control] button').filter({ hasText: '基本' }).click();
+  // 手動でOVERVIEWへ移す（収録範囲は基本まで下がる）
+  await page.getByRole('button', { name: /^OVERVIEW/ }).click();
   await expect(page).toHaveURL(/lod=core/);
-  // focus と scope は保持され、自動調整で上書きされない
+  await expect(page).toHaveURL(/mode=overview/);
+  // focus は保持され、自動調整で上書きされない
   await expect(page).toHaveURL(/focus=cubism/);
   await expect(
-    page.locator('.network-scope-option[aria-pressed="true"]'),
-  ).toHaveText('このムーブメント');
+    page.locator('[data-network-node][aria-pressed="true"]'),
+  ).toContainText('キュビスム');
 });
