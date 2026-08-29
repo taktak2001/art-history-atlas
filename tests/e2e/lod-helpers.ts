@@ -28,3 +28,16 @@ export async function selectLod(
     .click();
   await expect(page.getByRole('menu', { name: '表示密度' })).toBeHidden();
 }
+
+/**
+ * 関係ネットワークは情報量ではなく閲覧目的で切り替える。
+ * 収録範囲は OVERVIEW=基本 / STUDY=充実 / FOCUS=すべて に対応する。
+ */
+export async function selectNetworkMode(
+  page: Page,
+  mode: 'overview' | 'study' | 'focus',
+) {
+  await page
+    .getByRole('button', { name: new RegExp(`^${mode.toUpperCase()}`) })
+    .click();
+}
