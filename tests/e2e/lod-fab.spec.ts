@@ -2,11 +2,13 @@ import { expect, test } from '@playwright/test';
 import AxeBuilder from '@axe-core/playwright';
 import { openLodFab } from './lod-helpers';
 
+// 関係ネットワークは情報量ではなく閲覧目的（OVERVIEW/STUDY/FOCUS）で切り替えるため
+// 共通FABを置かない。FABの検証はLODを情報量として使い続ける画面で行う。
 test('mobileのLOD FABは90度の3sectorへ開き、tapとdragでLODを選べる', async ({
   page,
 }, testInfo) => {
   test.skip(testInfo.project.name !== 'mobile', 'mobile project only');
-  await page.goto('/network/');
+  await page.goto('/matrix/');
 
   const fab = page.locator('[data-semantic-lod-fab]');
   const trigger = page.getByRole('button', { name: '表示密度を変更' });
@@ -25,7 +27,7 @@ test('mobileのLOD FABは90度の3sectorへ開き、tapとdragでLODを選べる
     expect(closedBox.y + closedBox.height).toBeLessThanOrEqual(844);
   }
   await page.screenshot({
-    path: 'docs/screenshots/lod-fab-network-mobile-closed.png',
+    path: 'docs/screenshots/lod-fab-matrix-mobile-closed.png',
   });
 
   await openLodFab(page);
@@ -53,7 +55,7 @@ test('mobileのLOD FABは90度の3sectorへ開き、tapとdragでLODを選べる
   expect(leafShape.height).toBeCloseTo(172, 0);
   expect(leafShape.outline).toContain('A 168 168');
   await page.screenshot({
-    path: 'docs/screenshots/lod-fab-network-mobile-expanded.png',
+    path: 'docs/screenshots/lod-fab-matrix-mobile-expanded.png',
   });
 
   await page.locator('body').click({ position: { x: 12, y: 320 } });
@@ -71,14 +73,14 @@ test('mobileのLOD FABは90度の3sectorへ開き、tapとdragでLODを選べる
   const standard = menu.getByRole('menuitemradio', { name: /充実に切り替え/ });
   await expect(standard).toHaveAttribute('data-drag-highlight', 'true');
   await page.screenshot({
-    path: 'docs/screenshots/lod-fab-network-mobile-drag-middle.png',
+    path: 'docs/screenshots/lod-fab-matrix-mobile-drag-middle.png',
   });
   await page.mouse.up();
   await expect(menu).toBeHidden();
   await expect(page).toHaveURL(/lod=standard/);
   await expect(trigger).toHaveAttribute('title', '表示密度: 充実');
   await page.screenshot({
-    path: 'docs/screenshots/lod-fab-network-mobile-middle-selected.png',
+    path: 'docs/screenshots/lod-fab-matrix-mobile-middle-selected.png',
   });
 
   await openLodFab(page);
@@ -92,22 +94,6 @@ test('mobileのLOD FABは90度の3sectorへ開き、tapとdragでLODを選べる
   await page.mouse.up();
   await expect(menu).toBeHidden();
   await expect(page).toHaveURL(/lod=detailed/);
-
-  const graph = page.getByRole('group', { name: '美術運動の関係ネットワーク図' });
-  await graph.getByRole('button', { name: 'イタリア・ルネサンスを選択' }).click();
-  const detail = page.locator('[data-network-detail-panel]');
-  await expect(detail).toBeVisible();
-  const positions = await Promise.all([trigger.boundingBox(), detail.boundingBox()]);
-  expect(positions[0]).not.toBeNull();
-  expect(positions[1]).not.toBeNull();
-  if (positions[0] && positions[1]) {
-    expect(positions[0].y + positions[0].height).toBeLessThanOrEqual(
-      positions[1].y,
-    );
-  }
-  await page.screenshot({
-    path: 'docs/screenshots/lod-fab-network-mobile-selected-sheet.png',
-  });
 
   const accessibility = await new AxeBuilder({ page }).analyze();
   expect(
@@ -173,17 +159,17 @@ test('desktopの共通FABはhover不要で開き、Escapeで親へフォーカ�
   page,
 }, testInfo) => {
   test.skip(testInfo.project.name !== 'desktop', 'desktop project only');
-  await page.goto('/network/');
+  await page.goto('/matrix/');
 
   const trigger = await openLodFab(page);
   const menu = page.getByRole('menu', { name: '表示密度' });
   await page.screenshot({
-    path: 'docs/screenshots/lod-fab-network-desktop-expanded.png',
+    path: 'docs/screenshots/lod-fab-matrix-desktop-expanded.png',
   });
   await page.keyboard.press('Escape');
   await expect(menu).toBeHidden();
   await expect(trigger).toBeFocused();
   await page.screenshot({
-    path: 'docs/screenshots/lod-fab-network-desktop-closed.png',
+    path: 'docs/screenshots/lod-fab-matrix-desktop-closed.png',
   });
 });

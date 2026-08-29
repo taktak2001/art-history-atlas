@@ -1,5 +1,5 @@
 import { test, expect } from '@playwright/test';
-import { selectLod } from './lod-helpers';
+import { selectNetworkMode } from './lod-helpers';
 
 test('比較ページはネイティブselectを使わず、検索ピッカーで追加する', async ({ page }) => {
   await page.goto('/compare/?ids=surrealism,baroque');
@@ -118,12 +118,13 @@ test('ネットワークで検索後に手動変更しても自動設定へ戻�
   await page.locator('[data-movement-option="cubism"]').click();
   await expect(page).toHaveURL(/lod=standard/);
 
-  // 手動でLODを基本へ戻す
-  await selectLod(page, 'core');
+  // 手動でOVERVIEWへ移す（収録範囲は基本まで下がる）
+  await selectNetworkMode(page, 'overview');
+  await expect(page).toHaveURL(/mode=overview/);
   await expect(page).toHaveURL(/lod=core/);
-  // focus と scope は保持され、自動調整で上書きされない
+  // focus は保持され、自動調整で上書きされない
   await expect(page).toHaveURL(/focus=cubism/);
   await expect(
-    page.locator('.network-scope-option[aria-pressed="true"]'),
-  ).toHaveText('このムーブメント');
+    page.locator('[data-network-node][aria-pressed="true"]'),
+  ).toContainText('キュビスム');
 });

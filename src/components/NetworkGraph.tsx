@@ -25,7 +25,17 @@ import {
   RELATIONSHIP_DEFINITIONS,
   RELATION_KINDS,
 } from '@/lib/relationship-definitions';
-import { SemanticLodFab } from '@/components/SemanticLodFab';
+import {
+  DEFAULT_NETWORK_MODE,
+  NETWORK_MODES,
+  NETWORK_MODE_LABELS,
+  NETWORK_MODE_PRESET,
+  NETWORK_MODE_PURPOSES,
+  edgeEmphasis,
+  nodeEmphasis,
+  parseNetworkMode,
+  type NetworkMode,
+} from '@/lib/network-mode';
 import {
   ArrowMarkerDefs,
   RelationLine,
@@ -315,6 +325,10 @@ export function NetworkGraph({ movements, relationships, eraOrder }: Props) {
   const [activeEra, setActiveEra] = useState<EraId>(eraOrder[0]);
   const [expandedGroupIds, setExpandedGroupIds] = useState<Set<string>>(new Set());
   const [networkZoom, setNetworkZoom] = useState(NETWORK_ZOOM_MIN);
+  const [mode, setModeState] = useState<NetworkMode>(DEFAULT_NETWORK_MODE);
+  const urlLodExplicitRef = useRef<boolean | null>(null);
+  const modePreset = NETWORK_MODE_PRESET[mode];
+  // 初期値は最小の収録範囲。モード/URLを読んだ後に確定させる（初回描画を軽く保つ）
   const { lod, setLod, applyPurposeDefault, clearLod, hasExplicitChoice } =
     useLodState('core');
 
@@ -325,6 +339,29 @@ export function NetworkGraph({ movements, relationships, eraOrder }: Props) {
     media.addEventListener('change', update);
     return () => media.removeEventListener('change', update);
   }, []);
+
+  // ?mode= を単一の共有状態として扱う。?focus= だけが来た場合はFOCUSとして開く
+  useEffect(() => {
+    const readMode = () => {
+      const params = new URL(window.location.href).searchParams;
+      const parsed = parseNetworkMode(params.get('mode'));
+      const next = parsed ?? (params.get('focus') ? 'focus' : DEFAULT_NETWORK_MODE);
+      setModeState(next);
+
+      // 起動時のカメラ。?focus= があるときは focus 側の自動調整に任せる。
+      if (params.get('focus')) return;
+      const { camera } = NETWORK_MODE_PRESET[next];
+      if (typeof camera !== 'number') return;
+      // 俯瞰へのフィットはOVERVIEWのものにする。
+      // 倍率を持つモードで開いたときに、後から俯瞰へ引き戻されないようにする。
+      overviewFitAppliedRef.current = true;
+      setNetworkZoom(clampNetworkZoom(camera));
+    };
+    readMode();
+    window.addEventListener('popstate', readMode);
+    return () => window.removeEventListener('popstate', readMode);
+  }, []);
+
 
   const movementIds = useMemo(
     () => new Set(movements.map((movement) => movement.id)),
@@ -378,6 +415,20 @@ export function NetworkGraph({ movements, relationships, eraOrder }: Props) {
     window.addEventListener('popstate', readScope);
     return () => window.removeEventListener('popstate', readScope);
   }, []);
+
+  // URL(?mode=)で開いた場合も収録範囲をモードに合わせる。
+  // ただし ?lod= を明示していればそちらを尊重する（deep linkを壊さない）。
+  useEffect(() => {
+    // 入口のURLで ?lod= を明示していれば、そちらを最優先する（deep linkを壊さない）。
+    // 判定は初回に一度だけ。以後のモード変更が自分の書いた ?lod= に阻まれないようにする。
+    if (urlLodExplicitRef.current === null) {
+      urlLodExplicitRef.current = Boolean(
+        new URL(window.location.href).searchParams.get('lod'),
+      );
+    }
+    if (urlLodExplicitRef.current) return;
+    applyPurposeDefault(NETWORK_MODE_PRESET[mode].lod);
+  }, [applyPurposeDefault, mode]);
 
   // focus 付き遷移の初期状態だけを自動調整する。
   // 直接関係を欠落なく出せる最小LODへ上げ、表示関係を「このムーブメント」にする。
@@ -736,6 +787,29 @@ export function NetworkGraph({ movements, relationships, eraOrder }: Props) {
     return ids;
   }, [relatedNodeIds, visibleEdges, selectedNodeId]);
 
+  /**
+   * 強弱づけのための2ホップ先。
+   *
+   * 表示中の線ではなく収録関係の全体から求める。「このムーブメント」表示では
+   * 直接関係しか線が出ないため、visibleEdges から数えると2ホップが常に空になり、
+   * FOCUSで「直接 / 2ホップ / それ以外」の3段が作れない。
+   * レーンの圧縮や node-state は従来どおり表示中の線に基づくので、ここには混ぜない。
+   */
+  const emphasisSecondHopIds = useMemo(() => {
+    const ids = new Set<string>();
+    if (!selectedNodeId) return ids;
+    for (const relationship of aggregatedEdges) {
+      if (
+        relatedNodeIds.has(relationship.from) ||
+        relatedNodeIds.has(relationship.to)
+      ) {
+        if (!relatedNodeIds.has(relationship.from)) ids.add(relationship.from);
+        if (!relatedNodeIds.has(relationship.to)) ids.add(relationship.to);
+      }
+    }
+    return ids;
+  }, [aggregatedEdges, relatedNodeIds, selectedNodeId]);
+
   const nodeTextObstacles = useMemo<NetworkRouteObstacle[]>(() => {
     return displayedMovements.flatMap((movement) => {
       const position = layout.positions.get(movement.id);
@@ -911,6 +985,7 @@ export function NetworkGraph({ movements, relationships, eraOrder }: Props) {
 
   // 注釈として読める大きさを確保する（縮小より配置で衝突を解く方針）
   const labelFontSize = semanticLevel === 'overview' ? 8 : 12;
+  const showRelationLabels = modePreset.relationLabels;
 
   /**
    * 関係ラベルの配置。中点固定をやめ、線の近くで衝突しない位置を選ぶ。
@@ -920,6 +995,8 @@ export function NetworkGraph({ movements, relationships, eraOrder }: Props) {
    * スクロール中に毎フレーム再計算されない。
    */
   const edgeLabelPlacements = useMemo(() => {
+    // OVERVIEWは線より配置を読むモードなので、関係ラベルは原則出さない
+    if (!showRelationLabels) return [];
     const entries = visibleEdges
       .map((relationship) => {
         const geometry = getEdgeGeometry(
@@ -935,9 +1012,8 @@ export function NetworkGraph({ movements, relationships, eraOrder }: Props) {
           (selectedNodeId &&
             (relationship.from === selectedNodeId ||
               relationship.to === selectedNodeId)) ||
-          (semanticLevel === 'detail' &&
-            !selectionActive &&
-            idleLabelIds.has(relationship.id));
+          // STUDY以上では、選択が無くても主要関係の意味を線の途中に出す
+          (!selectionActive && idleLabelIds.has(relationship.id));
         if (!showLabel) return null;
 
         const touchesSelection =
@@ -1033,6 +1109,7 @@ export function NetworkGraph({ movements, relationships, eraOrder }: Props) {
       }];
     });
   }, [
+    showRelationLabels,
     displayedMovements,
     focusContext,
     focusedEdgeId,
@@ -1313,7 +1390,63 @@ export function NetworkGraph({ movements, relationships, eraOrder }: Props) {
     setRelationKindFilter('all');
     setSelectedEdgeId(null);
     setSelectedNodeId(id);
+    // 検索やURLから1件を指した時点で、目的は「そのムーブメントを理解すること」になる
+    if (mode !== 'focus') applyMode('focus');
   };
+
+  /**
+   * モードは閲覧目的そのもの。収録範囲とカメラは付随して決まる。
+   * 倍率は数値としては見せない（内部実装をユーザーに意識させない）。
+   */
+  const applyMode = (next: NetworkMode) => {
+    setModeState(next);
+    const url = new URL(window.location.href);
+    url.searchParams.set('mode', next);
+    window.history.pushState(window.history.state, '', url);
+
+    const preset = NETWORK_MODE_PRESET[next];
+    // モードがLODを決めるので、ユーザーの明示選択としては扱わない
+    setLod(preset.lod, false);
+    applyModeCamera(next);
+  };
+
+  /** モードごとのカメラ。倍率を決め打ちするのはSTUDYだけ */
+  const applyModeCamera = (next: NetworkMode) => {
+    const { camera } = NETWORK_MODE_PRESET[next];
+    if (camera === 'fit-all') {
+      overviewFitAppliedRef.current = true;
+      returnToOverviewOnClearRef.current = false;
+      window.requestAnimationFrame(() => requestCameraFit('overview', true));
+      return;
+    }
+    if (camera === 'fit-selection') {
+      // 選ばれていなければカメラは動かさない（選択時にfocus fitが走る）
+      if (!selectedNodeIdRef.current) return;
+      window.requestAnimationFrame(() => requestCameraFit('focus'));
+      return;
+    }
+    zoomAnchorRef.current = null;
+    setNetworkZoom(clampNetworkZoom(camera));
+  };
+
+  const setMode = (next: NetworkMode) => {
+    if (next === mode) return;
+    applyMode(next);
+    setSelectedEdgeId(null);
+    setExpandedGroupIds(new Set());
+
+    if (next === 'focus') {
+      // 深掘りする対象が無ければ、まず選んでもらう
+      if (!selectedNodeId) setPickerOpen(true);
+      return;
+    }
+    setRelationScope('important');
+    setScopeTouched(false);
+  };
+
+  // URLで開いたときのカメラは、既存の overview / focus 自動調整に任せる。
+  // モードのカメラを適用するのはユーザーがモードを選んだときだけにして、
+  // 起動時のカメラ決定を二重に走らせない。
 
   const setKindFilter = (kind: RelationKindFilter) => {
     returnToOverviewOnClearRef.current = !cameraChangedAfterFocusRef.current;
@@ -1719,78 +1852,56 @@ export function NetworkGraph({ movements, relationships, eraOrder }: Props) {
         )}
       </div>
 
-      <div className="network-map-tools" aria-label="ネットワーク倍率">
-        <div className="network-zoom-control" role="group" aria-label="ネットワーク倍率">
-          <button
-            type="button"
-            onClick={() => changeNetworkZoom(-0.16)}
-            aria-label="ネットワークを縮小"
-            disabled={networkZoom <= NETWORK_ZOOM_MIN}
-          >
-            −
-          </button>
-          <output aria-live="polite">{Math.round(networkZoom * 100)}%</output>
-          <button
-            type="button"
-            onClick={() => changeNetworkZoom(0.16)}
-            aria-label="ネットワークを拡大"
-            disabled={networkZoom >= NETWORK_ZOOM_MAX}
-          >
-            ＋
-          </button>
-          <button
-            type="button"
-            onClick={showNetworkOverview}
-            aria-label="主要系譜の全体表示へ戻す"
-            className="network-overview-control"
-          >
-            全体
-          </button>
-        </div>
-      </div>
-
-      <SemanticLodFab
-        value={lod}
-        counts={{
-          core: filterMovementsByLod(movements, 'core').length,
-          standard: filterMovementsByLod(movements, 'standard').length,
-          detailed: filterMovementsByLod(movements, 'detailed').length,
-        }}
-        bottomOffset={
-          isMobile && (selectedMovement || selectedEdge)
-            ? 'calc(min(40dvh, 22rem) + 1.25rem)'
-            : undefined
-        }
-        onChange={(next) => {
-          // focus中はLODを手動変更しても選択を保持する
-          // （focusノードと直接関係はLODに関わらず表示し続ける）
-          if (!selectedNodeId) setSelectedNodeId(null);
-          setSelectedEdgeId(null);
-          setExpandedGroupIds(new Set());
-          setLod(next);
-        }}
-      />
-
-      <nav className="network-era-nav" aria-label="ネットワークの時代移動">
-        <div className="scroll-x flex h-full items-stretch">
-          {eraOrder.map((era) => (
+      {/* モード切替と時代選択は1本のツールバーとしてまとめ、
+          検索・年代軸とは別の階層であることを面で示す */}
+      <div className="network-toolbar">
+        <div
+          className="network-mode-switch"
+          role="group"
+          aria-label="表示モード"
+          data-network-mode-switch
+        >
+          {NETWORK_MODES.map((candidate) => (
             <button
-              key={era}
+              key={candidate}
               type="button"
-              onClick={() => jumpToEra(era)}
-              aria-current={activeEra === era ? 'true' : undefined}
-              className="network-era-nav__button"
+              onClick={() => setMode(candidate)}
+              aria-pressed={mode === candidate}
+              aria-label={`${NETWORK_MODE_LABELS[candidate]}：${NETWORK_MODE_PURPOSES[candidate]}`}
+              className="network-mode-switch__option"
+              data-network-mode-option={candidate}
             >
-              {ERA_JUMP_LABELS[era]}
+              {NETWORK_MODE_LABELS[candidate]}
             </button>
           ))}
         </div>
-      </nav>
+
+        <label className="network-era-select">
+          <span className="sr-only">時代へ移動</span>
+          <select
+            value={activeEra}
+            onChange={(event) => jumpToEra(event.target.value as EraId)}
+            data-network-era-select
+          >
+            {eraOrder.map((era) => (
+              <option key={era} value={era}>
+                {ERA_JUMP_LABELS[era]}
+              </option>
+            ))}
+          </select>
+          <AccordionChevron open={false} />
+        </label>
+      </div>
+
+      <p className="network-mode-purpose" aria-live="polite">
+        {NETWORK_MODE_PURPOSES[mode]}
+      </p>
 
       <div
         className="network-map-shell"
         data-has-detail={Boolean(selectedMovement || selectedEdge)}
       >
+      <div className="network-map-viewport">
       <div
         ref={scrollRef}
         className="network-scroll cursor-grab overflow-auto border hairline bg-raised focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent data-[dragging=true]:cursor-grabbing"
@@ -1800,6 +1911,7 @@ export function NetworkGraph({ movements, relationships, eraOrder }: Props) {
         tabIndex={0}
         data-network-scope={relationScope}
         data-network-lod={lod}
+        data-network-mode={mode}
         data-network-mobile={isMobile}
         data-network-semantic-level={semanticLevel}
         data-network-zoom={networkZoom.toFixed(2)}
@@ -1905,7 +2017,18 @@ export function NetworkGraph({ movements, relationships, eraOrder }: Props) {
               if (!geometry) return null;
 
               return (
-                <g key={relationship.id} data-relation-kind={relationship.kind}>
+                <g
+                  key={relationship.id}
+                  data-relation-kind={relationship.kind}
+                  data-edge-emphasis={edgeEmphasis({
+                    mode,
+                    kind: relationship.kind,
+                    from: relationship.from,
+                    to: relationship.to,
+                    selectedId: selectedNodeId,
+                    directNodeIds: relatedNodeIds,
+                  })}
+                >
                   {renderPath(relationship, 'base')}
                   <path
                     d={geometry.d}
@@ -2011,6 +2134,13 @@ export function NetworkGraph({ movements, relationships, eraOrder }: Props) {
                   data-node-role={
                     isEdgeSource ? 'source' : isEdgeTarget ? 'target' : undefined
                   }
+                  data-node-emphasis={nodeEmphasis({
+                    mode,
+                    nodeId: movement.id,
+                    selectedId: selectedNodeId,
+                    directNodeIds: relatedNodeIds,
+                    secondHopNodeIds: emphasisSecondHopIds,
+                  })}
                 >
                   <span className="network-node__station" aria-hidden="true">
                     <span />
@@ -2175,16 +2305,10 @@ export function NetworkGraph({ movements, relationships, eraOrder }: Props) {
                       data-edge-label-leader
                     />
                   )}
-                  {/* 線が文字を貫通しないための小さな紙色バックプレート（pillにしない） */}
-                  <rect
-                    x={placement.rect.x}
-                    y={placement.rect.y}
-                    width={placement.rect.width}
-                    height={placement.rect.height}
-                    fill="rgb(var(--c-raised))"
-                    fillOpacity="0.98"
-                    data-edge-label-backplate
-                  />
+                  {/*
+                    線が文字を貫通しないよう、矩形の板ではなく紙色のハローで抜く。
+                    地域レーンに地色が入ったので、板だと背景から浮いた箱に見えてしまう。
+                  */}
                   <text
                     x={placement.x}
                     y={placement.y}
@@ -2193,7 +2317,12 @@ export function NetworkGraph({ movements, relationships, eraOrder }: Props) {
                     fill={RELATION_COLOR[relationship.kind]}
                     fontSize={labelFontSize}
                     fontWeight="600"
+                    stroke="rgb(var(--c-raised))"
+                    strokeWidth="4"
+                    strokeLinejoin="round"
+                    paintOrder="stroke fill"
                     data-edge-label
+                    data-edge-label-halo
                     data-edge-label-anchor={anchor}
                   >
                     {text}
@@ -2203,6 +2332,43 @@ export function NetworkGraph({ movements, relationships, eraOrder }: Props) {
             })}
           </svg>
         </div>
+      </div>
+
+      {/* FOCUSはカメラが選択に合わせて決まるので、倍率の操作も数値も出さない */}
+      {mode !== 'focus' && (
+        <div
+          className="network-zoom-fab"
+          role="group"
+          aria-label="ネットワーク倍率"
+          data-network-zoom-fab
+        >
+          <button
+            type="button"
+            onClick={showNetworkOverview}
+            aria-label="主要系譜の全体表示へ戻す"
+          >
+            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6" aria-hidden="true">
+              <path d="M4 9V4h5M20 9V4h-5M4 15v5h5M20 15v5h-5" strokeLinecap="round" strokeLinejoin="round" />
+            </svg>
+          </button>
+          <button
+            type="button"
+            onClick={() => changeNetworkZoom(-0.16)}
+            aria-label="ネットワークを縮小"
+            disabled={networkZoom <= NETWORK_ZOOM_MIN}
+          >
+            −
+          </button>
+          <button
+            type="button"
+            onClick={() => changeNetworkZoom(0.16)}
+            aria-label="ネットワークを拡大"
+            disabled={networkZoom >= NETWORK_ZOOM_MAX}
+          >
+            ＋
+          </button>
+        </div>
+      )}
       </div>
 
       {selectedEdge && (
@@ -2235,7 +2401,7 @@ export function NetworkGraph({ movements, relationships, eraOrder }: Props) {
 
       {selectedMovement && (
         <section className="network-detail-panel" data-network-detail-panel>
-          <p className="network-detail-panel__eyebrow">SELECTED MOVEMENT</p>
+          <p className="network-detail-panel__eyebrow">選択中のムーブメント</p>
           <button
             type="button"
             className="network-detail-panel__close"
@@ -2257,9 +2423,10 @@ export function NetworkGraph({ movements, relationships, eraOrder }: Props) {
             movementById={movementById}
           />
 
+          {/* 概要 → 代表作家 → 代表作品 → 関係 の順に読ませる（理解の入口として） */}
           <div className="network-detail-panel__grid">
             <section aria-labelledby="network-detail-artists">
-              <h4 id="network-detail-artists">Artists</h4>
+              <h4 id="network-detail-artists">代表作家</h4>
               {selectedArtists.length > 0 ? (
                 <ul>
                   {selectedArtists.map((artist) => (
@@ -2272,8 +2439,23 @@ export function NetworkGraph({ movements, relationships, eraOrder }: Props) {
                 <p>収録作家を確認中</p>
               )}
             </section>
+            <section aria-labelledby="network-detail-works">
+              <h4 id="network-detail-works">代表作品</h4>
+              {selectedWorks.length > 0 ? (
+                <ul>
+                  {selectedWorks.map((work) => (
+                    <li key={work.id}>
+                      <Link href={`/works/${work.id}/`}>{work.titleJa}</Link>
+                      <small>{work.year}</small>
+                    </li>
+                  ))}
+                </ul>
+              ) : (
+                <p>代表作品を確認中</p>
+              )}
+            </section>
             <section aria-labelledby="network-detail-relations">
-              <h4 id="network-detail-relations">Relationships</h4>
+              <h4 id="network-detail-relations">関係</h4>
               <ul>
                 {selectedNodeEdges.slice(0, 5).map((relationship) => {
                   const outgoing = relationship.from === selectedMovement.id;
@@ -2287,21 +2469,6 @@ export function NetworkGraph({ movements, relationships, eraOrder }: Props) {
                   );
                 })}
               </ul>
-            </section>
-            <section aria-labelledby="network-detail-works">
-              <h4 id="network-detail-works">Works</h4>
-              {selectedWorks.length > 0 ? (
-                <ul>
-                  {selectedWorks.map((work) => (
-                    <li key={work.id}>
-                      <Link href={`/works/${work.id}/`}>{work.titleJa}</Link>
-                      <small>{work.year}</small>
-                    </li>
-                  ))}
-                </ul>
-              ) : (
-                <p>代表作品を確認中</p>
-              )}
             </section>
           </div>
           {selectedGroup &&
