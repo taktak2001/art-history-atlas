@@ -1,6 +1,7 @@
 import type { Work, ImageMeta } from '@/lib/schema';
 import { coreExpansionWorks } from './expansion/core-works';
 import { finalExpansionWorks } from './expansion/final-works';
+import { phaseTwoExpansionWorks } from './expansion/phase-two-works';
 import { applyImageReferences } from './expansion/image-references';
 import { applyImageSupplements } from './expansion/image-supplements';
 import { standardOneExpansionWorks } from './expansion/standard-one-works';
@@ -454,7 +455,7 @@ const workRecords: Work[] = [
     year: '1614〜1620年頃',
     medium: 'カンヴァス・油彩',
     collection: 'ウフィツィ美術館（フィレンツェ）',
-    movementIds: ['baroque'],
+    movementIds: ['baroque', 'caravaggisti'],
     description:
       '劇的な明暗と力強い動勢で、旧約の女性ユディトが敵将を討つ瞬間を描く。カラヴァッジョの手法を継ぎ、女性の主体性を前景化したバロックの傑作。',
     image: pd('GENTILESCHI Judith.jpg', {
@@ -971,7 +972,7 @@ const workRecords: Work[] = [
     year: '1884〜1886年',
     medium: 'カンヴァス・油彩',
     collection: 'シカゴ美術館',
-    movementIds: ['post-impressionism'],
+    movementIds: ['post-impressionism', 'neo-impressionism'],
     description:
       '無数の色点を並置する点描（分割主義）で、休日の川辺を静止した幾何学的秩序として構成する。印象派の直観を科学的方法へ転じた作品。',
     image: pd('A Sunday on La Grande Jatte, Georges Seurat, 1884.jpg', {
@@ -1504,6 +1505,7 @@ const workRecords: Work[] = [
   ...coreExpansionWorks,
   ...standardOneExpansionWorks,
   ...finalExpansionWorks,
+  ...phaseTwoExpansionWorks,
 ];
 
 // applyImageSupplements で最終的に画像が付く作品を先に確定させ、

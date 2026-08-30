@@ -1,6 +1,7 @@
 import type { Movement } from '@/lib/schema';
 import { coreExpansionMovements } from './expansion/core-movements';
 import { finalExpansionMovements } from './expansion/final-movements';
+import { phaseTwoExpansionMovements } from './expansion/phase-two-movements';
 import { applyNameOrigins } from './expansion/name-origins';
 import { applyScholarlyNotes } from './expansion/scholarly-notes';
 import { standardOneExpansionMovements } from './expansion/standard-one-movements';
@@ -1729,6 +1730,7 @@ const movementRecords: Movement[] = [
   ...coreExpansionMovements,
   ...standardOneExpansionMovements,
   ...finalExpansionMovements,
+  ...phaseTwoExpansionMovements,
 ];
 
 // 研究上の留保と名称成立データを最後に付与する。既存の記述データは変更しない。

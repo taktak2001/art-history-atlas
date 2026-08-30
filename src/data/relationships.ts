@@ -1,6 +1,7 @@
 import type { Relationship } from '@/lib/schema';
 import { coreExpansionRelationships } from './expansion/core-relationships';
 import { finalExpansionRelationships } from './expansion/final-relationships';
+import { phaseTwoExpansionRelationships } from './expansion/phase-two-relationships';
 import { standardOneExpansionRelationships } from './expansion/standard-one-relationships';
 
 /**
@@ -379,4 +380,5 @@ export const relationships: Relationship[] = [
   ...coreExpansionRelationships,
   ...standardOneExpansionRelationships,
   ...finalExpansionRelationships,
+  ...phaseTwoExpansionRelationships,
 ];

@@ -27,7 +27,7 @@ test('iPhone幅のoverviewは主要系譜だけを読みやすい密度で表示
 
   const nodeCount = await graph.locator('[data-network-node]').count();
   expect(nodeCount).toBeGreaterThanOrEqual(10);
-  expect(nodeCount).toBeLessThanOrEqual(15);
+  expect(nodeCount).toBeLessThanOrEqual(16);
   await expect(graph).toHaveAttribute('data-network-semantic-level', 'overview');
   await expect(graph.locator('[data-edge-label]')).toHaveCount(0);
   expect(await graph.locator('[data-overview-landmark="true"]').count()).toBeGreaterThan(0);
@@ -67,7 +67,7 @@ test('全体は主要系譜へ戻し、mobile地域列を100px以内に保つ', 
   await expect(graph).toHaveAttribute('data-network-scope', 'all');
   const nodeCount = await graph.locator('[data-network-node]').count();
   expect(nodeCount).toBeGreaterThanOrEqual(10);
-  expect(nodeCount).toBeLessThanOrEqual(15);
+  expect(nodeCount).toBeLessThanOrEqual(16);
 
   const regionWidth = await graph
     .locator('.network-region-lane__label')
@@ -151,15 +151,19 @@ test('選択時は直接関係、2-hop、背景の3段階で焦点化する', as
   expect(await graph.locator('[data-node-state="related"]').count()).toBeGreaterThan(0);
   expect(await graph.locator('[data-node-state="secondary"]').count()).toBeGreaterThan(0);
   expect(await graph.locator('[data-node-state="dimmed"]').count()).toBeGreaterThan(0);
-  const secondHopOpacity = await graph
-    .locator('[data-node-state="secondary"]')
-    .first()
-    .evaluate((element) => Number(getComputedStyle(element).opacity));
-  const backgroundOpacity = await graph
-    .locator('[data-node-state="dimmed"]')
-    .first()
-    .evaluate((element) => Number(getComputedStyle(element).opacity));
-  expect(secondHopOpacity).toBeGreaterThan(backgroundOpacity);
+  await expect
+    .poll(async () => {
+      const secondHopOpacity = await graph
+        .locator('[data-node-state="secondary"]')
+        .first()
+        .evaluate((element) => Number(getComputedStyle(element).opacity));
+      const backgroundOpacity = await graph
+        .locator('[data-node-state="dimmed"]')
+        .first()
+        .evaluate((element) => Number(getComputedStyle(element).opacity));
+      return secondHopOpacity - backgroundOpacity;
+    })
+    .toBeGreaterThan(0);
   await expect(page.locator('[data-network-detail-panel] figure')).toContainText(
     'LOCAL ORBIT',
   );
@@ -322,7 +326,7 @@ test('線の見方はEscapeで閉じ、操作説明だけを上部に残す', as
 });
 
 test('関係タイプごとに線種・通常線幅・方向を使い分ける', async ({ page }) => {
-  await page.goto('/network/?mode=overview');
+  await page.goto('/network/?lod=detailed&scope=all');
 
   const graph = page.getByRole('group', { name: '美術運動の関係ネットワーク図' });
   const base = graph.locator('[data-network-layer="base-edges"]');
@@ -527,7 +531,7 @@ test('基本表示ではルネサンスとバロックの直接関係だけを�
 });
 
 test('関係選択時に起点・到達先と自然な反発文を表示する', async ({ page }) => {
-  await page.goto('/network/?mode=overview');
+  await page.goto('/network/?lod=detailed&scope=all');
 
   const reactionItem = page
     .locator('[data-relation-list-item][data-relation-kind="reaction"] button')
@@ -742,7 +746,7 @@ test('詳細ページから関係ネットワークへ移ると直接関係が�
   // 5. 直接関係先を保ち、非関連ノードは背景として残して弱める
   await expect(page.getByText('中国山水画').first()).toBeVisible();
   expect(await page.locator('[data-network-node]').count()).toBeGreaterThanOrEqual(26);
-  expect(await page.locator('[data-network-node]').count()).toBeLessThanOrEqual(48);
+  expect(await page.locator('[data-network-node]').count()).toBeLessThanOrEqual(72);
   await expect(page.locator('[data-network-node][data-node-state="dimmed"]').first()).toBeVisible();
 
   // 6. 全体寄りではなくサブグラフの件数を出す

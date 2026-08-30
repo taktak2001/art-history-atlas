@@ -135,8 +135,8 @@ describe('収録規模（MVP要件）', () => {
   it('各ムーブメントに鑑賞ポイントがある', () => {
     for (const m of movements) expect(m.viewingPoints.length, m.id).toBeGreaterThan(0);
   });
-  it('全54件に出典付きの名称由来がある', () => {
-    expect(movements).toHaveLength(54);
+  it('全84件に出典付きの名称由来がある', () => {
+    expect(movements).toHaveLength(84);
     const sourceIds = new Set(sources.map((source) => source.id));
     for (const movement of movements) {
       expect(movement.nameOrigin, movement.id).toBeDefined();
@@ -161,8 +161,8 @@ describe('収録規模（MVP要件）', () => {
 });
 
 describe('Movement詳細の情報分類', () => {
-  it('全54件で技法と媒体・素材が見た目の特徴へ混入していない', () => {
-    expect(movements).toHaveLength(54);
+  it('全84件で技法と媒体・素材が見た目の特徴へ混入していない', () => {
+    expect(movements).toHaveLength(84);
     expect(auditMovementContentTaxonomy(movements)).toEqual([]);
   });
 

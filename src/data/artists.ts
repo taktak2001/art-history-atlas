@@ -1,6 +1,7 @@
 import type { Artist } from '@/lib/schema';
 import { coreExpansionArtists } from './expansion/core-artists';
 import { finalExpansionArtists } from './expansion/final-artists';
+import { phaseTwoExpansionArtists } from './expansion/phase-two-artists';
 import { standardOneExpansionArtists } from './expansion/standard-one-artists';
 
 /**
@@ -875,7 +876,7 @@ export const artists: Artist[] = [
     lifeNote: '没年は概算',
     regionIds: ['italy'],
     country: 'イタリア',
-    movementIds: ['baroque'],
+    movementIds: ['baroque', 'caravaggisti'],
     bio: 'カラヴァッジョの明暗法を継ぎ、力強い女性像を描いたバロックの画家。《ホロフェルネスの首を斬るユディト》で知られる。',
     keyWorkIds: ['work-judith-holofernes'],
     sourceIds: ['tate-baroque'],
@@ -917,7 +918,7 @@ export const artists: Artist[] = [
     died: 1891,
     regionIds: ['france'],
     country: 'フランス',
-    movementIds: ['post-impressionism'],
+    movementIds: ['post-impressionism', 'neo-impressionism'],
     bio: '色彩理論に基づく点描（分割主義）を確立し、印象派の直観を体系的な方法へ転じた。《グランド・ジャット島の日曜日の午後》で知られる。',
     keyWorkIds: ['work-grande-jatte'],
     sourceIds: ['tate-post-impressionism'],
@@ -940,4 +941,5 @@ export const artists: Artist[] = [
   ...coreExpansionArtists,
   ...standardOneExpansionArtists,
   ...finalExpansionArtists,
+  ...phaseTwoExpansionArtists,
 ];
