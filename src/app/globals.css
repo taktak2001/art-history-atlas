@@ -4742,12 +4742,17 @@ html.dark .chronology-era--digital {
 }
 
 .movements-directory-toolbar {
+  display: grid;
+  gap: 0.7rem;
+  padding-block: 0.35rem 0;
+}
+
+.movements-directory-controls {
   position: sticky;
   top: calc(4.25rem + env(safe-area-inset-top));
   z-index: 30;
-  display: grid;
-  gap: 0.7rem;
-  padding-block: 0.35rem 0.65rem;
+  margin-top: 0.7rem;
+  padding-bottom: 0.65rem;
 }
 
 .movements-search {
@@ -5262,7 +5267,7 @@ html.dark .chronology-era--digital {
     background: rgb(var(--c-surface));
   }
 
-  .movements-directory-toolbar {
+  .movements-directory-controls {
     top: 1rem;
   }
 

@@ -203,6 +203,9 @@ export function MovementsExplorer() {
           </p>
         </div>
 
+      </div>
+
+      <div className="movements-directory-controls">
         <div className="movements-directory-toolbar__utilities">
           <button
             type="button"
@@ -249,45 +252,45 @@ export function MovementsExplorer() {
             />
           </label>
         </div>
-      </div>
 
-      <div id="advanced-filters" hidden={!advancedOpen} className="movements-advanced__panel">
-        <label htmlFor="f-era">
-          <span>時代区分</span>
-          <select id="f-era" aria-label="時代区分" value={era} onChange={(event) => setEra(event.target.value as EraId | 'all')} className={selectClass}>
-            <option value="all">すべての時代</option>
-            {ERA_ORDER.map((item) => <option key={item} value={item}>{ERA_LABELS[item]}</option>)}
-          </select>
-        </label>
-        <label htmlFor="f-region">
-          <span>地域</span>
-          <select id="f-region" aria-label="地域" value={region} onChange={(event) => setRegion(event.target.value as RegionId | 'all')} className={selectClass}>
-            <option value="all">すべての地域</option>
-            {regions.map((item) => <option key={item} value={item}>{REGION_LABELS[item]}</option>)}
-          </select>
-        </label>
-        <label htmlFor="f-cls">
-          <span>分類</span>
-          <select id="f-cls" aria-label="分類" value={cls} onChange={(event) => setCls(event.target.value as ClassificationKind | 'all')} className={selectClass}>
-            <option value="all">すべての分類</option>
-            {CLASSIFICATIONS.map((item) => <option key={item} value={item}>{CLASSIFICATION_LABELS[item]}</option>)}
-          </select>
-        </label>
-        <label htmlFor="f-ver">
-          <span>情報確認状態</span>
-          <select id="f-ver" aria-label="情報確認状態" value={ver} onChange={(event) => setVer(event.target.value as VerificationStatus | 'all')} className={selectClass}>
-            <option value="all">すべて</option>
-            {VERIFICATIONS.map((item) => <option key={item} value={item}>{VERIFICATION_LABELS[item]}</option>)}
-          </select>
-        </label>
-        <label htmlFor="f-hierarchy">
-          <span>階層</span>
-          <select id="f-hierarchy" aria-label="階層" value={hierarchyScope} onChange={(event) => setHierarchyScope(event.target.value as HierarchyScope)} className={selectClass}>
-            <option value="all">すべて</option>
-            <option value="parent">親・代表のみ</option>
-            <option value="child">子・内訳のみ</option>
-          </select>
-        </label>
+        <div id="advanced-filters" hidden={!advancedOpen} className="movements-advanced__panel">
+          <label htmlFor="f-era">
+            <span>時代区分</span>
+            <select id="f-era" aria-label="時代区分" value={era} onChange={(event) => setEra(event.target.value as EraId | 'all')} className={selectClass}>
+              <option value="all">すべての時代</option>
+              {ERA_ORDER.map((item) => <option key={item} value={item}>{ERA_LABELS[item]}</option>)}
+            </select>
+          </label>
+          <label htmlFor="f-region">
+            <span>地域</span>
+            <select id="f-region" aria-label="地域" value={region} onChange={(event) => setRegion(event.target.value as RegionId | 'all')} className={selectClass}>
+              <option value="all">すべての地域</option>
+              {regions.map((item) => <option key={item} value={item}>{REGION_LABELS[item]}</option>)}
+            </select>
+          </label>
+          <label htmlFor="f-cls">
+            <span>分類</span>
+            <select id="f-cls" aria-label="分類" value={cls} onChange={(event) => setCls(event.target.value as ClassificationKind | 'all')} className={selectClass}>
+              <option value="all">すべての分類</option>
+              {CLASSIFICATIONS.map((item) => <option key={item} value={item}>{CLASSIFICATION_LABELS[item]}</option>)}
+            </select>
+          </label>
+          <label htmlFor="f-ver">
+            <span>情報確認状態</span>
+            <select id="f-ver" aria-label="情報確認状態" value={ver} onChange={(event) => setVer(event.target.value as VerificationStatus | 'all')} className={selectClass}>
+              <option value="all">すべて</option>
+              {VERIFICATIONS.map((item) => <option key={item} value={item}>{VERIFICATION_LABELS[item]}</option>)}
+            </select>
+          </label>
+          <label htmlFor="f-hierarchy">
+            <span>階層</span>
+            <select id="f-hierarchy" aria-label="階層" value={hierarchyScope} onChange={(event) => setHierarchyScope(event.target.value as HierarchyScope)} className={selectClass}>
+              <option value="all">すべて</option>
+              <option value="parent">親・代表のみ</option>
+              <option value="child">子・内訳のみ</option>
+            </select>
+          </label>
+        </div>
       </div>
 
       {activeFilters.length > 0 && (

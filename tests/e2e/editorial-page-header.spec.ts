@@ -35,20 +35,22 @@ for (const [path, englishTitle, japaneseTitle] of editorialPages) {
   });
 }
 
-test('ムーブメント検索ツールバーはガラス面としてスクロール中も固定される', async ({
+test('ムーブメント検索はスクロールし、フィルターと並び順だけが固定される', async ({
   page,
 }) => {
   await page.goto('/movements/');
 
   const toolbar = page.locator('.movements-directory-toolbar');
+  const controls = page.locator('.movements-directory-controls');
   const search = page.locator('.movements-search');
   const utilities = page.locator('.movements-directory-toolbar__utilities');
   await expect(toolbar).toBeVisible();
+  await expect(controls).toBeVisible();
   await expect(search).toBeVisible();
   await expect(utilities).toBeVisible();
   await expect(utilities.locator('svg')).toHaveCount(4);
 
-  const initial = await toolbar.evaluate((element) => {
+  const initial = await controls.evaluate((element) => {
     const styles = getComputedStyle(element);
     return {
       position: styles.position,
@@ -62,10 +64,11 @@ test('ムーブメント検索ツールバーはガラス面としてスクロ�
   });
   expect(initial.position).toBe('sticky');
   expect(searchBackdrop).toContain('blur');
+  expect(await toolbar.evaluate((element) => getComputedStyle(element).position)).toBe('static');
 
-  const layout = await toolbar.evaluate((element) => {
-    const searchBox = element.querySelector<HTMLElement>('.movements-search')!.getBoundingClientRect();
-    const utilityBox = element
+  const layout = await page.evaluate(() => {
+    const searchBox = document.querySelector<HTMLElement>('.movements-search')!.getBoundingClientRect();
+    const utilityBox = document
       .querySelector<HTMLElement>('.movements-directory-toolbar__utilities')!
       .getBoundingClientRect();
     return { searchBottom: searchBox.bottom, utilitiesTop: utilityBox.top };
@@ -75,7 +78,11 @@ test('ムーブメント検索ツールバーはガラス面としてスクロ�
   await page.evaluate(() => window.scrollTo({ top: 1200, behavior: 'instant' }));
   await page.waitForTimeout(100);
 
-  const stuckY = await toolbar.evaluate((element) => element.getBoundingClientRect().top);
+  const stuckY = await controls.evaluate((element) => element.getBoundingClientRect().top);
+  const searchY = await search.evaluate((element) => element.getBoundingClientRect().bottom);
   expect(Math.abs(stuckY - initial.top)).toBeLessThanOrEqual(2);
   expect(stuckY).toBeLessThan(initial.y);
+  expect(searchY).toBeLessThan(0);
+  await expect(page.getByRole('button', { name: /詳細条件・フィルター/ })).toBeInViewport();
+  await expect(page.getByRole('combobox', { name: '並び順' })).toBeInViewport();
 });
