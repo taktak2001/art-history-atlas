@@ -2806,47 +2806,6 @@ html.dark .timeline-era-option[aria-current='true'] {
   border-top: 1px solid rgb(var(--c-line));
 }
 
-.network-map-tools {
-  display: flex;
-  min-height: 2.75rem;
-  align-items: center;
-  justify-content: flex-end;
-  gap: 1rem;
-  border-top: 1px solid rgb(var(--c-line));
-}
-
-.network-zoom-control {
-  display: grid;
-  grid-template-columns: 2.75rem 3.25rem 2.75rem 3.5rem;
-  align-items: center;
-  border-inline: 1px solid rgb(var(--c-line));
-}
-
-.network-zoom-control button,
-.network-zoom-control output {
-  display: grid;
-  min-height: 2.75rem;
-  place-items: center;
-  color: rgb(var(--c-muted));
-  font-size: 0.75rem;
-  font-variant-numeric: tabular-nums;
-  letter-spacing: 0;
-}
-
-.network-zoom-control button:hover:not(:disabled),
-.network-zoom-control button:focus-visible {
-  color: rgb(var(--c-ink));
-}
-
-.network-zoom-control button:disabled {
-  opacity: 0.3;
-}
-
-.network-overview-control {
-  border-left: 1px solid rgb(var(--c-line));
-  font-weight: 600;
-}
-
 .network-clear-selection {
   min-height: 2.75rem;
   padding-inline: 0.15rem;
@@ -2860,32 +2819,185 @@ html.dark .timeline-era-option[aria-current='true'] {
   color: rgb(var(--c-ink));
 }
 
-.network-era-nav {
-  position: sticky;
-  top: 4rem;
-  z-index: 35;
-  height: 3rem;
+/* モード切替と時代選択は1本のツールバーとしてまとめる。
+   検索・年代軸とは別の階層であることを、間隔ではなく面で示す */
+.network-toolbar {
+  display: flex;
+  min-height: 3.5rem;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
   margin-inline: -1rem;
   padding-inline: 1rem;
   border-block: 1px solid rgb(var(--c-line));
-  background: rgb(var(--c-paper) / 0.95);
-  backdrop-filter: blur(16px) saturate(130%);
+  background: rgb(var(--c-surface));
 }
 
-.network-era-nav__button {
-  min-width: max-content;
+.network-mode-switch {
+  display: flex;
+  flex: none;
+  height: 2.125rem;
+  overflow: hidden;
+  border: 1px solid rgb(var(--c-line));
+  border-radius: 0.3125rem;
+  background: rgb(var(--c-paper));
+}
+
+.network-mode-switch__option {
+  display: grid;
   min-height: 2.75rem;
-  padding-inline: 0.85rem;
-  border-bottom: 2px solid transparent;
+  place-items: center;
+  padding-inline: 0.8rem;
+  border-left: 1px solid rgb(var(--c-line));
   color: rgb(var(--c-muted));
+  font-size: 0.65625rem;
+  font-weight: 600;
+  letter-spacing: 0.08em;
+  transition:
+    color 140ms ease,
+    background-color 140ms ease;
+}
+
+.network-mode-switch__option:first-child {
+  border-left: 0;
+}
+
+.network-mode-switch__option:hover {
+  color: rgb(var(--c-ink));
+}
+
+.network-mode-switch__option[aria-pressed='true'] {
+  background: rgb(var(--c-ink));
+  color: rgb(var(--c-paper));
+  font-weight: 700;
+}
+
+.network-era-select {
+  position: relative;
+  display: inline-flex;
+  min-width: 0;
+  align-items: center;
+  gap: 0.3rem;
+  color: rgb(var(--c-ink));
+}
+
+.network-era-select select {
+  /* ネイティブselectは最長の選択肢に合わせて広がるので、幅を明示して切り詰める */
+  max-width: 7.5rem;
+  min-width: 0;
+  min-height: 2.75rem;
+  padding-right: 0.15rem;
+  overflow: hidden;
+  border: 0;
+  background: transparent;
+  color: inherit;
+  font-family: var(--font-serif);
+  /* iOSの自動ズームを避けるため16px以上を保つ */
+  font-size: 1rem;
+  font-weight: 500;
+  letter-spacing: 0.02em;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  appearance: none;
+}
+
+.network-era-select .accordion-chevron {
+  /* selectそのものがタップ対象なので、シェブロンは44pxの枠を持たなくてよい */
+  min-width: 0;
+  min-height: 0;
+  pointer-events: none;
+  color: rgb(var(--c-muted));
+}
+
+.network-mode-purpose {
+  padding-block: 0.5rem;
+  color: rgb(var(--c-faint));
   font-size: 0.75rem;
 }
 
-.network-era-nav__button[aria-current='true'] {
-  border-color: rgb(var(--c-accent));
-  background: rgb(var(--c-raised));
+/* ズームは地図の上に浮かせる。倍率の数値は出さない
+   （モードを選ぶと倍率も決まる、という内部実装を意識させない） */
+.network-map-viewport {
+  position: relative;
+  min-width: 0;
+}
+
+.network-zoom-fab {
+  position: absolute;
+  right: 0.875rem;
+  bottom: 0.875rem;
+  z-index: 46;
+  display: flex;
+  height: 2.25rem;
+  align-items: center;
+  overflow: hidden;
+  border: 1px solid rgb(var(--c-line));
+  border-radius: 1.125rem;
+  background: rgb(var(--c-raised) / 0.94);
+  box-shadow: 0 2px 10px rgb(var(--c-network-shadow) / 0.12);
+  backdrop-filter: blur(10px);
+}
+
+.network-zoom-fab button {
+  display: grid;
+  width: 2.375rem;
+  height: 100%;
+  place-items: center;
+  color: rgb(var(--c-muted));
+  font-size: 0.9375rem;
+}
+
+.network-zoom-fab button + button {
+  border-left: 1px solid rgb(var(--c-line));
+}
+
+.network-zoom-fab button:hover:not(:disabled),
+.network-zoom-fab button:focus-visible {
   color: rgb(var(--c-ink));
-  font-weight: 700;
+}
+
+.network-zoom-fab button:disabled {
+  opacity: 0.3;
+}
+
+/* ───────────────────────────────────────────────
+   モードごとの強弱。
+   数値はここに集約する（コンポーネント側は役割名だけを渡す）
+   ─────────────────────────────────────────────── */
+
+/* FOCUS：選ぶ→周りが引く、を大胆にやる */
+.network-node[data-node-emphasis='selected'],
+.network-node[data-node-emphasis='direct'] {
+  opacity: 1;
+}
+
+.network-node[data-node-emphasis='second'] {
+  opacity: 0.45;
+}
+
+.network-node[data-node-emphasis='background'] {
+  opacity: 0.13;
+}
+
+[data-edge-emphasis='primary'] {
+  opacity: 1;
+}
+
+[data-edge-emphasis='second'] {
+  opacity: 0.45;
+}
+
+[data-edge-emphasis='background'] {
+  opacity: 0.1;
+}
+
+/* OVERVIEW：線より配置を読む。主幹（重要関係＋復興）だけを少し強く */
+[data-edge-emphasis='backbone'] {
+  opacity: 0.55;
+}
+
+[data-edge-emphasis='minor'] {
+  opacity: 0.28;
 }
 
 .network-scroll {
@@ -2908,7 +3020,7 @@ html.dark .timeline-era-option[aria-current='true'] {
   grid-template-columns: minmax(0, 1fr) minmax(18rem, 21rem);
 }
 
-.network-map-shell > .network-scroll {
+.network-map-shell > .network-map-viewport {
   min-width: 0;
 }
 
@@ -2966,12 +3078,10 @@ html.dark .timeline-era-option[aria-current='true'] {
 }
 
 .network-region-lane {
+  /* 地域は箱ではなくレーン。地色は各地域色のごく薄い一様な帯だけで示し、
+     境界線は引かない（罫線を足すとレーンが箱に見える） */
   border-bottom: 0;
-  background: linear-gradient(
-    90deg,
-    rgb(var(--network-region-rgb) / 0.018),
-    transparent 24rem
-  );
+  background: rgb(var(--network-region-rgb) / 0.045);
 }
 
 .network-region-lane[data-lane-relevance='context'] {
@@ -3267,8 +3377,13 @@ html.dark .timeline-era-option[aria-current='true'] {
   transform: none;
 }
 
+/* 390pxのFOCUSでは、2ホップ先も駅だけを残して名前は畳む。
+   「その先にもある」ことは点で伝わり、読ませたいのは選択と直接関係だけ。 */
 .network-scroll[data-network-mobile='true'][data-network-camera='focused']
   .network-node[data-node-state='dimmed']
+  .network-node__content,
+.network-scroll[data-network-mobile='true'][data-network-camera='focused']
+  .network-node[data-node-emphasis='second']
   .network-node__content {
   display: none;
 }
@@ -4159,8 +4274,14 @@ html.dark .timeline-era-option[aria-current='true'] {
     min-height: 2.5rem;
   }
 
-  .network-map-tools {
-    min-height: 2.5rem;
+  .network-toolbar {
+    min-height: 3.25rem;
+  }
+
+  .network-mode-switch__option {
+    padding-inline: 0.62rem;
+    font-size: 0.625rem;
+    letter-spacing: 0.06em;
   }
 
   .network-scroll {
@@ -4182,23 +4303,37 @@ html.dark .timeline-era-option[aria-current='true'] {
   .network-map-shell > .network-detail-panel {
     position: fixed;
     top: auto;
-    right: 0.75rem;
-    bottom: calc(0.5rem + env(safe-area-inset-bottom));
-    left: 0.75rem;
+    right: 0;
+    bottom: 0;
+    left: 0;
     z-index: 55;
-    max-height: min(40dvh, 22rem);
+    max-height: min(46dvh, 25rem);
     margin: 0;
+    padding-bottom: calc(1rem + env(safe-area-inset-bottom));
     overflow: auto;
-    box-shadow: 0 -10px 32px rgb(var(--c-ink) / 0.1);
+    border: 0;
+    border-radius: 1.375rem 1.375rem 0 0;
+    box-shadow:
+      0 -1px 0 rgb(var(--c-line) / 0.9),
+      0 -20px 48px rgb(var(--c-network-shadow) / 0.18);
+  }
+
+  /* 上端のつまみ。シートとして掴める見た目にする */
+  .network-map-shell > .network-detail-panel::before {
+    position: sticky;
+    top: 0;
+    display: block;
+    width: 2.5rem;
+    height: 0.3125rem;
+    margin: 0 auto 0.65rem;
+    border-radius: 0.1875rem;
+    background: rgb(var(--c-line));
+    content: '';
   }
 
   .network-detail-panel__grid {
     grid-template-columns: minmax(0, 1fr);
     gap: 0.9rem;
-  }
-
-  .network-era-nav {
-    top: 4rem;
   }
 
   .chronology-page {

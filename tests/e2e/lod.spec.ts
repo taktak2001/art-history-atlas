@@ -1,11 +1,13 @@
 import { test, expect } from '@playwright/test';
-import { openLodFab, selectLod } from './lod-helpers';
+import { openLodFab, selectLod, selectNetworkMode } from './lod-helpers';
 
-test('主要4画面でLOD操作を右下の銀杏形FABへ一本化する', async ({
+test('主要3画面でLOD操作を右下の銀杏形FABへ一本化する', async ({
   page,
 }) => {
-  // ムーブメント一覧はLODを持たない（常に全件が対象）
-  for (const route of ['/timeline/', '/chronology/', '/network/', '/matrix/']) {
+  // ムーブメント一覧はLODを持たない（常に全件が対象）。
+  // 関係ネットワークは情報量ではなく閲覧目的（OVERVIEW/STUDY/FOCUS）で切り替えるため、
+  // 共通FABを置かない。
+  for (const route of ['/timeline/', '/chronology/', '/matrix/']) {
     await page.goto(route);
     const fab = page.locator('[data-semantic-lod-fab]');
     const trigger = page.getByRole('button', { name: '表示密度を変更' });
@@ -129,23 +131,47 @@ test('PCの通史coreは一時インスペクタを出さず代表項目から�
   await expect(page.locator('[data-movement-inspector]')).toHaveCount(0);
 });
 
-test('ネットワークはLOD外ノードをDOMへ描画しない', async ({ page }, testInfo) => {
-  await page.goto('/network/?lod=core');
-  const graph = page.getByRole('group', { name: '美術運動の関係ネットワーク図' });
-  await expect(graph).toHaveAttribute('data-network-lod', 'core');
-  await expect(graph.getByRole('button', { name: '未来派を選択' })).toHaveCount(0);
+test('ネットワークは情報量ではなく閲覧目的でモードを切り替える', async ({ page }) => {
+  await page.goto('/network/');
 
-  await selectLod(page, 'standard');
-  if (testInfo.project.name === 'mobile') {
-    await page.getByRole('button', { name: 'すべて表示' }).click();
-  }
-  // Overview is an editorial map capped at the principal movements. Zoom into
-  // Study before asserting that the selected LOD's complete DOM set is present.
-  const zoomIn = page.getByRole('button', { name: 'ネットワークを拡大' });
-  for (let step = 0; step < 8; step += 1) {
-    if ((await graph.getAttribute('data-network-semantic-level')) !== 'overview') break;
-    await zoomIn.click();
-  }
+  const graph = page.getByRole('group', { name: '美術運動の関係ネットワーク図' });
+  // 日常利用の標準はSTUDY
+  await expect(page.locator('[data-network-mode-option="study"]')).toHaveAttribute(
+    'aria-pressed',
+    'true',
+  );
+  await expect(graph).toHaveAttribute('data-network-mode', 'study');
+  await expect(graph).toHaveAttribute('data-network-lod', 'standard');
+  // 共通のLOD FABはネットワークには置かない
+  await expect(page.locator('[data-semantic-lod-fab]')).toHaveCount(0);
+
+  // OVERVIEWは俯瞰専用。収録範囲が基本まで下がり、関係ラベルも出さない
+  await selectNetworkMode(page, 'overview');
+  await expect(page).toHaveURL(/mode=overview/);
+  await expect(graph).toHaveAttribute('data-network-lod', 'core');
+  await expect(graph).toHaveAttribute('data-network-semantic-level', 'overview');
+  await expect(page.locator('[data-edge-label]')).toHaveCount(0);
+
+  // STUDYへ戻すと通常ムーブメントと関係ラベルが戻る
+  await selectNetworkMode(page, 'study');
   await expect(graph).toHaveAttribute('data-network-semantic-level', 'study');
   await expect(graph.getByRole('button', { name: '未来派を選択' })).toBeVisible();
+  // ラベルはスクロール外にも置かれるので、可視ではなく件数で見る
+  await expect
+    .poll(() => page.locator('[data-edge-label]').count())
+    .toBeGreaterThan(0);
+});
+
+test('ネットワークのモードは倍率ではなく閲覧目的で、倍率の数値は出さない', async ({
+  page,
+}) => {
+  await page.goto('/network/?mode=study');
+
+  // ズーム率の数値は見せない（モードを選ぶと倍率も決まる、という内部実装を意識させない）
+  await expect(page.getByText(/^\d+%$/)).toHaveCount(0);
+  await expect(page.locator('[data-network-zoom-fab]')).toBeVisible();
+
+  // FOCUSはカメラが選択に合わせて決まるので、倍率の操作自体を出さない
+  await page.goto('/network/?mode=focus&focus=cubism');
+  await expect(page.locator('[data-network-zoom-fab]')).toHaveCount(0);
 });
