@@ -116,7 +116,7 @@ test('ネットワークで検索後に手動変更しても自動設定へ戻�
   const dialog = page.getByRole('dialog', { name: 'ムーブメントを検索' });
   await dialog.getByRole('combobox').fill('キュビスム');
   await page.locator('[data-movement-option="cubism"]').click();
-  await expect(page).toHaveURL(/lod=standard/);
+  await expect(page).toHaveURL(/lod=detailed/);
 
   // 手動でLODを基本へ戻す
   await selectLod(page, 'core');

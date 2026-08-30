@@ -529,10 +529,21 @@ export function NetworkGraph({ movements, relationships, eraOrder }: Props) {
         ? selectNetworkOverviewMovements(
             lodMovements,
             editorialDegreeByNode,
-            isMobile ? 12 : 16,
+            16,
           )
         : lodMovements;
     const ids = new Set(overviewBase.map((movement) => movement.id));
+
+    // An explicit relation-type filter must not yield an empty map merely
+    // because both endpoints fell outside the compact overview landmarks.
+    // Keep the normal overview quiet, but reveal the endpoints the user
+    // explicitly asked to inspect.
+    if (relationKindFilter !== 'all') {
+      for (const relationship of scopedEdges) {
+        ids.add(relationship.from);
+        ids.add(relationship.to);
+      }
+    }
 
     // A focus remains a local map even when the camera is still at overview
     // scale. Keep the selected station and every direct destination visible.
@@ -556,9 +567,9 @@ export function NetworkGraph({ movements, relationships, eraOrder }: Props) {
       );
   }, [
     editorialDegreeByNode,
-    isMobile,
     lodMovements,
     movements,
+    relationKindFilter,
     scopedEdges,
     selectedNodeId,
     semanticLevel,

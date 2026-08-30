@@ -115,8 +115,8 @@ test('地域フィルタ（日本）を適用できる', async ({ page }) => {
   // 地域は「詳細条件」アコーディオン内にあるため、まず開く
   await page.getByRole('button', { name: /詳細条件/ }).click();
   await page.getByLabel('地域', { exact: true }).selectOption('japan');
-  await expect(page.getByRole('link', { name: /もの派/ })).toBeVisible();
-  await expect(page.getByRole('link', { name: /具体美術協会/ })).toBeVisible();
+  await expect(page.getByRole('link', { name: /日本画/ })).toBeVisible();
+  await expect(page.getByRole('link', { name: /洋画/ })).toBeVisible();
   // 日本以外（バロック）は表示されない
   await expect(page.getByRole('link', { name: /^バロック/ })).toHaveCount(0);
 });

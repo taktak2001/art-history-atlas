@@ -122,7 +122,7 @@ describe('縦型年表の展示情報', () => {
     expect(connection?.relationship.from).toBe('impressionism');
     expect(connection?.label).toContain('印象派');
     expect(nextMovement(movement('impressionism'), movements, relationships)?.id).toBe(
-      'post-impressionism',
+      'neo-impressionism',
     );
     expect(
       nextMovement(

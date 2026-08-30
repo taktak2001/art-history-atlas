@@ -82,7 +82,7 @@ test('ムーブメント一覧はLODを持たず、常に全件から検索す�
   await page.goto('/movements/?lod=core');
 
   await expect(page.getByText('LEVEL OF DETAIL')).toHaveCount(0);
-  await expect(page.getByText('54件のムーブメント')).toBeVisible();
+  await expect(page.getByText('84件のムーブメント')).toBeVisible();
 
   await page.getByRole('searchbox').fill('未来派');
   await expect(page.getByText('現在の表示範囲では非表示')).toHaveCount(0);

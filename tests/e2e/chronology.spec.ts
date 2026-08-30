@@ -23,7 +23,7 @@ test('初期表示は時代ヒーローだけを示し、選択した展示を�
   await expect(page.getByRole('button', { name: '表示密度を変更' })).toBeVisible();
   await openLodFab(page);
   await expect(
-    page.getByRole('menuitemradio', { name: /基本に切り替え、32件/ }),
+    page.getByRole('menuitemradio', { name: /基本に切り替え、36件/ }),
   ).toHaveAttribute('aria-checked', 'true');
   await page.getByRole('button', { name: '表示密度を変更' }).click();
   await expect(page.locator('.chronology-era__toggle')).toHaveCount(0);

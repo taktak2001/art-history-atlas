@@ -1,6 +1,7 @@
 import type { Source } from '@/lib/schema';
 import { coreExpansionSources } from './expansion/core-sources';
 import { finalExpansionSources } from './expansion/final-sources';
+import { phaseTwoExpansionSources } from './expansion/phase-two-sources';
 import { supplementalImageSources } from './expansion/image-supplements';
 import { standardOneExpansionSources } from './expansion/standard-one-sources';
 
@@ -611,5 +612,6 @@ export const sources: Source[] = [
   ...coreExpansionSources,
   ...standardOneExpansionSources,
   ...finalExpansionSources,
+  ...phaseTwoExpansionSources,
   ...supplementalImageSources,
 ];
