@@ -55,12 +55,27 @@ export type ChronologicalNetworkLayout = {
 // Overview keeps labels at their normal CSS size and reduces the dataset, so
 // the camera can travel much farther out without turning text into microcopy.
 export const NETWORK_ZOOM_MIN = 0.18;
+export const NETWORK_OVERVIEW_ZOOM_MIN = 0.08;
 export const NETWORK_ZOOM_MAX = 1.6;
 export const NETWORK_VISUAL_GUTTER = 32;
 export const NETWORK_OVERVIEW_NODE_LIMIT = 26;
+export const NETWORK_OVERVIEW_LABEL_LIMIT = 5;
 
-export function clampNetworkZoom(value: number) {
-  return Math.min(NETWORK_ZOOM_MAX, Math.max(NETWORK_ZOOM_MIN, value));
+/**
+ * These are editorial anchors, not a second dataset. They express the five
+ * movements that make the long historical sweep legible at atlas scale. If a
+ * future dataset omits one, the selector below fills the vacancy by score.
+ */
+export const NETWORK_OVERVIEW_EDITORIAL_ANCHORS = [
+  'italian-renaissance',
+  'impressionism',
+  'cubism',
+  'abstract-expressionism',
+  'minimalism',
+] as const;
+
+export function clampNetworkZoom(value: number, minZoom = NETWORK_ZOOM_MIN) {
+  return Math.min(NETWORK_ZOOM_MAX, Math.max(minZoom, value));
 }
 
 export function networkSemanticLevel(zoom: number): NetworkSemanticLevel {
@@ -163,6 +178,51 @@ export function selectNetworkOverviewMovements(
   );
 }
 
+/**
+ * Overview separates stations from labels. The five curated anchors provide
+ * historical coverage and bridge roles; scoring is only the deterministic
+ * fallback, so relation degree cannot monopolise the atlas labels.
+ */
+export function selectNetworkOverviewLabelIds(
+  movements: Movement[],
+  relationshipDegreeById: ReadonlyMap<string, number>,
+  historicalBridgeById: ReadonlyMap<string, number> = new Map(),
+  limit = NETWORK_OVERVIEW_LABEL_LIMIT,
+): Set<string> {
+  const movementById = new Map(movements.map((movement) => [movement.id, movement]));
+  const selected: Movement[] = [];
+
+  for (const id of NETWORK_OVERVIEW_EDITORIAL_ANCHORS) {
+    const movement = movementById.get(id);
+    if (movement) selected.push(movement);
+    if (selected.length >= limit) break;
+  }
+
+  if (selected.length < limit) {
+    const selectedIds = new Set(selected.map((movement) => movement.id));
+    const rankedFallbacks = movements
+      .filter((movement) => !selectedIds.has(movement.id))
+      .sort((a, b) => {
+        const editorialScore = (movement: Movement) =>
+          networkNodeImportanceScore(
+            movement,
+            relationshipDegreeById.get(movement.id) ?? 0,
+          ) +
+          (historicalBridgeById.get(movement.id) ?? 0) * 3 +
+          (movement.visibilityLevel === 'core' ? 4 : 0) +
+          (movement.isRepresentative ? 4 : 0);
+        return (
+          editorialScore(b) - editorialScore(a) ||
+          a.dates.start - b.dates.start ||
+          a.id.localeCompare(b.id)
+        );
+      });
+    selected.push(...rankedFallbacks.slice(0, limit - selected.length));
+  }
+
+  return new Set(selected.slice(0, limit).map((movement) => movement.id));
+}
+
 export function getNetworkVisualBounds(
   rects: NetworkVisualRect[],
   gutter = 0,
@@ -201,6 +261,7 @@ export function getNetworkFitZoom({
   headerH,
   padding = NETWORK_VISUAL_GUTTER,
   maxZoom = NETWORK_ZOOM_MAX,
+  minZoom = NETWORK_ZOOM_MIN,
 }: {
   currentZoom: number;
   bounds: NetworkVisualBounds;
@@ -210,6 +271,7 @@ export function getNetworkFitZoom({
   headerH: number;
   padding?: number;
   maxZoom?: number;
+  minZoom?: number;
 }) {
   const availableWidth = Math.max(1, viewportWidth - axisW - padding * 2);
   const availableHeight = Math.max(1, viewportHeight - headerH - padding * 2);
@@ -217,7 +279,7 @@ export function getNetworkFitZoom({
     availableWidth / Math.max(1, bounds.width),
     availableHeight / Math.max(1, bounds.height),
   );
-  return Math.min(maxZoom, clampNetworkZoom(currentZoom * ratio));
+  return Math.min(maxZoom, clampNetworkZoom(currentZoom * ratio, minZoom));
 }
 
 const primaryRegion = (movement: Movement): RegionId =>
@@ -236,6 +298,7 @@ export function buildChronologicalNetworkLayout({
   safePad = 16,
   visualGutter = NETWORK_VISUAL_GUTTER,
   focusNodeIds,
+  overview = false,
 }: {
   movements: Movement[];
   regionOrder: RegionId[];
@@ -244,11 +307,15 @@ export function buildChronologicalNetworkLayout({
   safePad?: number;
   visualGutter?: number;
   focusNodeIds?: ReadonlySet<string>;
+  overview?: boolean;
 }): ChronologicalNetworkLayout {
-  const resolvedZoom = clampNetworkZoom(zoom);
+  const resolvedZoom = clampNetworkZoom(
+    zoom,
+    overview ? NETWORK_OVERVIEW_ZOOM_MIN : NETWORK_ZOOM_MIN,
+  );
   const mode = timelineModeById('survey');
-  const axisW = compact ? 88 : 142;
-  const headerH = compact ? 48 : 52;
+  const axisW = overview ? (compact ? 82 : 124) : compact ? 88 : 142;
+  const headerH = overview ? (compact ? 42 : 46) : compact ? 48 : 52;
   const basePad = compact ? 24 : 36;
   const baseNodeW = compact ? 150 : 174;
   const baseNodeH = compact ? 58 : 62;
@@ -261,21 +328,34 @@ export function buildChronologicalNetworkLayout({
   const nodeW = Math.round(baseNodeW * resolvedZoom);
   // Labels keep a readable CSS size while the historical world zooms. Give
   // every station enough physical height to keep its route below the label.
-  const nodeH = Math.max(compact ? 34 : 40, Math.round(baseNodeH * resolvedZoom));
-  const stationY = Math.max(20, nodeH - (compact ? 7 : 9));
-  const trackStep = Math.max(
-    compact ? 48 : 54,
-    Math.round(baseTrackStep * resolvedZoom),
-  );
+  const nodeH = overview
+    ? compact
+      ? 20
+      : 22
+    : Math.max(compact ? 34 : 40, Math.round(baseNodeH * resolvedZoom));
+  const stationY = overview ? Math.round(nodeH / 2) : Math.max(20, nodeH - (compact ? 7 : 9));
+  const trackStep = overview
+    ? compact
+      ? 13
+      : 15
+    : Math.max(compact ? 48 : 54, Math.round(baseTrackStep * resolvedZoom));
   const lanePadding = Math.max(
     compact ? 3 : 4,
     Math.round(baseLanePadding * resolvedZoom),
   );
-  const minimumLaneHeight = Math.max(
-    nodeH + (compact ? 8 : 12),
-    compact ? 0 : Math.round(baseMinimumLaneHeight * resolvedZoom),
-  );
-  const regionGap = Math.max(6, Math.round(baseRegionGap * resolvedZoom));
+  const minimumLaneHeight = overview
+    ? compact
+      ? 24
+      : 26
+    : Math.max(
+        nodeH + (compact ? 8 : 12),
+        compact ? 0 : Math.round(baseMinimumLaneHeight * resolvedZoom),
+      );
+  const regionGap = overview
+    ? compact
+      ? 2
+      : 3
+    : Math.max(6, Math.round(baseRegionGap * resolvedZoom));
   const timelineW = Math.round(baseTimelineW * resolvedZoom);
   // The final historical years must be centerable even on a wide viewport.
   // This is display-safe space only; it never changes the time coordinate.
@@ -343,7 +423,9 @@ export function buildChronologicalNetworkLayout({
     });
 
     const trackCount = trackEnds.length;
-    const compactPadding = compact
+    const compactPadding = overview
+      ? 2
+      : compact
       ? focusNodeIds
         ? 5
         : 8
@@ -403,7 +485,12 @@ export function buildChronologicalNetworkLayout({
     positions,
     lanes,
     canvasW: Math.ceil(Math.max(nominalCanvasW, visualBounds.maxX + visualGutter)),
-    canvasH: Math.ceil(Math.max(nominalCanvasH, visualBounds.maxY + visualGutter)),
+    canvasH: Math.ceil(
+      Math.max(
+        nominalCanvasH,
+        overview ? visualBounds.maxY : visualBounds.maxY + visualGutter,
+      ),
+    ),
     timelineW,
     nodeW,
     nodeH,
