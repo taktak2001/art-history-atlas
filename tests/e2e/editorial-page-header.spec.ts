@@ -48,6 +48,8 @@ test('ムーブメント検索はスクロールし、フィルターと並び�
   await expect(controls).toBeVisible();
   await expect(search).toBeVisible();
   await expect(utilities).toBeVisible();
+  await expect(toolbar).toHaveAttribute('data-scroll-role', 'flow-search');
+  await expect(controls).toHaveAttribute('data-scroll-role', 'sticky-controls');
   await expect(utilities.locator('svg')).toHaveCount(4);
 
   const initial = await controls.evaluate((element) => {

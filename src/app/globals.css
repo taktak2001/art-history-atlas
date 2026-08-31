@@ -4782,6 +4782,7 @@ html.dark .chronology-era--digital {
 }
 
 .movements-directory-toolbar {
+  position: static;
   display: grid;
   gap: 0.7rem;
   padding-block: 0.35rem 0;
