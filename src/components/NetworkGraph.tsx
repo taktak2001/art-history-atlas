@@ -81,12 +81,13 @@ import {
   buildChronologicalNetworkLayout,
   clampNetworkZoom,
   getNetworkFitZoom,
-  networkNodeImportanceScore,
   networkNodeProminence,
   getNetworkVisualBounds,
   NETWORK_ZOOM_MAX,
   NETWORK_ZOOM_MIN,
+  NETWORK_OVERVIEW_ZOOM_MIN,
   networkSemanticLevelForLod,
+  selectNetworkOverviewLabelIds,
   selectNetworkOverviewMovements,
   type ChronologicalNetworkLayout,
   type NetworkVisualBounds,
@@ -564,6 +565,8 @@ export function NetworkGraph({ movements, relationships, eraOrder }: Props) {
   // Information density follows the explicit LOD control. Camera zoom only
   // changes how much of the historical map is visible.
   const semanticLevel = networkSemanticLevelForLod(lod);
+  const overviewPresentation =
+    mode === 'overview' && !selectedNodeId && !selectedEdgeId;
 
   const editorialDegreeByNode = useMemo(() => {
     const degrees = new Map<string, number>();
@@ -573,6 +576,23 @@ export function NetworkGraph({ movements, relationships, eraOrder }: Props) {
     }
     return degrees;
   }, [relationships]);
+
+  const editorialBridgeByNode = useMemo(() => {
+    const bridgeCounts = new Map<string, number>();
+    const movementById = new Map(movements.map((movement) => [movement.id, movement]));
+    for (const relationship of relationships) {
+      const from = movementById.get(relationship.from);
+      const to = movementById.get(relationship.to);
+      if (!from || !to) continue;
+      const crossesEra = from.era !== to.era;
+      const crossesRegion =
+        (from.regionIds[0] ?? 'other') !== (to.regionIds[0] ?? 'other');
+      if (!crossesEra && !crossesRegion) continue;
+      bridgeCounts.set(from.id, (bridgeCounts.get(from.id) ?? 0) + 1);
+      bridgeCounts.set(to.id, (bridgeCounts.get(to.id) ?? 0) + 1);
+    }
+    return bridgeCounts;
+  }, [movements, relationships]);
 
   const displayedMovements = useMemo(() => {
     const overviewBase =
@@ -631,27 +651,15 @@ export function NetworkGraph({ movements, relationships, eraOrder }: Props) {
     [displayedMovements],
   );
 
-  const overviewLandmarkIds = useMemo(() => {
-    const landmarkByRegion = new Map<string, Movement>();
-    for (const movement of displayedMovements) {
-      const region = movement.regionIds[0] ?? 'other';
-      const current = landmarkByRegion.get(region);
-      if (
-        !current ||
-        networkNodeImportanceScore(
-          movement,
-          editorialDegreeByNode.get(movement.id) ?? 0,
-        ) >
-          networkNodeImportanceScore(
-            current,
-            editorialDegreeByNode.get(current.id) ?? 0,
-          )
-      ) {
-        landmarkByRegion.set(region, movement);
-      }
-    }
-    return new Set([...landmarkByRegion.values()].map((movement) => movement.id));
-  }, [displayedMovements, editorialDegreeByNode]);
+  const overviewLandmarkIds = useMemo(
+    () =>
+      selectNetworkOverviewLabelIds(
+        displayedMovements,
+        editorialDegreeByNode,
+        editorialBridgeByNode,
+      ),
+    [displayedMovements, editorialBridgeByNode, editorialDegreeByNode],
+  );
 
   const visibleEdges = useMemo(() => {
     const withinMap = scopedEdges.filter(
@@ -715,9 +723,98 @@ export function NetworkGraph({ movements, relationships, eraOrder }: Props) {
         compact: isMobile,
         safePad: NETWORK_SVG_SAFE_PADDING,
         focusNodeIds: layoutFocusNodeIds,
+        overview: overviewPresentation,
       }),
-    [displayedMovements, isMobile, layoutFocusNodeIds, networkZoom],
+    [
+      displayedMovements,
+      isMobile,
+      layoutFocusNodeIds,
+      networkZoom,
+      overviewPresentation,
+    ],
   );
+
+  const visibleSurveyTicks = useMemo(() => {
+    if (!overviewPresentation) return SURVEY_TICKS;
+    const minimumGap = isMobile ? 42 : 52;
+    const mode = timelineModeById('survey');
+    const priority = [
+      SURVEY_TICKS[0],
+      SURVEY_TICKS.at(-1)!,
+      1400,
+      1900,
+      1600,
+      1750,
+      -3000,
+      1950,
+      2000,
+      500,
+    ];
+    const selected: number[] = [];
+    for (const tick of priority) {
+      const x = yearToTimelineX(tick, mode, layout.timelineW);
+      if (
+        selected.every(
+          (existing) =>
+            Math.abs(yearToTimelineX(existing, mode, layout.timelineW) - x) >=
+            minimumGap,
+        )
+      ) {
+        selected.push(tick);
+      }
+    }
+    return selected.sort((a, b) => a - b);
+  }, [isMobile, layout.timelineW, overviewPresentation]);
+
+  const overviewLabelOffsets = useMemo(() => {
+    const offsets = new Map<string, number>();
+    if (!overviewPresentation) return offsets;
+    const placed: NetworkVisualRect[] = [];
+    const labels = displayedMovements
+      .filter((movement) => overviewLandmarkIds.has(movement.id))
+      .flatMap((movement) => {
+        const position = layout.positions.get(movement.id);
+        return position ? [{ movement, position }] : [];
+      })
+      .sort(
+        (a, b) =>
+          a.position.y - b.position.y ||
+          a.position.x - b.position.x ||
+          a.movement.id.localeCompare(b.movement.id),
+      );
+
+    for (const { movement, position } of labels) {
+      // These values mirror the compact Overview label's rendered box. The
+      // label is not scaled with the map, so offsets are expressed in screen
+      // pixels as well. Wider steps keep close editorial anchors legible at
+      // the mobile fit scale without changing the underlying station layout.
+      const candidates = [0, 16, -16, 32, -32, 48, -48];
+      const offset =
+        candidates.find((candidate) => {
+          const rect = {
+            x: position.x + 19,
+            y: position.y + layout.stationY - 40 + candidate,
+            width: 124,
+            height: 28,
+          };
+          return placed.every(
+            (other) =>
+              rect.x + rect.width + 4 <= other.x ||
+              rect.x >= other.x + other.width + 4 ||
+              rect.y + rect.height + 4 <= other.y ||
+              rect.y >= other.y + other.height + 4,
+          );
+        }) ?? 0;
+      offsets.set(movement.id, offset);
+      placed.push({
+        x: position.x + 19,
+        y: position.y + layout.stationY - 40 + offset,
+        width: 124,
+        height: 28,
+      });
+    }
+    return offsets;
+  }, [displayedMovements, layout, overviewLandmarkIds, overviewPresentation]);
 
   useLayoutEffect(() => {
     const anchor = zoomAnchorRef.current;
@@ -828,11 +925,14 @@ export function NetworkGraph({ movements, relationships, eraOrder }: Props) {
       const isSelected = movement.id === selectedNodeId;
       const contentVisible =
         isSelected ||
-        ((!layoutFocusNodeIds || layoutFocusNodeIds.has(movement.id)) &&
-          (networkZoom >= 0.52 || overviewLandmarkIds.has(movement.id)));
+        (overviewPresentation
+          ? overviewLandmarkIds.has(movement.id)
+          : (!layoutFocusNodeIds || layoutFocusNodeIds.has(movement.id)) &&
+            (networkZoom >= 0.52 || overviewLandmarkIds.has(movement.id)));
       if (!contentVisible) return [];
 
       const padding = isSelected ? 10 : 7;
+      const overviewOffset = overviewLabelOffsets.get(movement.id) ?? 0;
       const labelWidth = isSelected
         ? Math.max(layout.nodeW - 18, 160)
         : networkZoom < 0.52
@@ -841,9 +941,9 @@ export function NetworkGraph({ movements, relationships, eraOrder }: Props) {
       const labelHeight = isSelected
         ? 44
         : semanticLevel === 'overview'
-          ? 18
+          ? 28
           : 31;
-      const labelBottom = position.y + layout.stationY - 12;
+      const labelBottom = position.y + layout.stationY - 12 + overviewOffset;
       return [{
         id: movement.id,
         rect: {
@@ -859,7 +959,9 @@ export function NetworkGraph({ movements, relationships, eraOrder }: Props) {
     layout,
     layoutFocusNodeIds,
     networkZoom,
+    overviewPresentation,
     overviewLandmarkIds,
+    overviewLabelOffsets,
     selectedNodeId,
     semanticLevel,
   ]);
@@ -1140,6 +1242,27 @@ export function NetworkGraph({ movements, relationships, eraOrder }: Props) {
       if (nodeIds && !nodeIds.has(movement.id)) continue;
       const position = layout.positions.get(movement.id);
       if (!position) continue;
+      if (overviewPresentation) {
+        // Overview fits the actual station mark for every movement. Only the
+        // five editorial labels reserve text space; hidden cards must not make
+        // the camera believe that the atlas is wider or taller than it looks.
+        rects.push({
+          x: position.x + 2,
+          y: position.y + layout.stationY - 7,
+          width: 48,
+          height: 14,
+        });
+        if (overviewLandmarkIds.has(movement.id)) {
+          const overviewOffset = overviewLabelOffsets.get(movement.id) ?? 0;
+          rects.push({
+            x: position.x + 19,
+            y: position.y + layout.stationY - 40 + overviewOffset,
+            width: 124,
+            height: 28,
+          });
+        }
+        continue;
+      }
       const prominence = networkNodeProminence(
         movement,
         editorialDegreeByNode.get(movement.id) ?? 0,
@@ -1156,6 +1279,17 @@ export function NetworkGraph({ movements, relationships, eraOrder }: Props) {
         width: Math.max(layout.nodeW, compactLabelWidth) + 8,
         height: layout.nodeH + 8,
       });
+    }
+
+    if (overviewPresentation) {
+      for (const lane of layout.lanes) {
+        rects.push({
+          x: layout.safePad + layout.axisW,
+          y: lane.top,
+          width: 1,
+          height: lane.height,
+        });
+      }
     }
 
     for (const relationship of visibleEdges) {
@@ -1209,7 +1343,7 @@ export function NetworkGraph({ movements, relationships, eraOrder }: Props) {
     () => getCameraBounds(),
     // getCameraBounds is intentionally derived from these stable layout inputs.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    [displayedMovements, edgeLabelPlacements, editorialDegreeByNode, layout, networkZoom, nodeTextObstacles, visibleEdges],
+    [displayedMovements, edgeLabelPlacements, editorialDegreeByNode, layout, networkZoom, nodeTextObstacles, overviewLabelOffsets, overviewLandmarkIds, overviewPresentation, visibleEdges],
   );
   const focusedCameraBounds = useMemo(
     () => getCameraBounds(relatedNodeIds),
@@ -1286,6 +1420,10 @@ export function NetworkGraph({ movements, relationships, eraOrder }: Props) {
       headerH: layout.headerH,
       padding: 8,
       maxZoom: kind === 'focus' ? 1.12 : 0.84,
+      minZoom:
+        kind === 'overview'
+          ? NETWORK_OVERVIEW_ZOOM_MIN
+          : NETWORK_ZOOM_MIN,
     });
     const targetZoom = kind === 'focus' ? Math.max(0.84, calculatedZoom) : calculatedZoom;
     zoomAnchorRef.current = null;
@@ -1324,6 +1462,10 @@ export function NetworkGraph({ movements, relationships, eraOrder }: Props) {
       headerH: layout.headerH,
       padding: 8,
       maxZoom: pending.kind === 'focus' ? 1.12 : 0.84,
+      minZoom:
+        pending.kind === 'overview'
+          ? NETWORK_OVERVIEW_ZOOM_MIN
+          : NETWORK_ZOOM_MIN,
     });
     const targetZoom =
       pending.kind === 'focus' ? Math.max(0.84, calculatedZoom) : calculatedZoom;
@@ -1424,9 +1566,10 @@ export function NetworkGraph({ movements, relationships, eraOrder }: Props) {
   const applyModeCamera = (next: NetworkMode) => {
     const { camera } = NETWORK_MODE_PRESET[next];
     if (camera === 'fit-all') {
-      overviewFitAppliedRef.current = true;
-      returnToOverviewOnClearRef.current = false;
-      window.requestAnimationFrame(() => requestCameraFit('overview', true));
+      // Wait for the Overview-only layout and label visibility to commit.
+      // The layout effect then applies exactly one fit using those new bounds.
+      overviewFitAppliedRef.current = false;
+      returnToOverviewOnClearRef.current = true;
       return;
     }
     if (camera === 'fit-selection') {
@@ -1586,7 +1729,12 @@ export function NetworkGraph({ movements, relationships, eraOrder }: Props) {
       screenX,
       scrollTop: viewport.scrollTop,
     };
-    setNetworkZoom((current) => clampNetworkZoom(current + delta));
+    setNetworkZoom((current) =>
+      clampNetworkZoom(
+        current + delta,
+        overviewPresentation ? NETWORK_OVERVIEW_ZOOM_MIN : NETWORK_ZOOM_MIN,
+      ),
+    );
   }
 
   const handlePointerDown = (event: PointerEvent<HTMLDivElement>) => {
@@ -1641,9 +1789,8 @@ export function NetworkGraph({ movements, relationships, eraOrder }: Props) {
     setSelectedEdgeId(null);
     setFocusedEdgeId(null);
     setExpandedGroupIds(new Set());
-    setLod('core');
     if (relationScope === 'focus') setRelationScope('important');
-    window.requestAnimationFrame(() => requestCameraFit('overview', true));
+    applyMode('overview');
   };
 
   const selectedMovement = selectedNodeId
@@ -1926,6 +2073,7 @@ export function NetworkGraph({ movements, relationships, eraOrder }: Props) {
         data-network-semantic-level={semanticLevel}
         data-network-zoom={networkZoom.toFixed(2)}
         data-network-compact-overview={networkZoom < 0.52}
+        data-network-overview-presentation={overviewPresentation}
         data-network-camera={selectedNodeId ? 'focused' : 'overview'}
         data-network-visual-gutter={layout.visualGutter}
         data-network-scroll
@@ -1985,7 +2133,7 @@ export function NetworkGraph({ movements, relationships, eraOrder }: Props) {
               <strong>地域</strong>
               <span>年代 →</span>
             </div>
-            {SURVEY_TICKS.map((tick) => (
+            {visibleSurveyTicks.map((tick) => (
               <span
                 key={tick}
                 className="network-time-axis__tick"
@@ -2112,6 +2260,9 @@ export function NetworkGraph({ movements, relationships, eraOrder }: Props) {
                   width: layout.nodeW,
                   height: layout.nodeH,
                   '--network-station-y': `${layout.stationY}px`,
+                  '--network-overview-label-offset-y': `${
+                    overviewLabelOffsets.get(movement.id) ?? 0
+                  }px`,
                 } as CSSProperties}
               >
                 <button
@@ -2365,7 +2516,12 @@ export function NetworkGraph({ movements, relationships, eraOrder }: Props) {
             type="button"
             onClick={() => changeNetworkZoom(-0.16)}
             aria-label="ネットワークを縮小"
-            disabled={networkZoom <= NETWORK_ZOOM_MIN}
+            disabled={
+              networkZoom <=
+              (overviewPresentation
+                ? NETWORK_OVERVIEW_ZOOM_MIN
+                : NETWORK_ZOOM_MIN)
+            }
           >
             −
           </button>

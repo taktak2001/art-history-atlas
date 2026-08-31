@@ -3145,6 +3145,24 @@ html.dark .timeline-era-option[aria-current='true'] {
   background: rgb(var(--network-region-rgb));
 }
 
+/* OVERVIEW is an atlas key, not a reduced STUDY canvas. Ten region lanes fit
+   as compact index bands while the five editorial labels carry the names. */
+.network-scroll[data-network-overview-presentation='true']
+  .network-region-lane__label {
+  align-items: center;
+  padding: 0.2rem 0.42rem;
+  font-size: 0.5625rem;
+  line-height: 1.08;
+}
+
+.network-scroll[data-network-overview-presentation='true']
+  .network-region-lane__label
+  > span {
+  width: 0.3rem;
+  height: 0.3rem;
+  margin-top: 0;
+}
+
 .network-entity-cluster {
   position: absolute;
   z-index: 45;
@@ -3513,6 +3531,28 @@ html.dark .timeline-era-option[aria-current='true'] {
   .network-node[data-node-prominence='peripheral']:not([data-node-state='selected'])
   .network-node__content {
   display: none;
+}
+
+.network-scroll[data-network-overview-presentation='true']
+  .network-node:not([data-overview-landmark='true'])
+  .network-node__content {
+  display: none;
+}
+
+.network-scroll[data-network-overview-presentation='true']
+  .network-node[data-overview-landmark='true']
+  .network-node__content {
+  display: grid;
+  width: max-content;
+  max-width: 7.75rem;
+  transform: translateY(var(--network-overview-label-offset-y, 0));
+}
+
+.network-scroll[data-network-overview-presentation='true']
+  .network-node[data-overview-landmark='true']
+  .network-node__title {
+  font-size: 0.71875rem;
+  font-weight: 600;
 }
 
 .network-node[data-node-state='selected'] .network-node__title {

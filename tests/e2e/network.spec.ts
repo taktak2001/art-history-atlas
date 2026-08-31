@@ -223,6 +223,129 @@ test('overviewとfocused cameraを分け、全体操作で俯瞰へ戻る', asyn
   await expect(graph.locator('[data-node-state="dimmed"]')).toHaveCount(0);
 });
 
+for (const viewport of [
+  { name: 'mobile 390px', width: 390, height: 844 },
+  { name: 'desktop 1280px', width: 1280, height: 900 },
+] as const) {
+  test(`${viewport.name}のOverviewは16駅・10地域・主要5見出しを全体表示する`, async ({
+    page,
+  }) => {
+    await page.setViewportSize({ width: viewport.width, height: viewport.height });
+    await page.goto('/network/?mode=overview');
+    const graph = page.getByRole('group', {
+      name: '美術運動の関係ネットワーク図',
+    });
+
+    await expect.poll(async () => Number(await graph.getAttribute('data-network-zoom')))
+      .toBeLessThan(0.18);
+
+    const metrics = await graph.evaluate((element) => {
+      const graphRect = element.getBoundingClientRect();
+      const inside = (rect: DOMRect) =>
+        rect.left >= graphRect.left - 1 &&
+        rect.right <= graphRect.right + 1 &&
+        rect.top >= graphRect.top - 1 &&
+        rect.bottom <= graphRect.bottom + 1;
+      const intersects = (a: DOMRect, b: DOMRect, gap = 0) =>
+        a.left < b.right + gap &&
+        a.right + gap > b.left &&
+        a.top < b.bottom + gap &&
+        a.bottom + gap > b.top;
+      const nodes = Array.from(
+        element.querySelectorAll<HTMLElement>('[data-network-node]'),
+      );
+      const stations = nodes.map((node) => ({
+        id: node.dataset.networkNodeId,
+        rect: node
+          .querySelector<HTMLElement>('.network-node__station > span')!
+          .getBoundingClientRect(),
+      }));
+      const labels = nodes.flatMap((node) => {
+        const content = node.querySelector<HTMLElement>('.network-node__content');
+        if (!content || getComputedStyle(content).display === 'none') return [];
+        return [{ id: node.dataset.networkNodeId, rect: content.getBoundingClientRect() }];
+      });
+      const lanes = Array.from(
+        element.querySelectorAll<HTMLElement>('[data-network-region]'),
+      ).map((lane) => ({
+        region: lane.dataset.networkRegion,
+        height: Number(lane.dataset.laneHeight),
+        rect: lane.getBoundingClientRect(),
+        labelRect: lane
+          .querySelector<HTMLElement>('.network-region-lane__label')!
+          .getBoundingClientRect(),
+      }));
+      const ticks = Array.from(
+        element.querySelectorAll<HTMLElement>('.network-time-axis__tick'),
+      ).map((tick) => tick.getBoundingClientRect());
+      const labelCollisions: string[] = [];
+      for (let left = 0; left < labels.length; left += 1) {
+        for (let right = left + 1; right < labels.length; right += 1) {
+          if (intersects(labels[left].rect, labels[right].rect)) {
+            labelCollisions.push(`${labels[left].id}×${labels[right].id}`);
+          }
+        }
+      }
+      const stationCollisions: string[] = [];
+      for (let left = 0; left < stations.length; left += 1) {
+        for (let right = left + 1; right < stations.length; right += 1) {
+          if (intersects(stations[left].rect, stations[right].rect, 1)) {
+            stationCollisions.push(`${stations[left].id}×${stations[right].id}`);
+          }
+        }
+      }
+      const tickCollisions = ticks.some((tick, index) =>
+        ticks.slice(index + 1).some((candidate) => intersects(tick, candidate, 4)),
+      );
+      const canvas = element.querySelector<HTMLElement>('[data-network-canvas]')!;
+      const renaissance = labels.find((label) => label.id === 'italian-renaissance');
+      const baroque = labels.find((label) => label.id === 'baroque');
+
+      return {
+        stationCount: stations.length,
+        stationOverflow: stations.filter(({ rect }) => !inside(rect)).map(({ id }) => id),
+        stationCollisions,
+        regionCount: lanes.length,
+        regionOverflow: lanes
+          .filter(
+            ({ rect, labelRect }) =>
+              rect.top < graphRect.top - 1 ||
+              rect.bottom > graphRect.bottom + 1 ||
+              !inside(labelRect),
+          )
+          .map(({ region }) => region),
+        labelIds: labels.map(({ id }) => id),
+        labelCollisions,
+        tickCollisions,
+        canvasH: Math.round(canvas.getBoundingClientRect().height),
+        maxLaneHeight: Math.max(...lanes.map((lane) => lane.height)),
+        renaissanceBaroqueCollision:
+          renaissance && baroque
+            ? intersects(renaissance.rect, baroque.rect)
+            : false,
+      };
+    });
+
+    expect(metrics.stationCount).toBe(16);
+    expect(metrics.stationOverflow).toEqual([]);
+    expect(metrics.stationCollisions).toEqual([]);
+    expect(metrics.regionCount).toBe(10);
+    expect(metrics.regionOverflow).toEqual([]);
+    expect(metrics.labelIds).toEqual([
+      'italian-renaissance',
+      'impressionism',
+      'cubism',
+      'abstract-expressionism',
+      'minimalism',
+    ]);
+    expect(metrics.labelCollisions).toEqual([]);
+    expect(metrics.tickCollisions).toBe(false);
+    expect(metrics.renaissanceBaroqueCollision).toBe(false);
+    expect(metrics.canvasH).toBeLessThanOrEqual(viewport.height === 844 ? 450 : 480);
+    expect(metrics.maxLaneHeight).toBeLessThanOrEqual(56);
+  });
+}
+
 for (const [movementId, movementName] of [
   ['italian-renaissance', 'イタリア・ルネサンス'],
   ['abstract-expressionism', '抽象表現主義'],
