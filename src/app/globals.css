@@ -4782,16 +4782,16 @@ html.dark .chronology-era--digital {
 }
 
 .movements-directory-toolbar {
-  position: static;
-  display: grid;
-  gap: 0.7rem;
-  padding-block: 0.35rem 0;
-}
-
-.movements-directory-controls {
   position: sticky;
   top: calc(4.25rem + env(safe-area-inset-top));
   z-index: 30;
+  display: grid;
+  gap: 0.7rem;
+  padding-block: 0.35rem 0.65rem;
+}
+
+.movements-directory-controls {
+  position: static;
   margin-top: 0.7rem;
   padding-bottom: 0.65rem;
 }
@@ -5308,7 +5308,7 @@ html.dark .chronology-era--digital {
     background: rgb(var(--c-surface));
   }
 
-  .movements-directory-controls {
+  .movements-directory-toolbar {
     top: 1rem;
   }
 
