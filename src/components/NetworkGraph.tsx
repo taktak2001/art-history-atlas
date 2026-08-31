@@ -341,8 +341,12 @@ export function NetworkGraph({ movements, relationships, eraOrder }: Props) {
     return () => media.removeEventListener('change', update);
   }, []);
 
-  // ?mode= を単一の共有状態として扱う。?focus= だけが来た場合はFOCUSとして開く
-  useEffect(() => {
+  // ?mode= を単一の共有状態として扱う。?focus= だけが来た場合はFOCUSとして開く。
+  //
+  // カメラの自動フィットは useLayoutEffect で走るので、こちらも layout effect にする。
+  // passive effect のままだと、モードの倍率を入れる前に俯瞰フィットが要求され、
+  // その2パス目に倍率を奪われる（STUDYで開いても9%まで引かれてしまう）。
+  useLayoutEffect(() => {
     const readMode = () => {
       const params = new URL(window.location.href).searchParams;
       const parsed = parseNetworkMode(params.get('mode'));
