@@ -183,7 +183,7 @@ export function MovementsExplorer() {
 
   return (
     <div className="movements-directory-explorer">
-      <div className="movements-directory-toolbar" data-scroll-role="flow-search">
+      <div className="movements-directory-toolbar" data-scroll-role="sticky-search">
         <div className="movements-search">
           <label htmlFor="q" className="sr-only">ムーブメントを検索</label>
           <span className="movements-search__icon" aria-hidden="true">
@@ -205,7 +205,7 @@ export function MovementsExplorer() {
 
       </div>
 
-      <div className="movements-directory-controls" data-scroll-role="sticky-controls">
+      <div className="movements-directory-controls" data-scroll-role="flow-controls">
         <div className="movements-directory-toolbar__utilities">
           <button
             type="button"
